@@ -1,0 +1,6 @@
+dirs:
+  preemptive: '/data/Twist-Preemptive-Verification/'
+  reactive: '/data/Twist-Reactive-Verification/'
+  training: '/data/Twist-Training/'
+  modified_csvs: '/data/Modified_csvs/'
+  npys: '/data/Npy_files/'
