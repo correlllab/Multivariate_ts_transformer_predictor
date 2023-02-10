@@ -1,3 +1,5 @@
+target: 'preemptive'
+shuffle: False
 dirs:
   preemptive: '/data/Twist-Preemptive-Verification/'
   reactive: '/data/Twist-Reactive-Verification/'
