@@ -128,7 +128,9 @@ class DataManager:
         return failed
 
     # from James' notebook https://github.com/correlllab/Efficiency_from_Failure_Classification/blob/master/RAL2022/00_FCN-1.ipynb section 'Load Data'
-    def load_files_to_np_array(self, dir: str, extension: str, shufle: bool = False, verbose: bool = False):
+    # '*.npy' is the default extension due to speed advantages (also reading from csv can derive in unexpected behavior if
+    # csv files not treated properly first, i.e. need to be modified)
+    def load_files_to_np_array(self, dir: str, extension: str = '*.npy', shufle: bool = False, verbose: bool = False):
         if extension not in ['*.npy', '*.csv']:
             if verbose:
                 print('File extension not supported')
