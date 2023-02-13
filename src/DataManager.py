@@ -7,10 +7,11 @@ import matplotlib.pyplot as plt
 import yaml
 import csv
 from dateutil.parser import parse
+from YamlLoader import YamlLoader
 
 
 class DataManager:
-    def __init__(self, main_path: str, config: dict):
+    def __init__(self, main_path: str, config: dict) -> None:
         self.main_path = main_path
         self.preemptive = self.main_path + config['dirs']['preemptive']
         self.reactive = self.main_path + config['dirs']['reactive']
@@ -189,11 +190,13 @@ if __name__ == '__main__':
     MAIN_PATH = os.path.dirname(os.path.dirname(__file__))
     SRC_PATH = os.path.dirname(os.path.realpath(__file__))
 
-    with open('src/config/data_config.yaml', 'r') as config_file:
+    yl = YamlLoader()
+    conf = yl.load_yaml(path='src/config/data_config.yaml')
+    """ with open('src/config/data_config.yaml', 'r') as config_file:
         try:
             conf = yaml.safe_load(config_file)
         except yaml.YAMLError as e:
-            print('ERROR:' + e)
+            print('ERROR:' + e) """
 
 
     dm = DataManager(main_path=MAIN_PATH, config=conf)
