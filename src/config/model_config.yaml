@@ -1,0 +1,24 @@
+# Notation from https://machinelearningmastery.com/the-transformer-model/
+encoder:
+  head_size: 256
+  num_heads: 4 # h
+  dropout: 0.25
+  epsilon: 1e-6
+  ff_dim: 4
+  kernel_size: 1
+  activation: relu
+build: 
+  num_transformer_blocks: 4 # N
+  mlp_units: [128]
+  mlp_dropout: 0.4
+compile:
+  loss: sparse_categorical_crossentropy
+  lr: 1e-4
+  metrics: ["sparse_categorical_accuracy"]
+calbacks:
+  patience: 10
+  best_w: True
+fit:
+  val_split: 0.2
+  epochs: 200
+  batch_size: 64
