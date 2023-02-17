@@ -94,12 +94,12 @@ class DataManager:
     def create_npy_files(self, in_dir: str, out_dir: str, ext_name: str = '', time_col: int = 0, verbose: bool = False):
         """ Create npy files from csvs in 'in_dir' and saves them in 'out_dir' """
 
+        in_dir_exists = self._ensure_dir_exists(dir=in_dir, dir_type='read')
+        out_dir_exists = self._ensure_dir_exists(dir=out_dir, dir_type='write')
+
         # Start by removing all files in out_dir (avoid duplicates!)
         for f in os.listdir(out_dir):
             os.remove(os.path.join(out_dir, f))
-
-        in_dir_exists = self._ensure_dir_exists(dir=in_dir, dir_type='read')
-        out_dir_exists = self._ensure_dir_exists(dir=out_dir, dir_type='write')
 
         if verbose:
             print("The input  directory is" , in_dir  , "Exists?:" , in_dir_exists)
@@ -260,6 +260,7 @@ def make_plot(data, st_data, pad_data):
 
 
 if __name__ == '__main__':
+    # System and Tensorflow checks ----------------------------------------------------------------
     print( sys.version )
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # INFO and WARNING messages are not printed
     gpus = tensorflow.config.experimental.list_physical_devices(device_type='GPU')
@@ -276,6 +277,7 @@ if __name__ == '__main__':
     print( "Tensorflow sees the following devices:" )
     for dev in devices:
         print( f"\t{dev}" )
+    # ---------------------------------------------------------------------------------------------
     
     MAIN_PATH = os.path.dirname(os.path.dirname(__file__))
     SRC_PATH = os.path.dirname(os.path.realpath(__file__))
@@ -290,29 +292,34 @@ if __name__ == '__main__':
 
 
     dm = DataManager(main_path=MAIN_PATH, config=conf)
-    # failed = dm.create_npy_files(
-    #             in_dir=MAIN_PATH+conf['dirs'][conf['target']],
-    #             out_dir=MAIN_PATH+conf['dirs']['npys'],
-    #             ext_name=conf['target']
-    #          )
-    # print(f'The following .npy files failed to create: {failed}')
-    # ---------------------------------------------------------------
-    # d = dm.load_files_to_np_array(
-    #     dir=MAIN_PATH+conf['dirs']['npys'],
-    #     extension='*.npy',
-    #     shufle=conf['shuffle'],
-    #     verbose=True
-    # )
+    if conf['create_npys']:
+        for target in conf['targets']:
+            failed = dm.create_npy_files(
+                        in_dir=MAIN_PATH+conf['dirs'][target],
+                        out_dir=MAIN_PATH+conf['dirs']['npys']+target+'/',
+                        ext_name=target
+                    )
+            print(f'The following .npy files failed to create for target {target}: \n{failed}')
 
-    failed, data, st_data, pad_data = dm.run_pipeline(
-        files_dir=MAIN_PATH + conf['dirs']['npys']
-    )
 
-    print(f'The following files failed to load:\n{failed}')
+    data_dict = {k: None for k in conf['targets']}
+    for target in conf['targets']:
+        failed, data, st_data, pad_data = dm.run_pipeline(
+            files_dir=MAIN_PATH + conf['dirs']['npys'] + target + '/'
+        )
 
-    plot = False
+        data_dict[target] = {
+            'failed': failed,
+            'data': data,
+            'st_data': st_data,
+            'pad_data': pad_data
+        }
 
-    if plot:
-        make_plot(data, st_data, pad_data)
+        # print(f'The following files failed to load:\n{failed}')
 
-    print(failed, data, st_data, pad_data)
+        # plot = False
+
+        # if plot:
+        #     make_plot(data, st_data, pad_data)
+
+        print(failed, data, st_data, pad_data)
