@@ -10,6 +10,7 @@ import random
 from sklearn.preprocessing import RobustScaler
 from copy import deepcopy
 import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
 
 
 class DataManager:
@@ -20,11 +21,13 @@ class DataManager:
         self.shuffle = config['shuffle']
         self.dirs = config['dirs']
         self.npys = config['dirs']['npys']
+        self.test_split = config['test_split']
+        self.val_split = config['val_split']
         # self.preemptive = self.main_path + config['dirs']['preemptive']
         # self.reactive = self.main_path + config['dirs']['reactive']
         # self.training = self.main_path + config['dirs']['training']
         # self.csvs = self.main_path + config['dirs']['modified_csvs']
-        
+
 
 
     def modify_csv_files(self):
@@ -183,6 +186,7 @@ class DataManager:
         """ Creates files for a certain extension (only .npy extension implemented) """
 
         data_dict = {k: None for k in self.targets}
+        max_len = 0
 
         for target in self.targets:
             print(f'Running pipeline for target {target}...')
@@ -209,25 +213,66 @@ class DataManager:
                 transformer = RobustScaler().fit(d[:, 1:7])
                 st_data[index][:, 1:7] = transformer.transform(d[:, 1:7])
 
-            # Transpose and add zero padding
-            pad_data = deepcopy(st_data)
-            max_len = np.max([d.shape[0] for d in pad_data])
-            for index, d in enumerate(pad_data):
-                pad_data[index] = np.pad(d.transpose(), ((0, 0), (0, max_len - d.shape[0])), mode='constant')
-
-            # return failed, data, st_data, np.array(pad_data)
             data_dict[target] = {
                 'failed': failed,
                 'data': data,
                 'st_data': st_data,
-                'pad_data': np.array(pad_data)
+                'pad_data': None
             }
+
+            max_target_len = np.max([d.shape[0] for d in st_data])
+            if max_target_len >= max_len:
+                max_len = max_target_len
+
+        for target in self.targets:
+            # Transpose and add zero padding
+            pad_data = deepcopy(data_dict[target]['st_data'])
+            # max_len = np.max([d.shape[0] for d in pad_data])
+            for index, d in enumerate(pad_data):
+                pad_data[index] = np.pad(d.transpose(), ((0, 0), (0, max_len - d.shape[0])), mode='constant')
+
+            data_dict[target]['pad_data'] = np.array(pad_data)
 
             print('DONE')
             if verbose:
                 print(f'The following files failed to load for target {target}:\n{failed}')
 
         return data_dict
+
+
+    def _generate_x_y(self, data: np.array = []):
+        x = np.array([])
+        y = np.array([])
+        for trial in data:
+            # No se per que pero funciona, NO TOCAR
+            if not x.any():
+                x = np.array([trial[:6, :]])
+            else:
+                x = np.concatenate((np.array(x), np.array([trial[:6, :]])))
+
+            y = np.append(y, trial[7, 0])
+
+        return x, y
+
+
+    def load_train_test_data(self, data_dict: dict = {}):
+        preemptive = data_dict['preemptive']['pad_data']
+        reactive = data_dict['reactive']['pad_data']
+        # training = data_dict['training']['pad_data']
+
+        full_data = np.concatenate((preemptive, reactive))
+
+        test_indices = np.random.choice(range(full_data.shape[0]), int(full_data.shape[0] * self.test_split), replace=False)
+        train_indices = [el for el in range(full_data.shape[0]) if el not in test_indices]
+
+        x_train, y_train = self._generate_x_y(full_data[train_indices])
+        x_test, y_test = self._generate_x_y(full_data[test_indices])
+
+        return (x_train, y_train), (x_test, y_test)
+    
+
+    def load_train_val_data(self, x: np.array = [], y: np.array = [], shuffle: bool = False):
+        return train_test_split(x, y, test_size=self.val_split, stratify=y, shuffle=shuffle)
 
 
 
@@ -333,6 +378,13 @@ if __name__ == '__main__':
     print(f'Preemptive: {data_dict["preemptive"]["pad_data"].shape}')
     print(f'Reactive: {data_dict["reactive"]["pad_data"].shape}')
     print(f'Training: {data_dict["training"]["pad_data"].shape}')
+
+    # full_data = dm.load_train_test_data(data_dict=data_dict)
+    # print(f'Full data: {full_data.shape}')
+
+    (x_train, y_train), (x_test, y_test) = dm.load_train_test_data(data_dict=data_dict)
+    x_train, x_val, y_train, y_val = dm.load_train_val_data(x=x_train, y=y_train, shuffle=True)
+
 
     # data_dict = {k: None for k in conf['targets']}
     # for target in conf['targets']:
