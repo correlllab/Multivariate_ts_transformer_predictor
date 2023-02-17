@@ -50,3 +50,9 @@ coverage.xml
 
 # Sphinx documentation
 docs/_build/
+
+# MacOs stuff
+.DS_Store
+
+# Locked csv files
+*.csv#
