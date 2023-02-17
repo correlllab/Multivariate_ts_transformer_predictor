@@ -1,4 +1,4 @@
-create_npys: False
+create_npys: True
 targets: ['preemptive', 'reactive', 'training']
 shuffle: False
 dirs:

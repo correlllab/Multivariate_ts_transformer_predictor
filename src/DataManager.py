@@ -19,11 +19,12 @@ class DataManager:
         self.targets = config['targets']
         self.shuffle = config['shuffle']
         self.dirs = config['dirs']
-        self.preemptive = self.main_path + config['dirs']['preemptive']
-        self.reactive = self.main_path + config['dirs']['reactive']
-        self.training = self.main_path + config['dirs']['training']
-        self.csvs = self.main_path + config['dirs']['modified_csvs']
-        self.npys = self.main_path + config['dirs']['npys']
+        self.npys = config['dirs']['npys']
+        # self.preemptive = self.main_path + config['dirs']['preemptive']
+        # self.reactive = self.main_path + config['dirs']['reactive']
+        # self.training = self.main_path + config['dirs']['training']
+        # self.csvs = self.main_path + config['dirs']['modified_csvs']
+        
 
 
     def modify_csv_files(self):
@@ -95,48 +96,45 @@ class DataManager:
 
 
     # adapted from James' 'csv_to_npy_dir' function in https://github.com/correlllab/Efficiency_from_Failure_Classification/blob/83220b03ef4c41ebe2a57eb1a3324a75da8c8426/RAL2022/data_processing.py#L75
-    def create_npy_files(self, time_col: int = 0, verbose: bool = False):
+    def create_npy_files(self, target: str = '', time_col: int = 0, verbose: bool = False):
         """ Create npy files from csvs in 'in_dir' and saves them in 'out_dir' """
 
-        failed = {k: None for k in self.targets}
-        for target in self.targets:
-            in_dir = self.main_path + self.dirs[target]
-            out_dir = self.main_path + self.npys + target + '/'
-            ext_name = target
+        in_dir = self.main_path + self.dirs[target]
+        out_dir = self.main_path + self.npys + target + '/'
+        ext_name = target
 
-            in_dir_exists = self._ensure_dir_exists(dir=in_dir, dir_type='read')
-            out_dir_exists = self._ensure_dir_exists(dir=out_dir, dir_type='write')
+        in_dir_exists = self._ensure_dir_exists(dir=in_dir, dir_type='read')
+        out_dir_exists = self._ensure_dir_exists(dir=out_dir, dir_type='write')
 
-            # Start by removing all files in out_dir (avoid duplicates!)
-            for f in os.listdir(out_dir):
-                os.remove(os.path.join(out_dir, f))
+        # Start by removing all files in out_dir (avoid duplicates!)
+        for f in os.listdir(out_dir):
+            os.remove(os.path.join(out_dir, f))
 
+        if verbose:
+            print("The input  directory is" , in_dir  , "Exists?:" , in_dir_exists)
+            print("The output directory is" , out_dir , "Exists?:" , out_dir_exists)
+
+        if (in_dir_exists and out_dir_exists):
+            files = os.listdir(in_dir)
             if verbose:
-                print("The input  directory is" , in_dir  , "Exists?:" , in_dir_exists)
-                print("The output directory is" , out_dir , "Exists?:" , out_dir_exists)
+                print( "There are" , len(files) , "files to process in this directory\n" )
 
-            if (in_dir_exists and out_dir_exists):
-                # TODO: create npy files from csvs inside 'in_dir'
-                files = os.listdir(in_dir)
+            failed = []
+            for f in files:
+                full_path = in_dir + f
                 if verbose:
-                    print( "There are" , len(files) , "files to process in this directory\n" )
-
-                failed = []
-                for f in files:
-                    full_path = in_dir + f
+                    print(f'Processing {full_path} ...')
+                
+                try:
+                    _ = self._csv_to_npy(input_file=full_path, out_dir=out_dir, extended_name=ext_name)
+                except Exception as e:
+                    failed.append(f)
                     if verbose:
-                        print(f'Processing {full_path} ...')
-                    
-                    try:
-                        _ = self._csv_to_npy(input_file=full_path, out_dir=out_dir, extended_name=ext_name)
-                    except Exception as e:
-                        failed.append(f)
-                        if verbose:
-                            print(f'Conversion failed for {f} with error: {e}')
-            elif not in_dir_exists and verbose:
-                print('in_dir does not exist')
-            elif not out_dir_exists and verbose:
-                print('out_dir does not exist and could not be created')
+                        print(f'Conversion failed for {f} with error: {e}')
+        elif not in_dir_exists and verbose:
+            print('in_dir does not exist')
+        elif not out_dir_exists and verbose:
+            print('out_dir does not exist and could not be created')
 
         return failed
 
@@ -169,7 +167,9 @@ class DataManager:
                 succ += 1
             elif mat[0, 7] == 0:
                 fail += 1
-            data.append(mat)
+            # Cut the last column (if it even exists) cause it is not important and by doing this all datasets,
+            # for all the targets will have same amount of rows (vars)
+            data.append(mat[:, :9])
 
         if verbose and data:
             print(f'Created {len(data)} episode matrices')
@@ -179,34 +179,55 @@ class DataManager:
         return data
 
 
-    def run_pipeline(self, files_dir: str, in_dir: str = '', out_dir: str = '', file_extension: str = '*.npy', update_files: bool = False, verbose: bool = False):
-        # TODO: take loop in the main and adapt it here so that function uses self objects instead of passing by value
-        files = glob.glob(files_dir + file_extension)
+    def run_pipeline(self, file_extension: str = '*.npy', verbose: bool = False):
+        """ Creates files for a certain extension (only .npy extension implemented) """
 
-        # Check if files of the extension type exist in dir
-        # If files do not exist, create them
-        failed = []
-        if not files or update_files:
+        data_dict = {k: None for k in self.targets}
+
+        for target in self.targets:
+            print(f'Running pipeline for target {target}...')
             if file_extension == '*.npy':
-                failed = self.create_npy_files()
+                files_dir = self.main_path + self.dirs['npys'] + target + '/'
+            files = glob.glob(files_dir + file_extension)
 
-        # Load files data into np array
-        data = self.load_files_to_np_array(dir=files_dir, extension=file_extension)
+            # Check if files of the extension type exist in dir
+            # If files do not exist, create them
+            failed = []
+            if not files or self.create_npys:
+                if file_extension == '*.npy':
+                    print('-> Creating npy files')
+                    failed = self.create_npy_files(target=target)
 
-        # Apply standarization only to F-T columns (i.e. rows 1:6 all included, with 1:7 np excludes 7 so its 1 to 6)
-        st_data = deepcopy(data)
-        for index, d in enumerate(st_data):
-            transformer = RobustScaler().fit(d[:, 1:7])
-            st_data[index][:, 1:7] = transformer.transform(d[:, 1:7])
+            # Load files data into np array
+            print('-> Loading files to np array')
+            data = self.load_files_to_np_array(dir=files_dir, extension=file_extension)
 
-        # Transpose and add zero padding
-        pad_data = deepcopy(st_data)
-        max_len = np.max([d.shape[0] for d in pad_data])
-        for index, d in enumerate(pad_data):
-            pad_data[index] = np.pad(d.transpose(), ((0, 0), (0, max_len - d.shape[0])), mode='constant')
+            # Apply standarization only to F-T columns (i.e. rows 1:6 all included, with 1:7 np excludes 7 so its 1 to 6)
+            print('-> Applying transforms')
+            st_data = deepcopy(data)
+            for index, d in enumerate(st_data):
+                transformer = RobustScaler().fit(d[:, 1:7])
+                st_data[index][:, 1:7] = transformer.transform(d[:, 1:7])
 
-        return failed, data, st_data, np.array(pad_data)
+            # Transpose and add zero padding
+            pad_data = deepcopy(st_data)
+            max_len = np.max([d.shape[0] for d in pad_data])
+            for index, d in enumerate(pad_data):
+                pad_data[index] = np.pad(d.transpose(), ((0, 0), (0, max_len - d.shape[0])), mode='constant')
 
+            # return failed, data, st_data, np.array(pad_data)
+            data_dict[target] = {
+                'failed': failed,
+                'data': data,
+                'st_data': st_data,
+                'pad_data': np.array(pad_data)
+            }
+
+            print('DONE')
+            if verbose:
+                print(f'The following files failed to load for target {target}:\n{failed}')
+
+        return data_dict
 
 
 
@@ -303,34 +324,34 @@ if __name__ == '__main__':
 
 
     dm = DataManager(main_path=MAIN_PATH, config=conf)
-    if conf['create_npys']:
-        for target in conf['targets']:
-            failed = dm.create_npy_files(
-                        in_dir=MAIN_PATH+conf['dirs'][target],
-                        out_dir=MAIN_PATH+conf['dirs']['npys']+target+'/',
-                        ext_name=target
-                    )
-            print(f'The following .npy files failed to create for target {target}: \n{failed}')
+    # if conf['create_npys']:
+    #     for target in conf['targets']:
+    #         failed = dm.create_npy_files()
+    #         print(f'The following .npy files failed to create for target {target}: \n{failed}')
 
+    data_dict = dm.run_pipeline()
+    print(f'Preemptive: {data_dict["preemptive"]["pad_data"].shape}')
+    print(f'Reactive: {data_dict["reactive"]["pad_data"].shape}')
+    print(f'Training: {data_dict["training"]["pad_data"].shape}')
 
-    data_dict = {k: None for k in conf['targets']}
-    for target in conf['targets']:
-        failed, data, st_data, pad_data = dm.run_pipeline(
-            files_dir=MAIN_PATH + conf['dirs']['npys'] + target + '/'
-        )
+    # data_dict = {k: None for k in conf['targets']}
+    # for target in conf['targets']:
+    #     failed, data, st_data, pad_data = dm.run_pipeline(
+    #         files_dir=MAIN_PATH + conf['dirs']['npys'] + target + '/'
+    #     )
 
-        data_dict[target] = {
-            'failed': failed,
-            'data': data,
-            'st_data': st_data,
-            'pad_data': pad_data
-        }
+    #     data_dict[target] = {
+    #         'failed': failed,
+    #         'data': data,
+    #         'st_data': st_data,
+    #         'pad_data': pad_data
+    #     }
 
-        # print(f'The following files failed to load:\n{failed}')
+    #     # print(f'The following files failed to load:\n{failed}')
 
-        # plot = False
+    #     # plot = False
 
-        # if plot:
-        #     make_plot(data, st_data, pad_data)
+    #     # if plot:
+    #     #     make_plot(data, st_data, pad_data)
 
-        print(failed, data, st_data, pad_data)
+    #     print(failed, data, st_data, pad_data)
