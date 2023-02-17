@@ -15,6 +15,10 @@ import matplotlib.pyplot as plt
 class DataManager:
     def __init__(self, main_path: str, config: dict) -> None:
         self.main_path = main_path
+        self.create_npys = config['create_npys']
+        self.targets = config['targets']
+        self.shuffle = config['shuffle']
+        self.dirs = config['dirs']
         self.preemptive = self.main_path + config['dirs']['preemptive']
         self.reactive = self.main_path + config['dirs']['reactive']
         self.training = self.main_path + config['dirs']['training']
@@ -91,42 +95,48 @@ class DataManager:
 
 
     # adapted from James' 'csv_to_npy_dir' function in https://github.com/correlllab/Efficiency_from_Failure_Classification/blob/83220b03ef4c41ebe2a57eb1a3324a75da8c8426/RAL2022/data_processing.py#L75
-    def create_npy_files(self, in_dir: str, out_dir: str, ext_name: str = '', time_col: int = 0, verbose: bool = False):
+    def create_npy_files(self, time_col: int = 0, verbose: bool = False):
         """ Create npy files from csvs in 'in_dir' and saves them in 'out_dir' """
 
-        in_dir_exists = self._ensure_dir_exists(dir=in_dir, dir_type='read')
-        out_dir_exists = self._ensure_dir_exists(dir=out_dir, dir_type='write')
+        failed = {k: None for k in self.targets}
+        for target in self.targets:
+            in_dir = self.main_path + self.dirs[target]
+            out_dir = self.main_path + self.npys + target + '/'
+            ext_name = target
 
-        # Start by removing all files in out_dir (avoid duplicates!)
-        for f in os.listdir(out_dir):
-            os.remove(os.path.join(out_dir, f))
+            in_dir_exists = self._ensure_dir_exists(dir=in_dir, dir_type='read')
+            out_dir_exists = self._ensure_dir_exists(dir=out_dir, dir_type='write')
 
-        if verbose:
-            print("The input  directory is" , in_dir  , "Exists?:" , in_dir_exists)
-            print("The output directory is" , out_dir , "Exists?:" , out_dir_exists)
+            # Start by removing all files in out_dir (avoid duplicates!)
+            for f in os.listdir(out_dir):
+                os.remove(os.path.join(out_dir, f))
 
-        if (in_dir_exists and out_dir_exists):
-            # TODO: create npy files from csvs inside 'in_dir'
-            files = os.listdir(in_dir)
             if verbose:
-                print( "There are" , len(files) , "files to process in this directory\n" )
+                print("The input  directory is" , in_dir  , "Exists?:" , in_dir_exists)
+                print("The output directory is" , out_dir , "Exists?:" , out_dir_exists)
 
-            failed = []
-            for f in files:
-                full_path = in_dir + f
+            if (in_dir_exists and out_dir_exists):
+                # TODO: create npy files from csvs inside 'in_dir'
+                files = os.listdir(in_dir)
                 if verbose:
-                    print(f'Processing {full_path} ...')
-                
-                try:
-                    _ = self._csv_to_npy(input_file=full_path, out_dir=out_dir, extended_name=ext_name)
-                except Exception as e:
-                    failed.append(f)
+                    print( "There are" , len(files) , "files to process in this directory\n" )
+
+                failed = []
+                for f in files:
+                    full_path = in_dir + f
                     if verbose:
-                        print(f'Conversion failed for {f} with error: {e}')
-        elif not in_dir_exists and verbose:
-            print('in_dir does not exist')
-        elif not out_dir_exists and verbose:
-            print('out_dir does not exist and could not be created')
+                        print(f'Processing {full_path} ...')
+                    
+                    try:
+                        _ = self._csv_to_npy(input_file=full_path, out_dir=out_dir, extended_name=ext_name)
+                    except Exception as e:
+                        failed.append(f)
+                        if verbose:
+                            print(f'Conversion failed for {f} with error: {e}')
+            elif not in_dir_exists and verbose:
+                print('in_dir does not exist')
+            elif not out_dir_exists and verbose:
+                print('out_dir does not exist and could not be created')
 
         return failed
 
@@ -170,6 +180,7 @@ class DataManager:
 
 
     def run_pipeline(self, files_dir: str, in_dir: str = '', out_dir: str = '', file_extension: str = '*.npy', update_files: bool = False, verbose: bool = False):
+        # TODO: take loop in the main and adapt it here so that function uses self objects instead of passing by value
         files = glob.glob(files_dir + file_extension)
 
         # Check if files of the extension type exist in dir
@@ -177,7 +188,7 @@ class DataManager:
         failed = []
         if not files or update_files:
             if file_extension == '*.npy':
-                failed = self.create_npy_files(in_dir=in_dir, out_dir=out_dir, ext_name=file_extension)
+                failed = self.create_npy_files()
 
         # Load files data into np array
         data = self.load_files_to_np_array(dir=files_dir, extension=file_extension)
