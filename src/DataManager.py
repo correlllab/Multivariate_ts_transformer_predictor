@@ -3,11 +3,13 @@ import glob
 import pandas as pd
 import numpy as np
 import tensorflow
-import matplotlib.pyplot as plt
-import yaml
 import csv
 from dateutil.parser import parse
 from YamlLoader import YamlLoader
+import random
+from sklearn.preprocessing import RobustScaler
+from copy import deepcopy
+import matplotlib.pyplot as plt
 
 
 class DataManager:
@@ -92,12 +94,12 @@ class DataManager:
     def create_npy_files(self, in_dir: str, out_dir: str, ext_name: str = '', time_col: int = 0, verbose: bool = False):
         """ Create npy files from csvs in 'in_dir' and saves them in 'out_dir' """
 
+        in_dir_exists = self._ensure_dir_exists(dir=in_dir, dir_type='read')
+        out_dir_exists = self._ensure_dir_exists(dir=out_dir, dir_type='write')
+
         # Start by removing all files in out_dir (avoid duplicates!)
         for f in os.listdir(out_dir):
             os.remove(os.path.join(out_dir, f))
-
-        in_dir_exists = self._ensure_dir_exists(dir=in_dir, dir_type='read')
-        out_dir_exists = self._ensure_dir_exists(dir=out_dir, dir_type='write')
 
         if verbose:
             print("The input  directory is" , in_dir  , "Exists?:" , in_dir_exists)
@@ -131,7 +133,7 @@ class DataManager:
     # from James' notebook https://github.com/correlllab/Efficiency_from_Failure_Classification/blob/master/RAL2022/00_FCN-1.ipynb section 'Load Data'
     # '*.npy' is the default extension due to speed advantages (also reading from csv can derive in unexpected behavior if
     # csv files not treated properly first, i.e. need to be modified)
-    def load_files_to_np_array(self, dir: str, extension: str = '*.npy', shufle: bool = False, verbose: bool = False):
+    def load_files_to_np_array(self, dir: str, extension: str = '*.npy', shuffle: bool = False, verbose: bool = False):
         if extension not in ['*.npy', '*.csv']:
             if verbose:
                 print('File extension not supported')
@@ -141,8 +143,8 @@ class DataManager:
         if verbose:
             print(f'Found {len(files)} {extension} files')
 
-        if shufle:
-            shufle(files)
+        if shuffle:
+            random.shuffle(files)
 
         data = []
         succ = 0
@@ -167,9 +169,98 @@ class DataManager:
         return data
 
 
+    def run_pipeline(self, files_dir: str, in_dir: str = '', out_dir: str = '', file_extension: str = '*.npy', update_files: bool = False, verbose: bool = False):
+        files = glob.glob(files_dir + file_extension)
+
+        # Check if files of the extension type exist in dir
+        # If files do not exist, create them
+        failed = []
+        if not files or update_files:
+            if file_extension == '*.npy':
+                failed = self.create_npy_files(in_dir=in_dir, out_dir=out_dir, ext_name=file_extension)
+
+        # Load files data into np array
+        data = self.load_files_to_np_array(dir=files_dir, extension=file_extension)
+
+        # Apply standarization only to F-T columns (i.e. rows 1:6 all included, with 1:7 np excludes 7 so its 1 to 6)
+        st_data = deepcopy(data)
+        for index, d in enumerate(st_data):
+            transformer = RobustScaler().fit(d[:, 1:7])
+            st_data[index][:, 1:7] = transformer.transform(d[:, 1:7])
+
+        # Transpose and add zero padding
+        pad_data = deepcopy(st_data)
+        max_len = np.max([d.shape[0] for d in pad_data])
+        for index, d in enumerate(pad_data):
+            pad_data[index] = np.pad(d.transpose(), ((0, 0), (0, max_len - d.shape[0])), mode='constant')
+
+        return failed, data, st_data, np.array(pad_data)
+
+
+
+
+def make_plot(data, st_data, pad_data):
+    d = data[8]
+    fx = d[:, 1]
+    fy = d[:, 2]
+    fz = d[:, 3]
+    tx = d[:, 4]
+    ty = d[:, 5]
+    tz = d[:, 6]
+
+    d = st_data[8]
+    st_fx = d[:, 1]
+    st_fy = d[:, 2]
+    st_fz = d[:, 3]
+    st_tx = d[:, 4]
+    st_ty = d[:, 5]
+    st_tz = d[:, 6]
+
+    fig, axs = plt.subplots(3, 2, figsize=(15, 15))
+
+    axs[0, 0].plot(fx)
+    axs[0, 0].plot(fy)
+    axs[0, 0].plot(fz)
+    axs[0, 0].set_title('Force')
+
+    axs[0, 1].plot(tx)
+    axs[0, 1].plot(ty)
+    axs[0, 1].plot(tz)
+    axs[0, 1].set_title('Torque')
+
+    axs[1, 0].plot(st_fx)
+    axs[1, 0].plot(st_fy)
+    axs[1, 0].plot(st_fz)
+    axs[1, 0].set_title('Standarized force')
+
+    axs[1, 1].plot(st_tx)
+    axs[1, 1].plot(st_ty)
+    axs[1, 1].plot(st_tz)
+    axs[1, 1].set_title('Standarized torque')
+
+    d = pad_data[8]
+    st_fx = d[1, :]
+    st_fy = d[2, :]
+    st_fz = d[3, :]
+    st_tx = d[4, :]
+    st_ty = d[5, :]
+    st_tz = d[6, :]
+
+    axs[2, 0].plot(st_fx)
+    axs[2, 0].plot(st_fy)
+    axs[2, 0].plot(st_fz)
+    axs[2, 0].set_title('Standarized force with padding')
+
+    axs[2, 1].plot(st_tx)
+    axs[2, 1].plot(st_ty)
+    axs[2, 1].plot(st_tz)
+    axs[2, 1].set_title('Standarized torque with padding')
+
+    plt.show()
 
 
 if __name__ == '__main__':
+    # System and Tensorflow checks ----------------------------------------------------------------
     print( sys.version )
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # INFO and WARNING messages are not printed
     gpus = tensorflow.config.experimental.list_physical_devices(device_type='GPU')
@@ -186,6 +277,7 @@ if __name__ == '__main__':
     print( "Tensorflow sees the following devices:" )
     for dev in devices:
         print( f"\t{dev}" )
+    # ---------------------------------------------------------------------------------------------
     
     MAIN_PATH = os.path.dirname(os.path.dirname(__file__))
     SRC_PATH = os.path.dirname(os.path.realpath(__file__))
@@ -200,16 +292,34 @@ if __name__ == '__main__':
 
 
     dm = DataManager(main_path=MAIN_PATH, config=conf)
-    """ failed = dm.create_npy_files(
-                in_dir=MAIN_PATH+conf['dirs'][conf['target']],
-                out_dir=MAIN_PATH+conf['dirs']['npys'],
-                ext_name=conf['target']
-             )
-    print(f'The following .npy files failed to create: {failed}') """
-    d = dm.load_files_to_np_array(
-        dir=MAIN_PATH+conf['dirs']['npys'],
-        extension='*.npy',
-        shufle=conf['shuffle'],
-        verbose=True
-    )
-    print(d)
+    if conf['create_npys']:
+        for target in conf['targets']:
+            failed = dm.create_npy_files(
+                        in_dir=MAIN_PATH+conf['dirs'][target],
+                        out_dir=MAIN_PATH+conf['dirs']['npys']+target+'/',
+                        ext_name=target
+                    )
+            print(f'The following .npy files failed to create for target {target}: \n{failed}')
+
+
+    data_dict = {k: None for k in conf['targets']}
+    for target in conf['targets']:
+        failed, data, st_data, pad_data = dm.run_pipeline(
+            files_dir=MAIN_PATH + conf['dirs']['npys'] + target + '/'
+        )
+
+        data_dict[target] = {
+            'failed': failed,
+            'data': data,
+            'st_data': st_data,
+            'pad_data': pad_data
+        }
+
+        # print(f'The following files failed to load:\n{failed}')
+
+        # plot = False
+
+        # if plot:
+        #     make_plot(data, st_data, pad_data)
+
+        print(failed, data, st_data, pad_data)

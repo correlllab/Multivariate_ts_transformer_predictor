@@ -1,4 +1,5 @@
-target: 'preemptive'
+create_npys: False
+targets: ['preemptive', 'reactive', 'training']
 shuffle: False
 dirs:
   preemptive: '/data/Twist-Preemptive-Verification/'
