@@ -1,6 +1,8 @@
-create_npys: True
+create_npys: False
 targets: ['preemptive', 'reactive', 'training']
 shuffle: False
+test_split: 0.2
+val_split: 0.2
 dirs:
   preemptive: '/data/Twist-Preemptive-Verification/'
   reactive: '/data/Twist-Reactive-Verification/'
