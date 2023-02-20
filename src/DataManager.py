@@ -117,12 +117,12 @@ class DataManager:
             print("The input  directory is" , in_dir  , "Exists?:" , in_dir_exists)
             print("The output directory is" , out_dir , "Exists?:" , out_dir_exists)
 
+        failed = []
         if (in_dir_exists and out_dir_exists):
             files = os.listdir(in_dir)
             if verbose:
                 print( "There are" , len(files) , "files to process in this directory\n" )
 
-            failed = []
             for f in files:
                 full_path = in_dir + f
                 if verbose:
@@ -188,6 +188,7 @@ class DataManager:
         data_dict = {k: None for k in self.targets}
         max_len = 0
 
+        failed_files = []
         for target in self.targets:
             print(f'Running pipeline for target {target}...')
             if file_extension == '*.npy':
@@ -196,11 +197,10 @@ class DataManager:
 
             # Check if files of the extension type exist in dir
             # If files do not exist, create them
-            failed = []
             if not files or self.create_npys:
                 if file_extension == '*.npy':
                     print('-> Creating npy files')
-                    failed = self.create_npy_files(target=target)
+                    failed_files = self.create_npy_files(target=target)
 
             # Load files data into np array
             print('-> Loading files to np array')
@@ -214,7 +214,7 @@ class DataManager:
                 st_data[index][:, 1:7] = transformer.transform(d[:, 1:7])
 
             data_dict[target] = {
-                'failed': failed,
+                'failed': failed_files,
                 'data': data,
                 'st_data': st_data,
                 'pad_data': None
@@ -235,7 +235,7 @@ class DataManager:
 
             print('DONE')
             if verbose:
-                print(f'The following files failed to load for target {target}:\n{failed}')
+                print(f'The following files failed to load for target {target}:\n{data_dict[target]["failed"]}')
 
         return data_dict
 
@@ -256,11 +256,17 @@ class DataManager:
 
 
     def load_train_test_data(self, data_dict: dict = {}):
-        preemptive = data_dict['preemptive']['pad_data']
-        reactive = data_dict['reactive']['pad_data']
+        # preemptive = data_dict['preemptive']['pad_data']
+        # reactive = data_dict['reactive']['pad_data']
         # training = data_dict['training']['pad_data']
+        # full_data = np.concatenate((preemptive, reactive))
 
-        full_data = np.concatenate((preemptive, reactive))
+        full_data = []
+        for k in data_dict.keys():
+            if not np.any(full_data):
+                full_data = data_dict[k]['pad_data']
+            else:
+                full_data = np.concatenate((full_data, data_dict[k]['pad_data']))
 
         test_indices = np.random.choice(range(full_data.shape[0]), int(full_data.shape[0] * self.test_split), replace=False)
         train_indices = [el for el in range(full_data.shape[0]) if el not in test_indices]
