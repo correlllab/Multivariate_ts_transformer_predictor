@@ -84,7 +84,7 @@ class Transformer:
         )
 
         self.model.compile(
-            loss="categorical_crossentropy",
+            loss="binary_focal_crossentropy",
             optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4),
             metrics=["categorical_accuracy"],
         )
@@ -92,7 +92,8 @@ class Transformer:
 
         checkpoint_filepath = './models/tmp/checkpoints/'
         callbacks = [
-            tf.keras.callbacks.EarlyStopping(patience=100, restore_best_weights=True),
+            # Early stopping might xause overfitting
+            #tf.keras.callbacks.EarlyStopping(patience=100, restore_best_weights=True),
             tf.keras.callbacks.ModelCheckpoint(
                 filepath=checkpoint_filepath,
                 save_weights_only=False,

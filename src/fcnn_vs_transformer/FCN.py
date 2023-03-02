@@ -71,8 +71,8 @@ class FCN:
                 learning_rate = 0.0010, # 0.0015 #0.002 # 0.004
                 momentum      = 0.125 #0.25 # 0.50 # 0.75
             ),
-            loss      = 'categorical_crossentropy', #'MSE' 
-            metrics=['accuracy']
+            loss      = 'binary_focal_crossentropy', #'MSE' 
+            metrics=['categorical_accuracy']
         )
 
 
@@ -100,8 +100,8 @@ class FCN:
     def plot_acc_loss(self):
         loss = self.history.history['loss']
         val_loss = self.history.history['val_loss']
-        accuracy = self.history.history['accuracy']
-        val_accuracy = self.history.history['val_accuracy']
+        accuracy = self.history.history['categorical_accuracy']
+        val_accuracy = self.history.history['val_categorical_accuracy']
 
         fig, axes = plt.subplots(2, 2, figsize=(20, 8))
         axes[0, 0].plot(accuracy, label='Training accuracy')
