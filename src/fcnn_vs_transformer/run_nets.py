@@ -42,7 +42,7 @@ fcn_net.make_probabilities_plots(X_winTest=dp.X_winTest, Y_winTest=dp.Y_winTest)
 
 transformer_net = Transformer()
 transformer_net.fit(X_train=dp.X_train, Y_train=dp.Y_train, X_test=dp.X_test, Y_test=dp.Y_test,
-                    trainWindows=dp.trainWindows, epochs=3, save_model=True)
+                    trainWindows=dp.trainWindows, epochs=2, save_model=True)
 transformer_net.plot_acc_loss()
 transformer_net.compute_confusion_matrix(X_winTest=dp.X_winTest, Y_winTest=dp.Y_winTest, plot=True)
 transformer_net.make_probabilities_plots(X_winTest=dp.X_winTest, Y_winTest=dp.Y_winTest)
