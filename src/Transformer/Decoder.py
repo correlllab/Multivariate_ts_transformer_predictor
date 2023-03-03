@@ -7,9 +7,9 @@ from tensorflow.keras import optimizers
 from tensorflow.keras import regularizers
 from YamlLoader import YamlLoader
 from MultiHeadAttention import MultiHeadAttention
-from AttentionLayers import BaseAttention, GlobalSelfAttention, CrossAttention, MultiHeadAttention, CausalSelfAttention
-from FeedForwardLayer import FeedForward
-from PositionalEncoding import PositionalEmbedding
+from Transformer.AttentionLayers import BaseAttention, GlobalSelfAttention, CrossAttention, MultiHeadAttention, CausalSelfAttention
+from Transformer.FeedForwardLayer import FeedForward
+from Transformer.PositionalEncoding import PositionalEmbedding
 
 # from https://www.tensorflow.org/text/tutorials/transformer#define_the_components
 # Decoder layer

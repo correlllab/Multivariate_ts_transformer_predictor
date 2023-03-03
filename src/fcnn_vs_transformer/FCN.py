@@ -72,7 +72,7 @@ class FCN:
                 momentum      = 0.125 #0.25 # 0.50 # 0.75
             ),
             loss      = 'binary_focal_crossentropy', #'MSE' 
-            metrics=['categorical_accuracy']
+            #metrics=['categorical_accuracy']
         )
 
 
@@ -100,19 +100,19 @@ class FCN:
     def plot_acc_loss(self):
         loss = self.history.history['loss']
         val_loss = self.history.history['val_loss']
-        accuracy = self.history.history['categorical_accuracy']
-        val_accuracy = self.history.history['val_categorical_accuracy']
+        # accuracy = self.history.history['categorical_accuracy']
+        # val_accuracy = self.history.history['val_categorical_accuracy']
 
         fig, axes = plt.subplots(2, 2, figsize=(20, 8))
-        axes[0, 0].plot(accuracy, label='Training accuracy')
-        axes[0, 0].title.set_text('Training accuracy over epochs')
+        # axes[0, 0].plot(accuracy, label='Training accuracy')
+        # axes[0, 0].title.set_text('Training accuracy over epochs')
         axes[0, 1].plot(np.array(loss), label='Training loss', color='orange')
         axes[0, 1].title.set_text('Training loss over epochs')
 
 
 
-        axes[1, 0].plot(val_accuracy, label='Validation accuracy')
-        axes[1, 0].title.set_text('Valiadation accuracy over epochs')
+        # axes[1, 0].plot(val_accuracy, label='Validation accuracy')
+        # axes[1, 0].title.set_text('Valiadation accuracy over epochs')
         axes[1, 1].plot(np.array(val_loss), label='Validation loss', color='orange')
         axes[1, 1].title.set_text('Valiadation loss over epochs')
 

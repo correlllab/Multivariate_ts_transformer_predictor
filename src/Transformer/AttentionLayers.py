@@ -38,6 +38,7 @@ class CrossAttention(BaseAttention):
 # MultiHeadAttention layer in the encoder
 class GlobalSelfAttention(BaseAttention):
     def call(self, x):
+        print(f'In encoder call(), input shape = {x.shape}')
         attn_output = self.mha(
             query=x,
             value=x,

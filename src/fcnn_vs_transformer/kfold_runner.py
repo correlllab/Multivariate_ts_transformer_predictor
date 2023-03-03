@@ -26,7 +26,7 @@ for dev in devices:
 
 from data_preprocessing import DataPreprocessing
 from FCN import FCN
-from Transformer import Transformer
+from VanillaTransformer import Transformer
 
 
 
@@ -49,22 +49,38 @@ if __name__ == "__main__":
 
     # K-fold Cross Validation model evaluation
     fold_no = 1
-    acc_per_fold = []
-    loss_per_fold = []
+    losses = {'fcn': [], 'transformer': []}
+    accs = {'fcn': [], 'transformer': []}
     for train, test in kfold.split(inputs, targets):
-        transformer_net = Transformer()
         # Generate a print
         print('------------------------------------------------------------------------')
         print(f'Training for fold {fold_no} ...')
-        transformer_net.fit(X_train=inputs[train], Y_train=targets[train], X_test=inputs[test], Y_test=targets[test],
-                            trainWindows=dp.trainWindows, epochs=2, save_model=False)
-        print(f'Score for fold {fold_no}: {transformer_net.model.metrics_names[0]} of {transformer_net.evaluation[0]}; {transformer_net.model.metrics_names[1]} of {transformer_net.evaluation[1]*100}%')
-        acc_per_fold.append(transformer_net.evaluation[1] * 100)
-        loss_per_fold.append(transformer_net.evaluation[0])
+        fcn_net = FCN(rolling_window_width=dp.rollWinWidth)
+        fcn_net.build()
+        fcn_net.fit(X_train=dp.X_train_under, Y_train=dp.Y_train_under, X_test=dp.X_test, Y_test=dp.Y_test,
+                    trainWindows=dp.trainWindows, epochs=50, save_model=False)
+        evaluation = fcn_net.model.evaluate(dp.X_test,dp.Y_test, verbose=0)
+        print(f'Score for fold {fold_no}: {fcn_net.model.metrics_names[0]} of {evaluation[0]}; {fcn_net.model.metrics_names[1]} of {evaluation[1]*100}%')
+        accs['fcn'].append(evaluation[1] * 100)
+        losses['fcn'].append(evaluation[0])
+
+        # transformer_net = Transformer()
+        # transformer_net.fit(X_train=inputs[train], Y_train=targets[train], X_test=inputs[test], Y_test=targets[test],
+        #                     trainWindows=dp.trainWindows, epochs=2, save_model=False)
+        # print(f'Score for fold {fold_no}: {transformer_net.model.metrics_names[0]} of {transformer_net.evaluation[0]}; {transformer_net.model.metrics_names[1]} of {transformer_net.evaluation[1]*100}%')
+        # accs['transformer'].append(transformer_net.evaluation[1] * 100)
+        # losses['transformer'].append(transformer_net.evaluation[0])
+
         fold_no += 1
 
-    fig, axes = plt.subplots(1, 2, figsize=(20, 8))
-    axes[0, 0].plot(acc_per_fold, label='Eval Accuracy per fold')
-    axes[0, 0].title.set_text('Eval Accuracy per fold')
-    axes[0, 1].plot(np.array(loss_per_fold), label='Eval Loss per fold', color='orange')
-    axes[0, 1].title.set_text('Eval Loss per fold')
+    fig, axes = plt.subplots(2, 2, figsize=(20, 8))
+
+    axes[0, 0].plot(accs['fcn'], label='FCN Eval Accuracy per fold')
+    axes[0, 0].title.set_text('FCN Eval Accuracy per fold')
+    axes[0, 1].plot(np.array(losses['fcn']), label='FCN Eval Loss per fold', color='orange')
+    axes[0, 1].title.set_text('FCN Eval Loss per fold')
+
+    axes[1, 0].plot(accs['transformer'], label='Transformer Eval Accuracy per fold')
+    axes[1, 0].title.set_text('Transformer Eval Accuracy per fold')
+    axes[1, 1].plot(np.array(losses['transformer']), label='Transformer Eval Loss per fold', color='orange')
+    axes[1, 1].title.set_text('Transformer Eval Loss per fold')

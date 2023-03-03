@@ -3,11 +3,13 @@ import sys, os, glob
 import numpy as np
 from random import shuffle
 from tensorflow.keras.utils import to_categorical
+from imblearn.under_sampling import RandomUnderSampler
+from imblearn.over_sampling import RandomOverSampler
 
 class DataPreprocessing:
     def __init__(self) -> None:
         self.datadir = os.path.join(os.path.abspath("./"), "comp_data/")
-        self.shuffle = 1
+        self.shuffle = True
         self.data = None
         self.truncData = None
         self.window_data = None
@@ -19,6 +21,8 @@ class DataPreprocessing:
         self.testWindows = 0
         self.X_train = None
         self.Y_train = None
+        self.X_train_under = None
+        self.Y_train_under = None
         self.X_test = None
         self.Y_test = None
         self.X_winTest = None
@@ -111,7 +115,7 @@ class DataPreprocessing:
 
 
     def stack_windows(self):
-        self.testFrac     = 0.20
+        self.testFrac     = 0.10
         self.N_ep         = len( self.window_data )
         self.N_test       = int(self.N_ep * self.testFrac)
         self.N_train      = self.N_ep - self.N_test
@@ -235,6 +239,19 @@ class DataPreprocessing:
         print( f"\nDONE! Captured {len(self.X_winTest)}/{len(self.Y_winTest)} TEST episodes." )
 
 
+    def balance_classes(self):
+        print('    ====> CLASSES DISTRIBUTION BEFORE:')
+        print(f'        Passes = {int(sum(self.Y_train[:,0]))}; Fails = {int(sum(self.Y_train[:,1]))}\n')
+
+        undersampler = RandomUnderSampler(sampling_strategy='majority')
+        undersampler.fit_resample(self.X_train[:,:,0], self.Y_train)
+        self.X_train_under = self.X_train[undersampler.sample_indices_]
+        self.Y_train_under = self.Y_train[undersampler.sample_indices_]
+
+        print('    ====> CLASSES DISTRIBUTION AFTER:')
+        print(f'        Passes = {int(sum(self.Y_train_under[:,0]))}; Fails = {int(sum(self.Y_train_under[:,1]))}\n')
+        print(self.X_train_under.shape, self.Y_train_under.shape)
+
     def run(self, verbose=False):
         if verbose:
             print('\n====> Loading data...\n')
@@ -252,4 +269,8 @@ class DataPreprocessing:
             print('\n====> Capturing test episodes...\n')
         self.capture_test_episodes()
         if verbose:
+            print('\n====> Balancing classes...\n')
+        self.balance_classes()
+        if verbose:
             print('\n====> Done preprocessing!\n')
+        _ = input('Continue?:')
