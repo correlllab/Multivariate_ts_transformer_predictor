@@ -38,13 +38,12 @@ class GatedTransformer(tf.keras.Model):
 
         self.linear_layer = layers.Dense(target_space_size, activation='relu')
 
-        self.softmax_layer = layers.Softmax()
+        # self.softmax_layer = layers.Softmax()
 
     def call(self, inputs):
         # inputs = tf.keras.Input(shape=inputs.shape)
         context, x = inputs
 
-        print(f'\ncontext shape = {context.shape}; x shape = {x.shape}\n')
         # Time channel tower
         context = self.encoder(context)
 
@@ -54,9 +53,9 @@ class GatedTransformer(tf.keras.Model):
         # TODO
         # x = self.gate(x)
 
-        x = self.linear_layer(x)
+        logits = self.linear_layer(x)
 
-        logits = self.softmax_layer(x)
+        # logits = self.softmax_layer(x)
 
         try:
             # Drop the keras mask, so it doesn't scale the losses/metrics.
