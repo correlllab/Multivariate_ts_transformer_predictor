@@ -7,14 +7,14 @@ from tensorflow.keras import optimizers
 from tensorflow.keras import regularizers
 from YamlLoader import YamlLoader
 from MultiHeadAttention import MultiHeadAttention
-from AttentionLayers import BaseAttention, GlobalSelfAttention, CrossAttention, MultiHeadAttention, CausalSelfAttention
-from FeedForwardLayer import FeedForward
-from PositionalEncoding import PositionalEmbedding
+from Transformer.AttentionLayers import BaseAttention, GlobalSelfAttention, CrossAttention, MultiHeadAttention, CausalSelfAttention
+from Transformer.FeedForwardLayer import FeedForward
+from Transformer.PositionalEncoding import PositionalEmbedding
 
 # from https://www.tensorflow.org/text/tutorials/transformer#define_the_components
 # Encoder layer
 class EncoderLayer(layers.Layer):
-    def __init__(self,*, d_model, num_heads, ff_dim, dropout_rate=0.1):
+    def __init__(self, *, d_model, num_heads, ff_dim, dropout_rate=0.1):
         super().__init__()
 
         self.self_attention = GlobalSelfAttention(
@@ -39,10 +39,10 @@ class Encoder(tf.keras.layers.Layer):
         self.d_model = d_model
         self.num_layers = num_layers
 
-        self.pos_embedding = PositionalEmbedding(
-            space_size=space_size,
-            d_model=d_model
-        )
+        # self.pos_embedding = PositionalEmbedding(
+        #     space_size=space_size,
+        #     d_model=d_model
+        # )
 
         self.enc_layers = [
             EncoderLayer(d_model=d_model,
@@ -55,7 +55,8 @@ class Encoder(tf.keras.layers.Layer):
 
     def call(self, x):
         # `x` is token-IDs shape: (batch, seq_len)
-        x = self.pos_embedding(x)  # Shape `(batch_size, seq_len, d_model)`.
+        #TODO: pos encoding
+        # x = self.pos_embedding(x)  # Shape `(batch_size, seq_len, d_model)`.
 
         # Add dropout.
         x = self.dropout(x)

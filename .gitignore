@@ -6,6 +6,15 @@ __pycache__/
 
 # Python notebooks stuff
 .ipynb_checkpoints
+src/notebooks/*.npy
+src/notebooks/comp_data/*.npy
+src/fcnn_vs_transformers/notebooks/
+
+# TensorFlow models checkpoints
+src/fcnn_vs_transformers/models/tmp
+
+# Npy files
+src/fcnn_vs_transformers/comp_data/*.npy
 
 # C extensions
 *.so
