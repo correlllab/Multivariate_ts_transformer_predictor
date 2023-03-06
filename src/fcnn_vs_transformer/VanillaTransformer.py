@@ -71,6 +71,8 @@ class Transformer:
     
 
     def fit(self, X_train, Y_train, X_test, Y_test, trainWindows, epochs=200, save_model=True):
+        print(f'X_train.shape = {X_train.shape}')
+        print(f'X_train.shape[1:] = {X_train.shape[1:]}')
         input_shape = X_train.shape[1:]
         self.build_model(
             input_shape,
