@@ -22,6 +22,7 @@ class FeedForward(layers.Layer):
         self.layer_norm = layers.LayerNormalization()
 
     def call(self, x):
+        print(f'X shape = {x.shape}; self.seq(x) shape = {self.seq(x).shape}')
         x = self.add([x, self.seq(x)])
         x = self.layer_norm(x) 
         return x

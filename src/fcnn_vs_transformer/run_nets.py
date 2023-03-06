@@ -25,54 +25,29 @@ for dev in devices:
 from data_preprocessing import DataPreprocessing
 from FCN import FCN
 from VanillaTransformer import Transformer
-from GatedTransformer import GatedTransformer
 from Transformer.CustomSchedule import CustomSchedule
 # from ..Transformer.CustomSchedule import CustomSchedule
-from gtn_prova import GTN
+
 
 
 
 dp = DataPreprocessing()
 dp.run(verbose=True)
 
-# fcn_net = FCN(rolling_window_width=dp.rollWinWidth)
-# fcn_net.build()
-# fcn_net.fit(X_train=dp.X_train_under, Y_train=dp.Y_train_under, X_test=dp.X_test, Y_test=dp.Y_test,
-#             trainWindows=dp.trainWindows, epochs=200, save_model=False)
-# fcn_net.plot_acc_loss()
-# fcn_net.compute_confusion_matrix(X_winTest=dp.X_winTest, Y_winTest=dp.Y_winTest, plot=True)
-# fcn_net.make_probabilities_plots(X_winTest=dp.X_winTest, Y_winTest=dp.Y_winTest)
+fcn_net = FCN(rolling_window_width=dp.rollWinWidth)
+fcn_net.build()
+fcn_net.fit(X_train=dp.X_train_under, Y_train=dp.Y_train_under, X_test=dp.X_test, Y_test=dp.Y_test,
+            trainWindows=dp.trainWindows, epochs=200, save_model=False)
+fcn_net.plot_acc_loss()
+fcn_net.compute_confusion_matrix(X_winTest=dp.X_winTest, Y_winTest=dp.Y_winTest, plot=True)
+fcn_net.make_probabilities_plots(X_winTest=dp.X_winTest, Y_winTest=dp.Y_winTest)
 
-# transformer_net = Transformer()
-# transformer_net.fit(X_train=dp.X_train_under, Y_train=dp.Y_train_under, X_test=dp.X_test, Y_test=dp.Y_test,
-#                     trainWindows=dp.trainWindows, epochs=200, save_model=False)
-# transformer_net.plot_acc_loss()
-# transformer_net.compute_confusion_matrix(X_winTest=dp.X_winTest, Y_winTest=dp.Y_winTest, plot=True)
-# transformer_net.make_probabilities_plots(X_winTest=dp.X_winTest, Y_winTest=dp.Y_winTest)
+transformer_net = Transformer()
+transformer_net.fit(X_train=dp.X_train_under, Y_train=dp.Y_train_under, X_test=dp.X_test, Y_test=dp.Y_test,
+                    trainWindows=dp.trainWindows, epochs=200, save_model=False)
+transformer_net.plot_acc_loss()
+transformer_net.compute_confusion_matrix(X_winTest=dp.X_winTest, Y_winTest=dp.Y_winTest, plot=True)
+transformer_net.make_probabilities_plots(X_winTest=dp.X_winTest, Y_winTest=dp.Y_winTest)
 
-
-# num_layers = 4
-# d_model = 128
-# num_heads = 4
-# ff_dim = 512
-# target_space_size = 2
-# gtn = GatedTransformer(
-#     num_layers=num_layers, d_model=d_model, num_heads=num_heads, ff_dim=ff_dim,
-#     input_space_size=dp.X_train_under.shape[0], target_space_size=target_space_size 
-# )
-# output = gtn((dp.Y_train_under, dp.X_train_under))
-# learning_rate = CustomSchedule(d_model=d_model)
-# optimizer = tf.keras.optimizers.Adam(learning_rate, beta_1=0.9, beta_2=0.98,
-#                                      epsilon=1e-9)
-# gtn.compile(
-#     loss='binary_focal_crossentropy',
-#     optimizer=optimizer,
-#     metrics=['categorical_accuracy']
-# )
-# gtn.summary()
-
-gtn = GTN()
-gtn.fit(X_train=dp.X_train_under, Y_train=dp.Y_train_under, X_test=dp.X_test, Y_test=dp.Y_test,
-        trainWindows=dp.trainWindows, epochs=200, save_model=False)
 
 
