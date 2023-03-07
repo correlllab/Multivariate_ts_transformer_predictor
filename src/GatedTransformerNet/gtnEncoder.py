@@ -19,7 +19,7 @@ class GTN_Encoder(tf.keras.layers.Layer):
                  dtype: str = None,
                  dynamic: bool = False,
                  **kwargs):
-        super().__init__(trainable, name, dtype, dynamic, **kwargs)
+        super(GTN_Encoder, self).__init__(trainable, name, dtype, dynamic, **kwargs)
 
         self.mha = GTN_MultiHeadAttention(d_model=d_model, q=q, v=v, h=h)
         self.feedforward = GTN_FeedForward(d_model=d_model, d_hidden=d_hidden)

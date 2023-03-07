@@ -4,8 +4,8 @@ print( sys.version )
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # INFO and WARNING messages are not printed
 
 import tensorflow as tf
-from tensorflow.python.framework.ops import disable_eager_execution
-disable_eager_execution()
+# from tensorflow.python.framework.ops import disable_eager_execution
+# disable_eager_execution()
 import tensorflow_lattice as tfl
 
 from GatedTransformer import GatedTransformer
@@ -43,11 +43,10 @@ if __name__ == '__main__':
     num_heads = 4
     learning_rate = GTN_CustomSchedule(d_model)
     # learning_rate = 1e-4
-    optimizer = tf.keras.optimizers.legacy.Adam(learning_rate, beta_1=0.9, beta_2=0.98,
-                                                epsilon=1e-9)
+    optimizer = tf.keras.optimizers.legacy.Adam(learning_rate=1e-4, beta_1=0.9,
+                                         beta_2=0.98, epsilon=1e-9)
 
-
-    print(f'CREATING GTN...')
+    print(f'CREATING GTN...', end='')
     gtn = GatedTransformer(
         d_model=d_model,
         d_hidden=d_hidden,
@@ -65,10 +64,10 @@ if __name__ == '__main__':
     gtn.compile(
         loss='binary_focal_crossentropy',
         optimizer=optimizer,
-        metrics=['categorical_accuracy'],
-        experimental_run_tf_function=False
+        metrics=['categorical_accuracy']
     )
     print('DONE')
+
 
     history = gtn.fit(
         x=dp.X_train_under,

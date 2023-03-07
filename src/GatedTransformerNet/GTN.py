@@ -9,6 +9,8 @@ import numpy as np
 import seaborn as sns
 import pandas as pd
 
+from keras import backend as K
+
 from utils import CounterDict
 from helper_functions import scan_output_for_decision, graph_episode_output
 from Transformer.AttentionLayers import *
@@ -30,13 +32,13 @@ class GTN:
             key_dim=head_size, num_heads=num_heads, dropout=dropout
         )(inputs, inputs, use_causal_mask=True)
         # res = tf.keras.layers.LayerNormalization(tf.keras.layers.Add()([x, inputs]))
-        res = x + inputs
+        res = tf.keras.layers.LayerNormalization()(x + inputs)
 
         x = tf.keras.layers.Conv1D(filters=ff_dim, kernel_size=1, activation='relu')(res)
         x = tf.keras.layers.Dropout(dropout)(x)
         x = tf.keras.layers.Conv1D(filters=inputs.shape[-1], kernel_size=1)(x)
         # return tf.keras.layers.LayerNormalization(tf.keras.layers.Add()([x, res]))
-        return x + res
+        return tf.keras.layers.LayerNormalization()(x + res)
 
 
     def feature_encoder(self, inputs, head_size, num_heads, ff_dim, dropout=0.1):
@@ -44,30 +46,24 @@ class GTN:
             key_dim=head_size, num_heads=num_heads, dropout=dropout
         )(inputs, inputs)
         # res = tf.keras.layers.LayerNormalization(tf.keras.layers.Add()([x, inputs]))
-        res = x + inputs
+        res = tf.keras.layers.LayerNormalization()(x + inputs)
 
         x = tf.keras.layers.Conv1D(filters=ff_dim, kernel_size=1, activation='relu')(res)
         x = tf.keras.layers.Dropout(dropout)(x)
         x = tf.keras.layers.Conv1D(filters=inputs.shape[-1], kernel_size=1)(x)
         # return tf.keras.layers.LayerNormalization(tf.keras.layers.Add()([x, res]))
-        return x + res
+        return tf.keras.layers.LayerNormalization()(x + res)
 
 
-    def position_encode(x):
-        pe = tf.ones_like(x)
-        # position = tf.expand_dims(tf.convert_to_tensor(tf.range(0., x.shape[1]), dtype='float32'), axis=-1)
-        position = tf.expand_dims(tf.range(0., x.shape[1]), axis=-1)
-        # temp = tf.convert_to_tensor(tf.range(0., x.shape[-1], delta=2.), dtype='float32')
-        temp = tf.range(0., x.shape[-1], delta=2.)
-        temp = tf.multiply(temp, -(tf.divide(math.log(10000), x.shape[-1])))
-        temp = tf.expand_dims(tf.math.exp(temp), axis=0)
-        temp = tf.linalg.matmul(position, temp)  # shape:[input, d_model/2]
-        pe = tf.Variable(pe)
-        pe[:, 0::2].assign(tf.math.sin(temp))
-        pe[:, 1::2].assign(tf.math.cos(temp))
-        pe = tf.convert_to_tensor(pe)
+    def position_encode(self, x):
+        aux = np.zeros(x.shape)
+        mat = np.arange(x.shape[1], dtype=np.float32).reshape(
+            -1,1)/np.power(10000, np.arange(
+            0, x.shape[-1], 2, dtype=np.float32) / x.shape[-1])
+        aux[:, :, 0::2] = tf.math.sin(mat)
+        aux[:, :, 1::2] = tf.math.cos(mat)
+        pe = tf.convert_to_tensor(aux, dtype=tf.float32)
 
-        # return tf.keras.layers.Add()([x, pe])
         return x + pe
 
 
@@ -77,6 +73,7 @@ class GTN:
             embedding =  tf.keras.layers.Dense(d_model, input_shape=(d_timestep,), activation=None)(x)
         elif wise == 'timestep':
             embedding = tf.keras.layers.Dense(d_model, input_shape=(d_feature,), activation=None)(x)
+            embedding = self.position_encode(embedding)
 
         return embedding
 
@@ -99,7 +96,7 @@ class GTN:
     ):
         inputs = tf.keras.Input(shape=input_shape, dtype=tf.float32, batch_size=batch_size)
 
-        x_timestep = self.embedding(x=inputs, d_model=d_model, d_feature=d_feature, d_timestep=d_timestep, wise='timestep')
+        x_timestep = self.embedding(x=tf.transpose(inputs, perm=[0,2,1]), d_model=d_model, d_feature=d_feature, d_timestep=d_timestep, wise='timestep')
         x_feature = self.embedding(x=inputs, d_model=d_model, d_feature=d_feature, d_timestep=d_timestep, wise='feature')
 
         for _ in range(num_transformer_blocks):
@@ -113,6 +110,7 @@ class GTN:
             tf.keras.layers.Dense(2, input_shape=(d_timestep * d_model + d_feature * d_model,), activation=None)(tf.concat([x_timestep, x_feature],
         axis=-1)), axis=-1)
         gate_out = tf.concat([tf.multiply(x_timestep, gate[:, 0:1]), tf.multiply(x_feature, gate[:, 1:2])], axis=-1)
+        print(f'gate_out.shape = {gate_out.shape}')
         out =  tf.keras.layers.Dense(class_num, input_shape=(d_timestep * d_model + d_feature * d_model,), activation=None)(gate_out)
 
         self.model = tf.keras.Model(inputs, out)
@@ -193,6 +191,10 @@ if __name__ == '__main__':
     dp.run(verbose=True)
 
     gtn = GTN()
+    print(dp.X_train_under.shape)
+    print(dp.Y_train_under.shape)
+    print(dp.X_test.shape)
+    print(dp.Y_test.shape)
     gtn.fit(X_train=dp.X_train_under, Y_train=dp.Y_train_under, X_test=dp.X_test, Y_test=dp.Y_test,
             epochs=200, save_model=False)
     gtn.plot_acc_loss()

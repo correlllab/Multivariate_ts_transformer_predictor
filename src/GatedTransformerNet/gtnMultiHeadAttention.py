@@ -14,7 +14,7 @@ class GTN_MultiHeadAttention(tf.keras.layers.Layer):
                  dtype: str = None,
                  dynamic: bool = False,
                  **kwargs):
-        super().__init__(trainable, name, dtype, dynamic, **kwargs)
+        super(GTN_MultiHeadAttention, self).__init__(trainable, name, dtype, dynamic, **kwargs)
 
         # self.W_Q = tfl.layers.Linear(num_input_dims=d_model, units=q * h)
         # self.W_K = tfl.layers.Linear(num_input_dims=d_model, units=q * h)
@@ -23,10 +23,10 @@ class GTN_MultiHeadAttention(tf.keras.layers.Layer):
 
         self.h = h
 
-        self.W_Q = tf.keras.layers.Dense(q * h, input_shape=(d_model, ), activation=None)
-        self.W_K = tf.keras.layers.Dense(q * h, input_shape=(d_model, ), activation=None)
-        self.W_V = tf.keras.layers.Dense(v * h, input_shape=(d_model, ), activation=None)
-        self.W_O = tf.keras.layers.Dense(d_model, input_shape=(v * h,), activation=None)
+        self.W_Q = tf.keras.layers.Dense(q * h, input_shape=(d_model, ), activation='relu')
+        self.W_K = tf.keras.layers.Dense(q * h, input_shape=(d_model, ), activation='relu')
+        self.W_V = tf.keras.layers.Dense(v * h, input_shape=(d_model, ), activation='relu')
+        self.W_O = tf.keras.layers.Dense(d_model, input_shape=(v * h,), activation='relu')
 
         self.inf = tf.math.add(tf.math.pow(-2., 32), 1.)
 

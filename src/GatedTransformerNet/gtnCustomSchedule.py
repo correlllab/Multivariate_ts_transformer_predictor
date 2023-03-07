@@ -5,8 +5,8 @@ import tensorflow as tf
 class GTN_CustomSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
     def __init__(self,
                  d_model: int,
-                 warmup_steps=4000):
-        super().__init__()
+                 warmup_steps=4000.):
+        super(GTN_CustomSchedule, self).__init__()
 
         self.d_model = d_model
         self.d_model = tf.cast(self.d_model, tf.float32)

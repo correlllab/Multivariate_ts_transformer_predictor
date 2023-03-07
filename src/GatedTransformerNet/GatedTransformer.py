@@ -20,7 +20,7 @@ class GatedTransformer(tf.keras.Model):
                  dropout: float = 0.2,
                  *args,
                  **kwargs):
-        super().__init__(*args, **kwargs)
+        super(GatedTransformer, self).__init__(*args, **kwargs)
 
         self.num_heads = num_heads
 
