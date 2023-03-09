@@ -2,18 +2,21 @@
 import sys, os, glob
 import numpy as np
 from random import shuffle
+from copy import deepcopy
 from tensorflow.keras.utils import to_categorical
 from imblearn.under_sampling import RandomUnderSampler
-from imblearn.over_sampling import RandomOverSampler
+from imblearn.over_sampling import RandomOverSampler, SMOTE
+from sklearn.preprocessing import RobustScaler
 
 class DataPreprocessing:
-    def __init__(self) -> None:
+    def __init__(self, sampling: str = 'over' or 'under') -> None:
+        self.sampling = sampling
         self.datadir = os.path.join(os.path.abspath("./"), "comp_data/")
         self.shuffle = True
         self.data = None
         self.truncData = None
         self.window_data = None
-        self.testFrac = 0.20
+        self.testFrac = 0.10
         self.N_ep = 0
         self.N_test = 0
         self.N_train = 0
@@ -21,8 +24,8 @@ class DataPreprocessing:
         self.testWindows = 0
         self.X_train = None
         self.Y_train = None
-        self.X_train_under = None
-        self.Y_train_under = None
+        self.X_train_sampled = None
+        self.Y_train_sampled = None
         self.X_test = None
         self.Y_test = None
         self.X_winTest = None
@@ -243,19 +246,41 @@ class DataPreprocessing:
         print('    ====> CLASSES DISTRIBUTION BEFORE:')
         print(f'        Passes = {int(sum(self.Y_train[:,0]))}; Fails = {int(sum(self.Y_train[:,1]))}\n')
 
-        undersampler = RandomUnderSampler(sampling_strategy='majority')
-        undersampler.fit_resample(self.X_train[:,:,0], self.Y_train)
-        self.X_train_under = self.X_train[undersampler.sample_indices_]
-        self.Y_train_under = self.Y_train[undersampler.sample_indices_]
+        if self.sampling == 'over':
+            # TODO: try oversampler, probably does not work like this
+            oversampler = RandomOverSampler(sampling_strategy='minority')
+            self.X_train_sampled, self.Y_train_sampled = oversampler.fit_resample(self.X_tra)
+            undersampler.fit_resample(self.X_train[:,:,0], self.Y_train)
+            # oversampler.fit_resample(self.X_train[:,:,0], self.Y_train)
+            # self.X_train_sampled = deepcopy(self.X_train[oversampler.sample_indices_])
+            # self.Y_train_sampled = deepcopy(self.Y_train[oversampler.sample_indices_])
+        elif self.sampling == 'under':
+            undersampler = RandomUnderSampler(sampling_strategy='majority')
+            undersampler.fit_resample(self.X_train[:,:,0], self.Y_train)
+            self.X_train_sampled = deepcopy(self.X_train[undersampler.sample_indices_])
+            self.Y_train_sampled = deepcopy(self.Y_train[undersampler.sample_indices_])
+        else:
+            self.X_train_sampled = deepcopy(self.X_train)
+            self.Y_train_sampled = deepcopy(self.Y_train)
 
         print('    ====> CLASSES DISTRIBUTION AFTER:')
-        print(f'        Passes = {int(sum(self.Y_train_under[:,0]))}; Fails = {int(sum(self.Y_train_under[:,1]))}\n')
-        print(self.X_train_under.shape, self.Y_train_under.shape)
+        print(f'        Passes = {int(sum(self.Y_train_sampled[:,0]))}; Fails = {int(sum(self.Y_train_sampled[:,1]))}\n')
+        print(self.X_train_sampled.shape, self.Y_train_sampled.shape)
+
+
+    def scale_data(self):
+        for index, ep in enumerate(self.data):
+            transformer = RobustScaler().fit(ep[:, 1:7])
+            self.data[index][:, 1:7] = transformer.transform(ep[:, 1:7]) 
+
 
     def run(self, verbose=False):
         if verbose:
             print('\n====> Loading data...\n')
         self.load_data()
+        if verbose:
+            print('\n====> Scaling data...\n')
+        self.scale_data()
         if verbose:
             print('\n====> Setting episodes beginnings...\n')
         self.set_episode_beginning()

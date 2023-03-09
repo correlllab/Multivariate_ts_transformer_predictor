@@ -31,20 +31,20 @@ from Transformer.CustomSchedule import CustomSchedule
 
 
 
-dp = DataPreprocessing()
+dp = DataPreprocessing(sampling='under')
 dp.run(verbose=True)
 
 fcn_net = FCN(rolling_window_width=dp.rollWinWidth)
 fcn_net.build()
-fcn_net.fit(X_train=dp.X_train_under, Y_train=dp.Y_train_under, X_test=dp.X_test, Y_test=dp.Y_test,
-            trainWindows=dp.trainWindows, epochs=200, save_model=False)
+fcn_net.fit(X_train=dp.X_train_sampled, Y_train=dp.Y_train_sampled, X_test=dp.X_test, Y_test=dp.Y_test,
+            trainWindows=dp.trainWindows, epochs=200, save_model=True)
 fcn_net.plot_acc_loss()
 fcn_net.compute_confusion_matrix(X_winTest=dp.X_winTest, Y_winTest=dp.Y_winTest, plot=True)
 fcn_net.make_probabilities_plots(X_winTest=dp.X_winTest, Y_winTest=dp.Y_winTest)
 
 transformer_net = Transformer()
-transformer_net.fit(X_train=dp.X_train_under, Y_train=dp.Y_train_under, X_test=dp.X_test, Y_test=dp.Y_test,
-                    trainWindows=dp.trainWindows, epochs=200, save_model=False)
+transformer_net.fit(X_train=dp.X_train_sampled, Y_train=dp.Y_train_sampled, X_test=dp.X_test, Y_test=dp.Y_test,
+                    trainWindows=dp.trainWindows, epochs=200, save_model=True)
 transformer_net.plot_acc_loss()
 transformer_net.compute_confusion_matrix(X_winTest=dp.X_winTest, Y_winTest=dp.Y_winTest, plot=True)
 transformer_net.make_probabilities_plots(X_winTest=dp.X_winTest, Y_winTest=dp.Y_winTest)
