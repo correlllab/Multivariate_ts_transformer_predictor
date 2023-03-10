@@ -107,8 +107,10 @@ class GTN:
         x_feature = tf.reshape(x_feature, shape=(x_feature.shape[0], -1))
 
         gate = tf.nn.softmax(
-            tf.keras.layers.Dense(2, input_shape=(d_timestep * d_model + d_feature * d_model,), activation=None)(tf.concat([x_timestep, x_feature],
-        axis=-1)), axis=-1)
+            tf.keras.layers.Dense(2, input_shape=(d_timestep * d_model + d_feature * d_model,), activation=None)(
+                tf.concat([x_timestep, x_feature], axis=-1)
+            ), axis=-1
+        )
         gate_out = tf.concat([tf.multiply(x_timestep, gate[:, 0:1]), tf.multiply(x_feature, gate[:, 1:2])], axis=-1)
         print(f'gate_out.shape = {gate_out.shape}')
         out =  tf.keras.layers.Dense(class_num, input_shape=(d_timestep * d_model + d_feature * d_model,), activation=None)(gate_out)
@@ -136,7 +138,7 @@ class GTN:
 
         self.model.compile(
             loss='binary_focal_crossentropy',
-            optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4),
+            optimizer=tf.keras.optimizers.legacy.Adam(learning_rate=1e-4),
             metrics=['categorical_accuracy']
         )
         self.model.summary()

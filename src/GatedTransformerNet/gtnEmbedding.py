@@ -1,7 +1,7 @@
 #https://github.com/ZZUFaceBookDL/Gated_Transformer_Network/blob/master/Gated_Transfomer_Network/module/for_MTS/embedding.py
 import math
 import tensorflow as tf
-import tensorflow_lattice as tfl
+# import tensorflow_lattice as tfl
 import numpy as np
 
 

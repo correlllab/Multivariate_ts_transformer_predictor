@@ -6,7 +6,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # INFO and WARNING messages are not pri
 import tensorflow as tf
 # from tensorflow.python.framework.ops import disable_eager_execution
 # disable_eager_execution()
-import tensorflow_lattice as tfl
+# import tensorflow_lattice as tfl
 
 from GatedTransformer import GatedTransformer
 from gtnCustomSchedule import GTN_CustomSchedule

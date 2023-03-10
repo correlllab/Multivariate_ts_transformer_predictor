@@ -1,6 +1,6 @@
 #https://github.com/ZZUFaceBookDL/Gated_Transformer_Network/blob/5b75d17e94bc96c62a5504afc5e8331918dc1cc5/Gated_Transfomer_Network/module/for_MTS/transformer.py
 import tensorflow as tf
-import tensorflow_lattice as tfl
+# import tensorflow_lattice as tfl
 
 from gtnEncoder import GTN_Encoder
 from gtnEmbedding import GTN_Embedding
