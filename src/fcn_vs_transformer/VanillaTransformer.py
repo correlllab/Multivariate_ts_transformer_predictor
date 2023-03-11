@@ -92,8 +92,12 @@ class Transformer:
 
         checkpoint_filepath = './models/tmp/checkpoints/'
         callbacks = [
-            # Early stopping might xause overfitting
-            #tf.keras.callbacks.EarlyStopping(patience=100, restore_best_weights=True),
+            tf.keras.callbacks.EarlyStopping(
+                monitor='val_loss',
+                patience=10,
+                restore_best_weights=True,
+                start_from_epoch=epochs*0.2
+            ),
             tf.keras.callbacks.ModelCheckpoint(
                 filepath=checkpoint_filepath,
                 save_weights_only=False,
@@ -112,7 +116,7 @@ class Transformer:
             callbacks=callbacks,
         )
 
-        self.evaluation = self.model.evaluate(X_test, Y_test, verbose=1)
+        # self.evaluation = self.model.evaluate(X_test, Y_test, verbose=1)
 
         if save_model:
             self.model.save(self.file_name)
@@ -155,15 +159,20 @@ class Transformer:
                 
         print( '\n', self.file_name, '\n', perf )
 
-        confMatx = {
-            # Actual Positives
-            'TP' : (perf['TP'] if ('TP' in perf) else 0) / ((perf['TP'] if ('TP' in perf) else 0) + (perf['FN'] if ('FN' in perf) else 0)),
-            'FN' : (perf['FN'] if ('FN' in perf) else 0) / ((perf['TP'] if ('TP' in perf) else 0) + (perf['FN'] if ('FN' in perf) else 0)),
-            # Actual Negatives
-            'TN' : (perf['TN'] if ('TN' in perf) else 0) / ((perf['TN'] if ('TN' in perf) else 0) + (perf['FP'] if ('FP' in perf) else 0)),
-            'FP' : (perf['FP'] if ('FP' in perf) else 0) / ((perf['TN'] if ('TN' in perf) else 0) + (perf['FP'] if ('FP' in perf) else 0)),
-            'NC' : (perf['NC'] if ('NC' in perf) else 0) / len( X_winTest ),
-        }
+        try:
+            confMatx = {
+                # Actual Positives
+                'TP' : (perf['TP'] if ('TP' in perf) else 0) / ((perf['TP'] if ('TP' in perf) else 0) + (perf['FN'] if ('FN' in perf) else 0)),
+                'FN' : (perf['FN'] if ('FN' in perf) else 0) / ((perf['TP'] if ('TP' in perf) else 0) + (perf['FN'] if ('FN' in perf) else 0)),
+                # Actual Negatives
+                'TN' : (perf['TN'] if ('TN' in perf) else 0) / ((perf['TN'] if ('TN' in perf) else 0) + (perf['FP'] if ('FP' in perf) else 0)),
+                'FP' : (perf['FP'] if ('FP' in perf) else 0) / ((perf['TN'] if ('TN' in perf) else 0) + (perf['FP'] if ('FP' in perf) else 0)),
+                'NC' : (perf['NC'] if ('NC' in perf) else 0) / len( X_winTest ),
+            }
+        except ZeroDivisionError as e:
+            print(f'Building VanillaTransformer confusion matrix: {e}')
+            confMatx = None
+            plot = False
 
         print( confMatx )
 

@@ -33,14 +33,17 @@ class DataPreprocessing:
         self.rollWinWidth = None
 
 
-    def load_data(self):
+    def load_data(self, verbose=False):
+        """ Load 100 files so that there is balance between classes """
         ext      = "*.npy"
         npyFiles = glob.glob(self.datadir + ext)
-        print( f"Found {len(npyFiles)} {ext} files!" )
+        if verbose:
+            print( f"Found {len(npyFiles)} {ext} files!" )
 
         if self.shuffle:
             shuffle( npyFiles )
-            print( "Shuffled files!" )
+            if verbose:
+                print( "Shuffled files!" )
 
         epData = []
         N_s    = 0
@@ -53,27 +56,28 @@ class DataPreprocessing:
             elif epMatx[0,7] == 0.0:
                 N_f += 1
             epData.append( epMatx )
-            print( '>', end=' ' )
-            
-        print( f"\nCreated {len(epData)} episode matrices!" )
-        print( f"{N_s} successes, {N_f} failures, Success Rate: {N_s/(N_s+N_f)}, Failure Rate: {N_f/(N_s+N_f)}" )
+            if verbose:
+                print( '>', end=' ' )
+        
+        if verbose:
+            print( f"\nCreated {len(epData)} episode matrices!" )
+            print( f"{N_s} successes, {N_f} failures, Success Rate: {N_s/(N_s+N_f)}, Failure Rate: {N_f/(N_s+N_f)}" )
         self.data = epData
 
 
-    def set_episode_beginning(self):
+    def set_episode_beginning(self, verbose=False):
         # Begin each ep at 1st imapct 
         truncData   = []
         winWidth    = 10
         FzCol       =  3
         spikeThresh = 0.05
-        vb          = 0
 
         # For every episode
         for j, epMatx in enumerate( self.data ):
             # Look for the first spike in F_z
             N          = epMatx.shape[0]
-            if vb:
-                print( f"{j}\n{epMatx.shape} input data shape" )
+            # if verbose:
+            #     print( f"{j}\n{epMatx.shape} input data shape" )
             chopDex    = 0
             for bgn in range( int(1.5*50), N-winWidth+1 ):
                 end     = bgn+winWidth
@@ -84,23 +88,21 @@ class DataPreprocessing:
                     # print( np.amax( FzSlice ), np.amin( FzSlice ) )
                     # print( FzSlice )
                     chopDex = bgn
-                    if vb:
-                        print( f"Relevant data at {chopDex*20/1000.0} seconds!" )
+                    # if verbose:
+                    #     print( f"Relevant data at {chopDex*20/1000.0} seconds!" )
                     break
             if (chopDex*20/1000) < 15.0:
                 truncData.append( epMatx[ chopDex:,: ] )
             # else dump an episode that does not fit criteria, 2022-08-31: Dumped 5 episodes
-            if vb:
-                print( f"{ truncData[-1].shape } output data shape" )
-                print()
-            else:
+            if verbose:
                 print( '>', end=' ' )
-            
-        print( f"\nTruncated {len(truncData)} episodes!" )
+        
+        if verbose:
+            print( f"\nTruncated {len(truncData)} episodes!" )
         self.truncData = truncData
 
 
-    def get_complete_twist_windows(self):
+    def get_complete_twist_windows(self, verbose=False):
         self.rollWinWidth = int(7.0 * 50) #int(8.5 * 50)
         windowData   = []
         for j, epMatx in enumerate( self.truncData ):
@@ -112,12 +114,50 @@ class DataPreprocessing:
                 end = i+self.rollWinWidth
                 epWindows[i,:,:] = epMatx[ i:end, 1:8 ]
             windowData.append( epWindows )
-            print( f'{epWindows.shape}', end=' ' )
-        print( "\nDONE!" )
+            if verbose:
+                print( f'{epWindows.shape}', end=' ' )
+        if verbose:
+            print( "\nDONE!" )
         self.window_data = windowData
 
 
-    def stack_windows(self):
+    def balance_window_data(self, verbose=False):
+        window_limit = 75000
+        positive_windows = []
+        negative_windows = []
+        positive_sum = 0.
+        negative_sum = 0.
+        positive_flag = False
+        negative_flag = False
+        stop_flag = False
+        i = 0
+        while not stop_flag:
+            episode = self.window_data[i]
+            if episode[0,0,6] == 1.0:
+                if positive_sum <= window_limit:
+                    positive_sum += episode.shape[0]
+                    positive_windows.append(episode)
+                else:
+                    positive_flag = True
+            elif episode[0,0,6] == 0.0:
+                if negative_sum <= window_limit:
+                    negative_sum += episode.shape[0]
+                    negative_windows.append(episode)
+                else:
+                    negative_flag = True
+
+            stop_flag = (positive_flag and negative_flag)
+            i += 1
+
+        if verbose:
+            print(f'Truncated to {positive_sum} positive windows and {negative_sum} negative windows')
+
+        # Concat the two lists and shuffle
+        self.window_data = [*positive_windows, *negative_windows]
+        shuffle(self.window_data)
+
+
+    def stack_windows(self, verbose=False):
         self.testFrac     = 0.10
         self.N_ep         = len( self.window_data )
         self.N_test       = int(self.N_ep * self.testFrac)
@@ -137,8 +177,9 @@ class DataPreprocessing:
             self.testWindows += ep.shape[0]
             i += 1
 
-        print( f"{self.trainWindows} windows to Train and {self.testWindows} to Test" )
-        print( f"All episodes accounted for?: {i == self.N_ep}, {i}, {self.N_ep}" )
+        if verbose:
+            print( f"{self.trainWindows} windows to Train and {self.testWindows} to Test" )
+            print( f"All episodes accounted for?: {i == self.N_ep}, {i}, {self.N_ep}" )
 
         datasetTrain = np.zeros( (self.trainWindows, self.window_data[0].shape[1], self.window_data[0].shape[2],) )
         datasetTest  = np.zeros( (self.testWindows , self.window_data[0].shape[1], self.window_data[0].shape[2],) )
@@ -151,7 +192,8 @@ class DataPreprocessing:
                 datasetTrain[j,:,:] = window
                 j += 1
             i += 1
-            print( "T", end = " " )
+            if verbose:
+                print( "T", end = " " )
             
         j = 0
             
@@ -161,18 +203,21 @@ class DataPreprocessing:
                 datasetTest[j,:,:] = window
                 j += 1
             i += 1
-            print( "V", end = " " )
+            if verbose:
+                print( "V", end = " " )
                 
                 
         self.X_train = datasetTrain[ :, :, 0:6 ]
         self.Y_train = np.zeros( (self.trainWindows, 1) )
-        print( f"\nTrain X shape: {self.X_train.shape}" )
-        print( f"\nTrain Y shape: {self.Y_train.shape}" )
+        if verbose:
+            print( f"\nTrain X shape: {self.X_train.shape}" )
+            print( f"\nTrain Y shape: {self.Y_train.shape}" )
 
         self.X_test = datasetTest[ :, :, 0:6 ]
         self.Y_test = np.zeros( (self.testWindows, 1) )
-        print( f"\nTest X shape: {self.X_test.shape}" )
-        print( f"\nTest Y shape: {self.Y_test.shape}" )
+        if verbose:
+            print( f"\nTest X shape: {self.X_test.shape}" )
+            print( f"\nTest Y shape: {self.Y_test.shape}" )
 
         i   = 0 
         k   = 0
@@ -192,7 +237,8 @@ class DataPreprocessing:
                     raise ValueError( "BAD LABEL" )
                 k += 1
             i += 1
-            print( i, end = " " )
+            if verbose:
+                print( i, end = " " )
             
         k = 0
 
@@ -212,18 +258,20 @@ class DataPreprocessing:
                     raise ValueError( "BAD LABEL" )
                 k += 1
             i += 1
-            print( i, end = " " )
-            
-        print( '\n' )
-        print( self.Y_train.shape, self.Y_test.shape )
+            if verbose:
+                print( i, end = " " )
+        
+        if verbose:
+            print( '\n' )
+            print( self.Y_train.shape, self.Y_test.shape )
         self.Y_train = to_categorical( self.Y_train )
         self.Y_test  = to_categorical( self.Y_test  )
-        print( self.Y_train.shape, self.Y_test.shape )
-            
-        print( f"\nThere are {pos} passing windows and {neg} failing windows!, Total: {pos+neg}" )
+        if verbose:
+            print( self.Y_train.shape, self.Y_test.shape )
+            print( f"\nThere are {pos} passing windows and {neg} failing windows!, Total: {pos+neg}" )
 
 
-    def capture_test_episodes(self):
+    def capture_test_episodes(self, verbose=False):
         self.X_winTest = []
         self.Y_winTest = []
 
@@ -237,20 +285,23 @@ class DataPreprocessing:
             elif ep[ 0, 0, 6 ] == 0.0:
                 y_i[:,:] = [0.0, 1.0]
                 self.Y_winTest.append( y_i )
-            print( '>', end=' ' )
-            
-        print( f"\nDONE! Captured {len(self.X_winTest)}/{len(self.Y_winTest)} TEST episodes." )
+            if verbose:
+                print( '>', end=' ' )
+
+        if verbose:
+            print( f"\nDONE! Captured {len(self.X_winTest)}/{len(self.Y_winTest)} TEST episodes." )
 
 
-    def balance_classes(self):
-        print('    ====> CLASSES DISTRIBUTION BEFORE:')
-        print(f'        Passes = {int(sum(self.Y_train[:,0]))}; Fails = {int(sum(self.Y_train[:,1]))}\n')
+    def balance_classes(self, verbose=False):
+        if verbose:
+            print('    ====> CLASSES DISTRIBUTION BEFORE:')
+            print(f'        Passes = {int(sum(self.Y_train[:,0]))}; Fails = {int(sum(self.Y_train[:,1]))}\n')
 
         if self.sampling == 'over':
             # TODO: try oversampler, probably does not work like this
-            oversampler = RandomOverSampler(sampling_strategy='minority')
-            self.X_train_sampled, self.Y_train_sampled = oversampler.fit_resample(self.X_tra)
-            undersampler.fit_resample(self.X_train[:,:,0], self.Y_train)
+            # oversampler = RandomOverSampler(sampling_strategy='minority')
+            oversampler = SMOTE()
+            self.X_train_sampled, self.Y_train_sampled = oversampler.fit_resample(self.X_train.reshape(self.X_train.shape[0], -1), self.Y_train)
             # oversampler.fit_resample(self.X_train[:,:,0], self.Y_train)
             # self.X_train_sampled = deepcopy(self.X_train[oversampler.sample_indices_])
             # self.Y_train_sampled = deepcopy(self.Y_train[oversampler.sample_indices_])
@@ -263,12 +314,13 @@ class DataPreprocessing:
             self.X_train_sampled = deepcopy(self.X_train)
             self.Y_train_sampled = deepcopy(self.Y_train)
 
-        print('    ====> CLASSES DISTRIBUTION AFTER:')
-        print(f'        Passes = {int(sum(self.Y_train_sampled[:,0]))}; Fails = {int(sum(self.Y_train_sampled[:,1]))}\n')
-        print(self.X_train_sampled.shape, self.Y_train_sampled.shape)
+        if verbose:
+            print('    ====> CLASSES DISTRIBUTION AFTER:')
+            print(f'        Passes = {int(sum(self.Y_train_sampled[:,0]))}; Fails = {int(sum(self.Y_train_sampled[:,1]))}\n')
+            print(self.X_train_sampled.shape, self.Y_train_sampled.shape)
 
 
-    def scale_data(self):
+    def scale_data(self, verbose=False):
         for index, ep in enumerate(self.data):
             transformer = RobustScaler().fit(ep[:, 1:7])
             self.data[index][:, 1:7] = transformer.transform(ep[:, 1:7]) 
@@ -277,25 +329,28 @@ class DataPreprocessing:
     def run(self, verbose=False):
         if verbose:
             print('\n====> Loading data...\n')
-        self.load_data()
+        self.load_data(verbose=verbose)
         if verbose:
             print('\n====> Scaling data...\n')
-        self.scale_data()
+        self.scale_data(verbose=verbose)
         if verbose:
             print('\n====> Setting episodes beginnings...\n')
-        self.set_episode_beginning()
+        self.set_episode_beginning(verbose=verbose)
         if verbose:
             print('\n====> Getting complete twist windows...\n')
-        self.get_complete_twist_windows()
+        self.get_complete_twist_windows(verbose=verbose)
+        if verbose:
+            print('\n====> Balancing windows...\n')
+        self.balance_window_data(verbose=verbose)
         if verbose:
             print('\n====> Stacking windows...\n')
-        self.stack_windows()
+        self.stack_windows(verbose=verbose)
         if verbose:
             print('\n====> Capturing test episodes...\n')
-        self.capture_test_episodes()
+        self.capture_test_episodes(verbose=verbose)
         if verbose:
             print('\n====> Balancing classes...\n')
-        self.balance_classes()
+        self.balance_classes(verbose=verbose)
         if verbose:
             print('\n====> Done preprocessing!\n')
-        _ = input('Continue?:')
+            _ = input('Continue?:')

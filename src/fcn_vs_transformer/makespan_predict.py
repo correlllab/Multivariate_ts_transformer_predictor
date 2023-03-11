@@ -1,10 +1,12 @@
-import os, sys
+import os, sys, json
 print(sys.version)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # INFO and WARNING messages are not printed
 import glob
 import pandas as pd
 import numpy as np
 import tensorflow
+import matplotlib.pyplot as plt
+from matplotlib.offsetbox import AnchoredText
 from random import choice
 
 from data_preprocessing import DataPreprocessing
@@ -47,7 +49,7 @@ def expected_makespan( MTF, MTN, MTS, P_TP, P_FN, P_TN, P_FP ):
     return -( MTF*P_FP + MTN*P_FN + MTN*P_TN + MTS*P_TP + 1) / (P_FN + P_FP + P_TN - 1)
 
 
-def run_makespan_prediction_for_model(model: tensorflow.keras.Model, dp: DataPreprocessing):
+def run_makespan_prediction_for_model(model: tensorflow.keras.Model, dp: DataPreprocessing, verbose=False):
     perf = CounterDict()
 
     N_posCls  = 0 # --------- Number of positive classifications
@@ -65,7 +67,8 @@ def run_makespan_prediction_for_model(model: tensorflow.keras.Model, dp: DataPre
 
     # print( xList[7].shape )
 
-    print( f"Each window is {winLen} timesteps long!" )
+    if verbose:
+        print( f"Each window is {winLen} timesteps long!" )
 
     timedEpisodes = []
 
@@ -82,8 +85,9 @@ def run_makespan_prediction_for_model(model: tensorflow.keras.Model, dp: DataPre
         with tensorflow.device('/GPU:0'):
             
             # Measure Accuracy Performance #
-            res      = model.predict( x_i )
-            print(res.shape, y_i.shape)
+            res      = model.predict( x_i, verbose=1 )
+            if verbose:
+                print(res.shape, y_i.shape)
             ans, aDx = scan_output_for_decision( res, y_i, threshold = 0.90 )
             perf.count( ans )
             
@@ -127,26 +131,44 @@ def run_makespan_prediction_for_model(model: tensorflow.keras.Model, dp: DataPre
         'NC' : (perf['NC'] if ('NC' in perf) else 0) / len( xList ),
     }
 
-    print()
-    print( perf )
-    print( confMatx )
+    if verbose:
+        print()
+        print( perf )
+        print( confMatx )
 
 
-    MTP /= N_posCls #- Mean Time to Positive Classification
-    MTN /= N_negCls #- Mean Time to Negative Classification
-    MTS /= N_success # Mean Time to Success
-    MTF /= N_failure # Mean Time to Failure
+    if N_posCls == 0:
+        MTP = 'inf'
+    else:
+        MTP /= N_posCls #- Mean Time to Positive Classification
 
-    print()
-    print( f"MTP: {MTP} [s]" )
-    print( f"MTN: {MTN} [s]" )
-    print( f"MTS: {MTS} [s]" )
-    print( f"MTF: {MTF} [s]" )
-    print( f"Success: {N_success}" )
-    print( f"Failure: {N_failure}" )
+    if N_negCls == 0:
+        MTN = 'inf'
+    else:
+        MTN /= N_negCls #- Mean Time to Negative Classification
+
+    if N_success == 0:
+        MTS = 'inf'
+    else:
+        MTS /= N_success # Mean Time to Success
+
+    if N_failure == 0:
+        MTF = 'inf'
+    else:
+        MTF /= N_failure # Mean Time to Failure
+
+    if verbose:
+        print()
+        print( f"MTP: {MTP} [s]" )
+        print( f"MTN: {MTN} [s]" )
+        print( f"MTS: {MTS} [s]" )
+        print( f"MTF: {MTF} [s]" )
+        print( f"Success: {N_success}" )
+        print( f"Failure: {N_failure}" )
 
 
-    print('MC BASELINE...')
+    if verbose:
+        print('MC BASELINE...')
     # TODO: decide which of the two is the right one and ask why N = 200000
     # N   = 200000 # Number of trials
     # MTS = 0.0 # Mean time to success
@@ -185,10 +207,11 @@ def run_makespan_prediction_for_model(model: tensorflow.keras.Model, dp: DataPre
         MTS += TS_i
         
     MTS /= N
-    print( f"Task Mean Time to Success: {MTS} [s]" )
+    print( f"\n    Task Mean Time to Success: {MTS} [s]" )
 
-    print('Expected makespan:', end=' ')
-    print( expected_makespan( 
+
+    print('    Expected makespan:', end=' ')
+    EMS = expected_makespan( 
         MTF = MTF, 
         MTN = MTN, 
         MTS = MTS, 
@@ -196,7 +219,9 @@ def run_makespan_prediction_for_model(model: tensorflow.keras.Model, dp: DataPre
         P_FN = confMatx['FN'] * (N_success/(N_success + N_failure)) , 
         P_TN = confMatx['TN'] * (N_failure/(N_success + N_failure)) , 
         P_FP = confMatx['FP'] * (N_failure/(N_success + N_failure))  
-    ) )
+    )
+    print( EMS, end=' [s]' )
+    return MTS, EMS
 
 
 if __name__ == '__main__':
@@ -217,26 +242,137 @@ if __name__ == '__main__':
         print
 
     print('FETCHING DATA...')
-    dp = DataPreprocessing(sampling='under')
+    dp = DataPreprocessing(sampling='none')
     dp.run(verbose=True)
 
     makespan_models = {}
 
-    print('LOADING MODELS...')
-    try:
-        fcn = tensorflow.keras.models.load_model('models/FCN.keras')
-        makespan_models['FCN'] = fcn
-    except OSError as e:
-        print(f'{e}: model does not exist!\n')
+    compute = True
+    save_dicts = True
+    res = {}
+    total = 50
+    if compute:
+        print('LOADING MODELS...')
+        try:
+            fcn = tensorflow.keras.models.load_model('models/FCN.keras')
+            makespan_models['FCN'] = fcn
+        except OSError as e:
+            print(f'{e}: model does not exist!\n')
 
-    try:
-        vanilla_transformer =  tensorflow.keras.models.load_model('models/Transformer.keras')
-        makespan_models['VanillaTransformer'] = vanilla_transformer
-    except OSError as e:
-        print(f'{e}: model does not exist!\n')
+        try:
+            vanilla_transformer = Transformer()
+            vanilla_transformer.build_model(
+                dp.X_train_sampled.shape[1:],
+                head_size=256,
+                num_heads=4,
+                ff_dim=4,
+                num_transformer_blocks=4,
+                mlp_units=[128],
+                mlp_dropout=0.4,
+                dropout=0.25
+            )
+            vanilla_transformer.model.compile(
+                loss="binary_focal_crossentropy",
+                optimizer=tensorflow.keras.optimizers.Adam(learning_rate=1e-4),
+                metrics=["categorical_accuracy"]
+            )
+            loss, accuracy_d = vanilla_transformer.model.evaluate(dp.X_test, dp.Y_test, verbose=2)
+            print("Untrained model: accuracy = {:5.2f}%; loss = {:5.2f}".format(100 * accuracy_d, loss))
+            vanilla_transformer.model.load_weights('./models/tmp/checkpoints/')
+            loss, accuracy_d = vanilla_transformer.model.evaluate(dp.X_test, dp.Y_test, verbose=2)
+            print("Restored model: accuracy = {:5.2f}%; loss = {:5.2f}".format(100 * accuracy_d, loss))
+            vanilla_transformer.model.save('models/Transformer.keras')
+            vanilla_transformer =  tensorflow.keras.models.load_model('models/Transformer.keras')
+            makespan_models['VanillaTransformer'] = vanilla_transformer
+        except OSError as e:
+            print(f'{e}: model does not exist!\n')
 
 
-    for model_name, model in makespan_models.items():
-        print(f'====> For model {model_name}:')
-        run_makespan_prediction_for_model(model=model, dp=dp)
-        print()
+        for i in range(total):
+            dp = DataPreprocessing(sampling='none')
+            dp.run(verbose=False)
+            print(f'\nIteration {i}/{total} [{(i*100)/total}%]')
+            for model_name, model in makespan_models.items():
+                if model_name not in res.keys():
+                    res[model_name] = {'MTS': [], 'EMS': []}
+                print(f'====> For model {model_name}:')
+                mts, ems = run_makespan_prediction_for_model(model=model, dp=dp, verbose=False)
+                res[model_name]['MTS'].append(mts)
+                res[model_name]['EMS'].append(ems)
+                print()
+        
+        if save_dicts:
+            with open('makespan_results.txt', 'w') as f:
+                f.write(json.dumps(res))
+    else:
+        with open('makespan_results.txt', 'r') as f:
+            res = json.loads(f.read())
+
+    print(f'res = {res}\n')
+
+    metrics = {k: {} for k in list(res.keys())}
+    for model_name in res.keys():
+        metrics[model_name]['MTS_mean'] = np.mean(res[model_name]['MTS'])
+        metrics[model_name]['MTS_std'] = np.std(res[model_name]['MTS'])
+
+        metrics[model_name]['EMS_mean'] = np.mean(res[model_name]['EMS'])
+        metrics[model_name]['EMS_std'] = np.std(res[model_name]['EMS'])
+
+    if save_dicts:
+        with open('makespan_metrics.txt', 'w') as f:
+                f.write(json.dumps(res))
+
+    print(f'metrics = {metrics}\n')
+
+    mts_hits = np.sum([1 if vt < fcn else 0 for vt, fcn in zip(res['VanillaTransformer']['MTS'], res['FCN']['MTS'])])
+    mts_performance = (mts_hits * 100) / total
+    mts_textstr = ''.join(f'Predicted Mean Time to Success is lower {mts_performance}% of the time woth VanillaTransformer')
+
+    ems_hits = np.sum([1 if vt < fcn else 0 for vt, fcn in zip(res['VanillaTransformer']['EMS'], res['FCN']['EMS'])])
+    ems_performance = (ems_hits * 100) / total
+    ems_textstr = ''.join(f'Predicted Makespan is lower {ems_performance}% of the time with VanillaTransformer')
+
+    props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+
+    fig, axes = plt.subplots(1, 2, figsize=(20, 8))
+    axes[0].title.set_text('Task Mean Time To Success for each model')
+    axes[1].title.set_text('Expected Makespan for each model')
+    for model_name in res.keys():
+        axes[0].plot(res[model_name]['MTS'], label=model_name)
+        axes[1].plot(res[model_name]['EMS'], label=model_name)
+
+    axes[0].legend()
+    axes[0].set_xlabel('Prediction index')
+    axes[0].set_ylabel('Mean time to Success')
+    axes[0].text(0.02, 0.75, mts_textstr, transform=axes[0].transAxes, bbox=props)
+    axes[1].legend()
+    axes[1].set_xlabel('Prediction index')
+    axes[1].set_ylabel('Makespan prediction')
+    axes[1].text(1.25, 0.75, ems_textstr, transform=axes[0].transAxes, bbox=props)
+
+    plt.savefig('imgs/makespan_prediction/mts_ems_lineplots.png')
+    plt.clf()
+
+    fig, axes = plt.subplots(1, 2, figsize=(20, 8))
+    axes[0].title.set_text('Task Mean Time To Success for each model')
+    axes[1].title.set_text('Expected Makespan for each model')
+    mts = []
+    ems = []
+    for model_name in res.keys():
+        mts.append(res[model_name]['MTS'])
+        ems.append(res[model_name]['EMS'])
+
+    axes[0].hist(mts, alpha=0.5, label=list(res.keys()), bins=10)
+    axes[1].hist(ems, alpha=0.5, label=list(res.keys()), bins=10)
+
+    axes[0].legend()
+    axes[0].set_xlabel('Mean time to success prediction')
+    axes[0].set_ylabel('Count')
+    axes[0].text(0.2, 0.75, mts_textstr, transform=axes[0].transAxes, bbox=props)
+    axes[1].legend()
+    axes[1].set_xlabel('Makespan prediction')
+    axes[1].set_ylabel('Count')
+    axes[1].text(1.5, 0.75, ems_textstr, transform=axes[0].transAxes, bbox=props)
+
+    plt.savefig('imgs/makespan_prediction/mts_ems_histograms.png')
+    plt.clf()

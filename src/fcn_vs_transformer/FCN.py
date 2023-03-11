@@ -79,6 +79,15 @@ class FCN:
     def fit(self, X_train, Y_train, X_test, Y_test, trainWindows, epochs=200, save_model=True):
         batchSize = 256 #128 #256 #512 (out of mem) #256 #128
 
+        callbacks = [
+            tensorflow.keras.callbacks.EarlyStopping(
+                monitor='val_loss',
+                patience=10,
+                restore_best_weights=True,
+                start_from_epoch=epochs*0.2
+            )
+        ]
+
         with tensorflow.device('/GPU:0'):
             self.history = self.model.fit( 
                 # X_train, Y_train.reshape((-1,2)), 
@@ -90,6 +99,7 @@ class FCN:
                 verbose          = True, 
                 # validation_split =   0.2,
                 steps_per_epoch  = int(trainWindows/batchSize), # https://stackoverflow.com/a/49924566
+                callbacks        = callbacks
             )
         
         if save_model:
@@ -133,15 +143,20 @@ class FCN:
                 
         print( '\n', self.file_name, '\n', perf )
 
-        confMatx = {
-            # Actual Positives
-            'TP' : (perf['TP'] if ('TP' in perf) else 0) / ((perf['TP'] if ('TP' in perf) else 0) + (perf['FN'] if ('FN' in perf) else 0)),
-            'FN' : (perf['FN'] if ('FN' in perf) else 0) / ((perf['TP'] if ('TP' in perf) else 0) + (perf['FN'] if ('FN' in perf) else 0)),
-            # Actual Negatives
-            'TN' : (perf['TN'] if ('TN' in perf) else 0) / ((perf['TN'] if ('TN' in perf) else 0) + (perf['FP'] if ('FP' in perf) else 0)),
-            'FP' : (perf['FP'] if ('FP' in perf) else 0) / ((perf['TN'] if ('TN' in perf) else 0) + (perf['FP'] if ('FP' in perf) else 0)),
-            'NC' : (perf['NC'] if ('NC' in perf) else 0) / len( X_winTest ),
-        }
+        try:
+            confMatx = {
+                # Actual Positives
+                'TP' : (perf['TP'] if ('TP' in perf) else 0) / ((perf['TP'] if ('TP' in perf) else 0) + (perf['FN'] if ('FN' in perf) else 0)),
+                'FN' : (perf['FN'] if ('FN' in perf) else 0) / ((perf['TP'] if ('TP' in perf) else 0) + (perf['FN'] if ('FN' in perf) else 0)),
+                # Actual Negatives
+                'TN' : (perf['TN'] if ('TN' in perf) else 0) / ((perf['TN'] if ('TN' in perf) else 0) + (perf['FP'] if ('FP' in perf) else 0)),
+                'FP' : (perf['FP'] if ('FP' in perf) else 0) / ((perf['TN'] if ('TN' in perf) else 0) + (perf['FP'] if ('FP' in perf) else 0)),
+                'NC' : (perf['NC'] if ('NC' in perf) else 0) / len( X_winTest ),
+            }
+        except ZeroDivisionError as e:
+            print(f'Building FCN confusion matrix: {e}')
+            confMatx = None
+            plot = False
 
         print( confMatx )
 

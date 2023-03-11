@@ -26,12 +26,11 @@ from data_preprocessing import DataPreprocessing
 from FCN import FCN
 from VanillaTransformer import Transformer
 from Transformer.CustomSchedule import CustomSchedule
-# from ..Transformer.CustomSchedule import CustomSchedule
 
 
 
 
-dp = DataPreprocessing(sampling='under')
+dp = DataPreprocessing(sampling='none')
 dp.run(verbose=True)
 
 fcn_net = FCN(rolling_window_width=dp.rollWinWidth)
