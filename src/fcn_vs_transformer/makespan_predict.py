@@ -326,7 +326,7 @@ if __name__ == '__main__':
 
     mts_hits = np.sum([1 if vt < fcn else 0 for vt, fcn in zip(res['VanillaTransformer']['MTS'], res['FCN']['MTS'])])
     mts_performance = (mts_hits * 100) / total
-    mts_textstr = ''.join(f'Predicted Mean Time to Success is lower {mts_performance}% of the time woth VanillaTransformer')
+    mts_textstr = ''.join(f'Predicted Mean Time to Success is lower {mts_performance}% of the time with VanillaTransformer')
 
     ems_hits = np.sum([1 if vt < fcn else 0 for vt, fcn in zip(res['VanillaTransformer']['EMS'], res['FCN']['EMS'])])
     ems_performance = (ems_hits * 100) / total
