@@ -343,11 +343,11 @@ if __name__ == '__main__':
 
     axes[0].legend()
     axes[0].set_xlabel('Prediction index')
-    axes[0].set_ylabel('Mean time to Success')
+    axes[0].set_ylabel('Mean time to Success [s]')
     axes[0].text(0.02, 0.75, mts_textstr, transform=axes[0].transAxes, bbox=props)
     axes[1].legend()
     axes[1].set_xlabel('Prediction index')
-    axes[1].set_ylabel('Makespan prediction')
+    axes[1].set_ylabel('Makespan prediction [s]')
     axes[1].text(1.25, 0.75, ems_textstr, transform=axes[0].transAxes, bbox=props)
 
     plt.savefig('imgs/makespan_prediction/mts_ems_lineplots.png')
@@ -366,11 +366,11 @@ if __name__ == '__main__':
     axes[1].hist(ems, alpha=0.5, label=list(res.keys()), bins=10)
 
     axes[0].legend()
-    axes[0].set_xlabel('Mean time to success prediction')
+    axes[0].set_xlabel('Mean time to success prediction [s]')
     axes[0].set_ylabel('Count')
     axes[0].text(0.2, 0.75, mts_textstr, transform=axes[0].transAxes, bbox=props)
     axes[1].legend()
-    axes[1].set_xlabel('Makespan prediction')
+    axes[1].set_xlabel('Makespan prediction [s]')
     axes[1].set_ylabel('Count')
     axes[1].text(1.5, 0.75, ems_textstr, transform=axes[0].transAxes, bbox=props)
 
