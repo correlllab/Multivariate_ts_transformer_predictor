@@ -30,18 +30,20 @@ class Transformer:
 
     def transformer_encoder(self, inputs, head_size, num_heads, ff_dim, dropout=0):
         # Normalization and Attention
-        x = layers.LayerNormalization(epsilon=1e-6)(inputs)
+        # x = layers.LayerNormalization(epsilon=1e-6)(inputs)
         x = layers.MultiHeadAttention(
             key_dim=head_size, num_heads=num_heads, dropout=dropout
-        )(x, x)
+        )(inputs, inputs)
         x = layers.Dropout(dropout)(x)
+        x = layers.LayerNormalization(epsilon=1e-6)(x)
         res = x + inputs
 
         # Feed Forward Part
-        x = layers.LayerNormalization(epsilon=1e-6)(res)
+        # x = layers.LayerNormalization(epsilon=1e-6)(res)
         x = layers.Conv1D(filters=ff_dim, kernel_size=1, activation="relu")(x)
         x = layers.Dropout(dropout)(x)
         x = layers.Conv1D(filters=inputs.shape[-1], kernel_size=1)(x)
+        x = layers.LayerNormalization(epsilon=1e-6)(x)
         return x + res
 
 
@@ -62,7 +64,7 @@ class Transformer:
         for _ in range(num_transformer_blocks):
             x = self.transformer_encoder(x, head_size, num_heads, ff_dim, dropout)
 
-        x = layers.GlobalAveragePooling1D(data_format="channels_first")(x)
+        x = layers.GlobalAveragePooling1D(data_format="channels_last")(x)
         for dim in mlp_units:
             x = layers.Dense(dim, activation="relu")(x)
             x = layers.Dropout(mlp_dropout)(x)
@@ -70,7 +72,7 @@ class Transformer:
         self.model = tf.keras.Model(inputs, outputs)
     
 
-    def fit(self, X_train, Y_train, X_test, Y_test, trainWindows, epochs=200, save_model=True):
+    def fit(self, X_train, Y_train, X_test, Y_test, trainWindows, batch_size=64, epochs=200, save_model=True):
         input_shape = X_train.shape[1:]
         self.build_model(
             input_shape,
@@ -97,23 +99,30 @@ class Transformer:
                 patience=10,
                 restore_best_weights=True,
                 start_from_epoch=epochs*0.2
-            ),
-            tf.keras.callbacks.ModelCheckpoint(
-                filepath=checkpoint_filepath,
-                save_weights_only=False,
-                monitor='val_categorical_accuracy',
-                mode='max',
-                save_best_only=True
             )
         ]
+
+        if save_model:
+            callbacks.append(
+                tf.keras.callbacks.ModelCheckpoint(
+                    filepath=checkpoint_filepath,
+                    save_weights_only=False,
+                    monitor='val_categorical_accuracy',
+                    mode='max',
+                    save_best_only=True
+                )
+            )
 
         self.history = self.model.fit(
             X_train,
             Y_train,
-            validation_split=0.2,
+            validation_split=0.1,
             epochs=epochs,
-            batch_size=64,
+            batch_size=batch_size,
             callbacks=callbacks,
+            # steps_per_epoch  = int(trainWindows/batch_size)
+            steps_per_epoch = len(X_train) // batch_size,
+            validation_steps = len(X_test) // batch_size
         )
 
         # self.evaluation = self.model.evaluate(X_test, Y_test, verbose=1)

@@ -30,48 +30,78 @@ from VanillaTransformer import Transformer
 
 
 
-if __name__ == "__main__":
-    dp = DataPreprocessing()
-    dp.run(verbose=True)
+def plot_histories(histories: dict, num_folds: int, save=False):
+    fig, axes = plt.subplots(2*num_folds, len(histories.keys()), figsize=(20, 8))
+    model_ind = 0
+    for model, hist in histories.items():
+        fold = 0
+        for h in hist:
+            axes[fold, model_ind].plot(h.history['categorical_accuracy'], label=f'{model.upper()} Training accuracy')
+            axes[fold, model_ind].plot(h.history['val_categorical_accuracy'], label=f'{model.upper()} Validation accuracy')
+            axes[fold, model_ind].title.set_text(f'{model.upper()} Accuracy over epochs in fold {fold}')
 
-    print('====> TESTING FOR CLASS IMBALANCE:')
-    print(f'Passes = {sum(dp.Y_train[:,0])}; Fails = {sum(dp.Y_train[:,1])}')
+            axes[fold+1, model_ind].plot(h.history['loss'], label=f'{model.upper()} Training loss')
+            axes[fold+1, model_ind].plot(h.history['val_loss'], label=f'{model.upper()} Validation loss')
+            axes[fold+1, model_ind].title.set_text(f'{model.upper()} Loss over epochs in fold {fold}')
+
+            fold += 2
+        model_ind += 1
+
+    if save:
+        plt.savefig('imgs/kfold/metrics_over_epochs.png')
+    else:
+        plt.plot()
+
+
+if __name__ == "__main__":
+    dp = DataPreprocessing(sampling='under')
+    dp.run(verbose=True)
 
     # Define the K-fold Cross Validator
     num_folds = 10
     kfold = KFold(n_splits=num_folds, shuffle=True)
 
     # Merge inputs and targets
-    inputs = np.concatenate((dp.X_train, dp.X_test), axis=0)
-    targets = np.concatenate((dp.Y_train, dp.Y_test), axis=0)
+    # inputs = np.concatenate((dp.X_train_sampled, dp.X_test), axis=0)
+    # targets = np.concatenate((dp.Y_train_sampled, dp.Y_test), axis=0)
+    inputs = dp.X_train_sampled
+    targets = dp.Y_train_sampled
 
-    print(inputs.shape, targets.shape)
 
     # K-fold Cross Validation model evaluation
     fold_no = 1
+    histories = {'fcn': [], 'transformer': []}
     losses = {'fcn': [], 'transformer': []}
     accs = {'fcn': [], 'transformer': []}
     for train, test in kfold.split(inputs, targets):
+        print(len(train), len(test))
         # Generate a print
         print('------------------------------------------------------------------------')
         print(f'Training for fold {fold_no} ...')
         fcn_net = FCN(rolling_window_width=dp.rollWinWidth)
         fcn_net.build()
-        fcn_net.fit(X_train=dp.X_train_under, Y_train=dp.Y_train_under, X_test=dp.X_test, Y_test=dp.Y_test,
-                    trainWindows=dp.trainWindows, epochs=50, save_model=False)
-        evaluation = fcn_net.model.evaluate(dp.X_test,dp.Y_test, verbose=0)
-        print(f'Score for fold {fold_no}: {fcn_net.model.metrics_names[0]} of {evaluation[0]}; {fcn_net.model.metrics_names[1]} of {evaluation[1]*100}%')
-        accs['fcn'].append(evaluation[1] * 100)
-        losses['fcn'].append(evaluation[0])
+        fcn_history = fcn_net.fit(X_train=inputs[train], Y_train=targets[train],
+                              X_test=inputs[test], Y_test=targets[test],
+                              trainWindows=dp.trainWindows, epochs=20, save_model=False)
+        fcn_evaluation = fcn_net.model.evaluate(dp.X_test,dp.Y_test, verbose=0)
+        print(f'Score for fold {fold_no}: {fcn_net.model.metrics_names[0]} of {fcn_evaluation[0]}; {fcn_net.model.metrics_names[1]} of {fcn_evaluation[1]*100}%')
+        histories['fcn'].append(fcn_history)
+        accs['fcn'].append(fcn_evaluation[1] * 100)
+        losses['fcn'].append(fcn_evaluation[0])
 
-        # transformer_net = Transformer()
-        # transformer_net.fit(X_train=inputs[train], Y_train=targets[train], X_test=inputs[test], Y_test=targets[test],
-        #                     trainWindows=dp.trainWindows, epochs=2, save_model=False)
-        # print(f'Score for fold {fold_no}: {transformer_net.model.metrics_names[0]} of {transformer_net.evaluation[0]}; {transformer_net.model.metrics_names[1]} of {transformer_net.evaluation[1]*100}%')
-        # accs['transformer'].append(transformer_net.evaluation[1] * 100)
-        # losses['transformer'].append(transformer_net.evaluation[0])
+        # vanilla_transformer = Transformer()
+        # transformer_history = vanilla_transformer.fit(X_train=inputs[train], Y_train=targets[train],
+        #                                               X_test=inputs[test], Y_test=targets[test],
+        #                                               trainWindows=dp.trainWindows, epochs=5, save_model=False)
+        # transformer_evaluation = vanilla_transformer.model.evaluate(dp.X_test, dp.Y_test, verbose=0)
+        # print(f'Score for fold {fold_no}: {vanilla_transformer.model.metrics_names[0]} of {vanilla_transformer.evaluation[0]}; {vanilla_transformer.model.metrics_names[1]} of {vanilla_transformer.evaluation[1]*100}%')
+        # histories['transformer'].append(transformer_history)
+        # accs['transformer'].append(transformer_evaluation[1] * 100)
+        # losses['transformer'].append(transformer_evaluation[0])
 
         fold_no += 1
+
+    plot_histories(histories=histories, num_folds=num_folds)
 
     fig, axes = plt.subplots(2, 2, figsize=(20, 8))
 
@@ -84,3 +114,5 @@ if __name__ == "__main__":
     axes[1, 0].title.set_text('Transformer Eval Accuracy per fold')
     axes[1, 1].plot(np.array(losses['transformer']), label='Transformer Eval Loss per fold', color='orange')
     axes[1, 1].title.set_text('Transformer Eval Loss per fold')
+
+    plt.savefig('imgs/kfold/averages.png')

@@ -97,8 +97,10 @@ class FCN:
                 batch_size       = batchSize, 
                 epochs           = epochs, #250, #50, #250, # 2022-09-12: Trained for 250 total
                 verbose          = True, 
-                # validation_split =   0.2,
-                steps_per_epoch  = int(trainWindows/batchSize), # https://stackoverflow.com/a/49924566
+                validation_split = 0.1,
+                # steps_per_epoch  = int(trainWindows/batchSize), # https://stackoverflow.com/a/49924566
+                steps_per_epoch = len(X_train) // batchSize,
+                validation_steps = len(X_test) // batchSize,
                 callbacks        = callbacks
             )
         
