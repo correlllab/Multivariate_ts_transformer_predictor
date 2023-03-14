@@ -264,8 +264,8 @@ class DataPreprocessing:
         if verbose:
             print( '\n' )
             print( self.Y_train.shape, self.Y_test.shape )
-        self.Y_train = to_categorical( self.Y_train )
-        self.Y_test  = to_categorical( self.Y_test  )
+        self.Y_train = to_categorical(self.Y_train, num_classes=2)
+        self.Y_test  = to_categorical(self.Y_test, num_classes=2)
         if verbose:
             print( self.Y_train.shape, self.Y_test.shape )
             print( f"\nThere are {pos} passing windows and {neg} failing windows!, Total: {pos+neg}" )

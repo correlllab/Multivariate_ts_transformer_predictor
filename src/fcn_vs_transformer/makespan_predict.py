@@ -50,7 +50,43 @@ def expected_makespan( MTF, MTN, MTS, P_TP, P_FN, P_TN, P_FP ):
     return -( MTF*P_FP + MTN*P_FN + MTN*P_TN + MTS*P_TP + 1) / (P_FN + P_FP + P_TN - 1)
 
 
-def run_makespan_prediction_for_model(model: tensorflow.keras.Model, dp: DataPreprocessing, verbose=False):
+def make_predictions(model_name: str, model: tensorflow.keras.Model, dp: DataPreprocessing, verbose: bool = False):
+    episode_predictions = []
+    rolling_window_width = int(7.0 * 50)
+    print( f"Each window is {rolling_window_width} timesteps long!" )
+    for ep_index, episode in enumerate(dp.truncData):
+        with tensorflow.device('/GPU:0'):
+            print(f'Episode {ep_index}')
+            time_steps = episode.shape[0]
+            n_windows = time_steps - rolling_window_width + 1
+            episode_X_list = []
+            # episode_label_list = []
+            true_label = None
+            for i in range(n_windows):
+                # TODO: make the window centered (i.e. i +- (window_width / 2)) ??
+                episode_window = episode[i:i + rolling_window_width, :]
+                episode_X_list.append(episode_window[:, 1:7])
+                # Need to change this because it is also done in training data
+                # if episode_window[0, 7] == 0.0:
+                #     episode_label_list.append(1.0)
+                # elif episode_window[0, 7] == 1.0:
+                #     episode_label_list.append(0.0)
+                # episode_X = episode_window[:, 1:7]
+                # episode_label = episode_window[0, 7]
+
+            episode_X = tensorflow.stack(episode_X_list)
+            # episode_label = tensorflow.stack(tensorflow.keras.utils.to_categorical(episode_label_list, num_classes=2))
+            if episode_window[0, 7] == 0.0:
+                true_label = 1.0
+            elif episode_window[0, 7] == 1.0:
+                true_label = 0.0
+            prediction = model.predict(episode_X)
+            episode_predictions.append([prediction, true_label])
+
+    np.save(f'{model_name}_episode_predictions.npy', episode_predictions, allow_pickle=True)
+
+
+def run_makespan_prediction_for_model(model_name: str, model: tensorflow.keras.Model, dp: DataPreprocessing, verbose: bool = False):
     perf = CounterDict()
 
     N_posCls  = 0 # --------- Number of positive classifications
@@ -66,91 +102,131 @@ def run_makespan_prediction_for_model(model: tensorflow.keras.Model, dp: DataPre
     # yList     = dp.Y_winTest
     # winLen    = dp.truncData[0].shape[1]
 
+    episode_predictions = np.array(np.load(f'{model_name}_episode_predictions.npy', allow_pickle=True))
+    if verbose:
+        print(f'\nEpisode predictions matrix shape = {episode_predictions.shape}\n')
+
     timed_episodes = []
 
     rolling_window_width = int(7.0 * 50)
     print( f"Each window is {rolling_window_width} timesteps long!" )
+    for episode in episode_predictions:
+        predictions = episode[0]
+        true_label = episode[1]
+        n_windows = len(predictions) - rolling_window_width + 1
+        n_steps = 0
+        for prediction in predictions:
+            ans, ad_x, row = scan_output_for_decision(
+                np.array([prediction]),
+                np.array([tensorflow.keras.utils.to_categorical(true_label, num_classes=2)]),
+                threshold=0.9
+            )
+            n_steps += 1
+            if ans != 'NC':
+                break
+
+        print(f'Window {n_steps}/{n_windows}: Prediction = [{row[0]:.3f}, {row[1]:.3f}] | True label = {true_label} | Answer = {ans}')
+
+        perf.count(ans)
+
+        # Measure time performance
+        # episode_len_s = n_steps * ts_s
+        episode_len_s = (rolling_window_width + n_steps - 1) * ts_s
+        # episode_len_s = (rolling_window_width + X_episodes.shape[0] - 1) * ts_s
+
+        episode_obj = EpisodePerf()
+        episode_obj.trueLabel = true_label
+        episode_obj.answer = ans
+        episode_obj.runTime = episode_len_s
+
+        if true_label == 1.0:
+            MTS += episode_len_s
+            N_success += 1
+            episode_obj.TTS = episode_len_s
+        elif true_label == 0.0:
+            MTF += episode_len_s
+            N_failure += 1
+            episode_obj.TTF = episode_len_s
+
+        tAns_s = (ad_x + rolling_window_width - 1) * ts_s
+        if ans in ( 'TP', 'FP' ):
+            MTP += tAns_s
+            episode_obj.TTP = tAns_s
+            N_posCls += 1
+        elif ans in ( 'TN', 'FN' ):
+            MTN += tAns_s
+            episode_obj.TTN = tAns_s
+            N_negCls += 1
+
+        timed_episodes.append(episode_obj)
+
+
+
     # for ep_index, episode in enumerate(dp.truncData):
     #     with tensorflow.device('/GPU:0'):
     #         print(f'Episode {ep_index}')
     #         time_steps = episode.shape[0]
     #         n_windows = time_steps - rolling_window_width + 1
+    #         episode_X_list = []
+    #         episode_label_list = []
+    #         true_label = None
     #         for i in range(n_windows):
     #             # TODO: make the window centered (i.e. i +- (window_width / 2)) ??
     #             episode_window = episode[i:i + rolling_window_width, :]
-    #             episode_X = episode_window[:, 1:7]
-    #             episode_label = episode_window[0, 7]
+    #             episode_X_list.append(episode_window[:, 1:7])
+    #             # Need to change this because it is also done in training data
+    #             if episode_window[0, 7] == 0.0:
+    #                 episode_label_list.append(1.0)
+    #             elif episode_window[0, 7] == 1.0:
+    #                 episode_label_list.append(0.0)
+    #             # episode_X = episode_window[:, 1:7]
+    #             # episode_label = episode_window[0, 7]
 
-    #             prediction = model(episode_X[None, :])
-    #             ans, ad_x = scan_output_for_decision(prediction, tensorflow.keras.utils.to_categorical(episode_label, num_classes=2), threshold=0.9)
-    #             if ans != 'NC':
-    #                 break
-    #             if i % 500 == 0.0:
-    #                 print(f'Window {i}/{n_windows}: Prediction = [{prediction[0][0]:.3f}, {prediction[0][1]:.3f}] | True label = {episode_label} | Answer = {ans}')
+    #         episode_X = tensorflow.stack(episode_X_list)
+    #         episode_label = tensorflow.stack(tensorflow.keras.utils.to_categorical(episode_label_list, num_classes=2))
+    #         true_label = episode_window[0, 7]
 
-    #         print(f'Window {i}/{n_windows}: Prediction = [{prediction[0][0]:.3f}, {prediction[0][1]:.3f}] | True label = {episode_label} | Answer = {ans}')
+    #         # prediction = model(episode_X)
+    #         prediction = model.predict(episode_X)
+    #         ans, ad_x, row = scan_output_for_decision(prediction, episode_label, threshold=0.9)
 
-    for ep_index, episode in enumerate(dp.truncData):
-        with tensorflow.device('/GPU:0'):
-            print(f'Episode {ep_index}')
-            time_steps = episode.shape[0]
-            n_windows = time_steps - rolling_window_width + 1
-            episode_X_list = []
-            episode_label_list = []
-            true_label = None
-            for i in range(n_windows):
-                # TODO: make the window centered (i.e. i +- (window_width / 2)) ??
-                episode_window = episode[i:i + rolling_window_width, :]
-                episode_X_list.append(episode_window[:, 1:7])
-                episode_label_list.append(episode_window[0, 7])
-                # episode_X = episode_window[:, 1:7]
-                # episode_label = episode_window[0, 7]
+    #         print(f'Window {i}/{n_windows}: Prediction = [{row[0]:.3f}, {row[1]:.3f}] | True label = {episode_label[0]} | Answer = {ans}')
 
-            episode_X = tensorflow.stack(episode_X_list)
-            episode_label = tensorflow.stack(tensorflow.keras.utils.to_categorical(episode_label_list, num_classes=2))
-            true_label = episode_window[0, 7]
+    #         perf.count(ans)
 
-            # prediction = model(episode_X)
-            prediction = model.predict(episode_X)
-            ans, ad_x, row = scan_output_for_decision(prediction, episode_label, threshold=0.9)
+    #         # Measure time performance
+    #         episode_len_s = (rolling_window_width + episode_X.shape[0] - 1) * ts_s
+    #         # episode_len_s = (rolling_window_width + X_episodes.shape[0] - 1) * ts_s
 
-            print(f'Window {i}/{n_windows}: Prediction = [{row[0]:.3f}, {row[1]:.3f}] | True label = {episode_label[0]} | Answer = {ans}')
+    #         episode_obj = EpisodePerf()
+    #         episode_obj.trueLabel = true_label
+    #         episode_obj.answer = ans
+    #         episode_obj.runTime = episode_len_s
 
-            perf.count(ans)
+    #         if true_label == 1.0:
+    #             MTS += episode_len_s
+    #             N_success += 1
+    #             episode_obj.TTS = episode_len_s
+    #         elif true_label == 0.0:
+    #             MTF += episode_len_s
+    #             N_failure += 1
+    #             episode_obj.TTF = episode_len_s
 
-            # Measure time performance
-            episode_len_s = (rolling_window_width + episode_X.shape[0] - 1) * ts_s
-            # episode_len_s = (rolling_window_width + X_episodes.shape[0] - 1) * ts_s
+    #         tAns_s = (ad_x + rolling_window_width - 1) * ts_s
+    #         if ans in ( 'TP', 'FP' ):
+    #             MTP += tAns_s
+    #             episode_obj.TTP = tAns_s
+    #             N_posCls += 1
+    #         elif ans in ( 'TN', 'FN' ):
+    #             MTN += tAns_s
+    #             episode_obj.TTN = tAns_s
+    #             N_negCls += 1
 
-            episode_obj = EpisodePerf()
-            episode_obj.trueLabel = true_label
-            episode_obj.answer = ans
-            episode_obj.runTime = episode_len_s
-
-            if true_label == 1.0:
-                MTS += episode_len_s
-                N_success += 1
-                episode_obj.TTS = episode_len_s
-            elif true_label == 0.0:
-                MTF += episode_len_s
-                N_failure += 1
-                episode_obj.TTF = episode_len_s
-
-            tAns_s = (ad_x + rolling_window_width - 1) * ts_s
-            if ans in ( 'TP', 'FP' ):
-                MTP += tAns_s
-                episode_obj.TTP = tAns_s
-                N_posCls += 1
-            elif ans in ( 'TN', 'FN' ):
-                MTN += tAns_s
-                episode_obj.TTN = tAns_s
-                N_negCls += 1
-
-        timed_episodes.append(episode_obj)
+    #     timed_episodes.append(episode_obj)
 
     times = []
     for ep in timed_episodes:
-        times.append(sum(item.runTime for item in ep)) 
+        times.append(ep.runTime) 
 
     confMatx = {
         # Actual Positives
@@ -165,24 +241,6 @@ def run_makespan_prediction_for_model(model: tensorflow.keras.Model, dp: DataPre
     print()
     print( perf )
     print( confMatx )
-
-
-        # for i in range(total):
-        #     dp = DataPreprocessing(sampling='none')
-        #     dp.run(verbose=False)
-        #     print(f'\nIteration {i}/{total} [{(i*100)/total}%]')
-        #     for model_name, model in makespan_models.items():
-        #         if model_name not in res.keys():
-        #             res[model_name] = {'MTS': [], 'EMS': []}
-        #         print(f'====> For model {model_name}:')
-        #         mts, ems = run_makespan_prediction_for_model(model=model, dp=dp, verbose=False)
-        #         res[model_name]['MTS'].append(mts)
-        #         res[model_name]['EMS'].append(ems)
-        #         print()
-        
-        # if save_dicts:
-        #     with open('makespan_results.txt', 'w') as f:
-        #         f.write(json.dumps(res))
 
     MTP /= N_posCls #- Mean Time to Positive Classification
     MTN /= N_negCls #- Mean Time to Negative Classification
@@ -199,22 +257,6 @@ def run_makespan_prediction_for_model(model: tensorflow.keras.Model, dp: DataPre
 
     if verbose:
         print('MC BASELINE...')
-    # TODO: decide which of the two is the right one and ask why N = 200000
-    # N   = 200000 # Number of trials
-    # MTS = 0.0 # Mean time to success
-
-    # for i in range(N):
-    #     failing = 1
-    #     TS_i    = 0.0
-    #     while( failing ):
-    #         ep = choice( timedEpisodes )
-    #         TS_i += ep.runTime
-    #         failing = not int( ep.trueLabel )
-    #     MTS += TS_i
-        
-    # MTS /= N
-    # print( f"Task Mean Time to Success: {MTS} [s]" )
-
     N   = 200000 # Number of trials
     MTS = 0.0 # Mean time to success
 
@@ -251,66 +293,101 @@ def run_makespan_prediction_for_model(model: tensorflow.keras.Model, dp: DataPre
         P_FP = confMatx['FP'] * (N_failure/(N_success + N_failure))  
     )
     print( EMS, end=' [s]' )
-    return MTS, EMS, confMatx, times
+    metrics = {
+        'EMS': [EMS],
+        'MTP': [MTP],
+        'MTN': [MTN],
+        'MTS': [MTS],
+        'MTF': [MTF],
+        'P_TP': confMatx['TP'] * (N_success/(N_success + N_failure)),
+        'P_FN': confMatx['FN'] * (N_success/(N_success + N_failure)),
+        'P_TN': confMatx['TN'] * (N_failure/(N_success + N_failure)),
+        'P_FP': confMatx['FP'] * (N_failure/(N_success + N_failure))
+    }
+    return metrics, confMatx, times
 
 
 def plot_mts_ems(res: dict, save_plots: bool = True):
-    mts_hits = np.sum([1 if vt < fcn else 0 for vt, fcn in zip(res['VanillaTransformer']['MTS'], res['FCN']['MTS'])])
-    mts_performance = (mts_hits * 100) / total
-    mts_textstr = ''.join(f'Predicted Mean Time to Success is lower {mts_performance}% of the time with VanillaTransformer')
+    mts_time_reduction = 1 - (res['VanillaTransformer']['metrics']['MTS'][0] / res['FCN']['metrics']['MTS'][0])
+    mts_textstr = ''.join(f'Mean Time to Success is decreased by {mts_time_reduction*100:.3f}% with VanillaTransformer')
 
-    ems_hits = np.sum([1 if vt < fcn else 0 for vt, fcn in zip(res['VanillaTransformer']['EMS'], res['FCN']['EMS'])])
-    ems_performance = (ems_hits * 100) / total
-    ems_textstr = ''.join(f'Predicted Makespan is lower {ems_performance}% of the time with VanillaTransformer')
+    ems_time_reduction = 1 - (res['VanillaTransformer']['metrics']['EMS'][0] / res['FCN']['metrics']['EMS'][0])
+    ems_textstr = ''.join(f'Makespan is decreased by {ems_time_reduction*100:.3f}% with VanillaTransformer')
 
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
 
-    fig, axes = plt.subplots(1, 2, figsize=(20, 8))
-    axes[0].title.set_text('Task Mean Time To Success for each model')
-    axes[1].title.set_text('Expected Makespan for each model')
-    for model_name in res.keys():
-        axes[0].plot(res[model_name]['MTS'], label=model_name)
-        axes[1].plot(res[model_name]['EMS'], label=model_name)
 
-    axes[0].legend()
-    axes[0].set_xlabel('Prediction index')
+    fig, axes = plt.subplots(1, 2, figsize=(20, 8))
+    for model_name in res.keys():
+        axes[0].bar([model_name], res[model_name]['metrics']['MTS'], label=model_name)
+        axes[1].bar([model_name], res[model_name]['metrics']['EMS'], label=model_name)
+
+    # axes[0].legend()
+    axes[0].set_xlabel('Model')
     axes[0].set_ylabel('Mean time to Success [s]')
-    axes[0].text(0.02, 0.75, mts_textstr, transform=axes[0].transAxes, bbox=props)
-    axes[1].legend()
-    axes[1].set_xlabel('Prediction index')
-    axes[1].set_ylabel('Makespan prediction [s]')
-    axes[1].text(1.25, 0.75, ems_textstr, transform=axes[0].transAxes, bbox=props)
+    axes[0].text(0.25, 0.75, mts_textstr, transform=axes[0].transAxes, bbox=props)
+    # axes[1].legend()
+    axes[1].set_xlabel('Model')
+    axes[1].set_ylabel('Expected Makespan [s]')
+    axes[1].text(1.55, 0.75, ems_textstr, transform=axes[0].transAxes, bbox=props)
+
+
+    # mts_hits = np.sum([1 if vt < fcn else 0 for vt, fcn in zip(res['VanillaTransformer']['metrics']['MTS'], res['FCN']['metrics']['MTS'])])
+    # mts_performance = (mts_hits * 100) / total
+    # mts_textstr = ''.join(f'Predicted Mean Time to Success is lower {mts_performance}% of the time with VanillaTransformer')
+
+    # ems_hits = np.sum([1 if vt < fcn else 0 for vt, fcn in zip(res['VanillaTransformer']['metrics']['EMS'], res['FCN']['metrics']['EMS'])])
+    # ems_performance = (ems_hits * 100) / total
+    # ems_textstr = ''.join(f'Predicted Makespan is lower {ems_performance}% of the time with VanillaTransformer')
+
+    # props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+
+    # fig, axes = plt.subplots(1, 2, figsize=(20, 8))
+    # axes[0].title.set_text('Task Mean Time To Success for each model')
+    # axes[1].title.set_text('Expected Makespan for each model')
+    # for model_name in res.keys():
+    #     axes[0].plot(res[model_name]['metrics']['MTS'], label=model_name)
+    #     axes[1].plot(res[model_name]['metrics']['EMS'], label=model_name)
+
+    # axes[0].legend()
+    # axes[0].set_xlabel('Prediction index')
+    # axes[0].set_ylabel('Mean time to Success [s]')
+    # axes[0].text(0.02, 0.75, mts_textstr, transform=axes[0].transAxes, bbox=props)
+    # axes[1].legend()
+    # axes[1].set_xlabel('Prediction index')
+    # axes[1].set_ylabel('Makespan prediction [s]')
+    # axes[1].text(1.25, 0.75, ems_textstr, transform=axes[0].transAxes, bbox=props)
+
+    # if save_plots:
+    #     plt.savefig('imgs/makespan_prediction/mts_ems_lineplots.png')
+    #     plt.clf()
+    # else:
+    #     plt.plot()
+
+
+    # fig, axes = plt.subplots(1, 2, figsize=(20, 8))
+    # axes[0].title.set_text('Task Mean Time To Success for each model')
+    # axes[1].title.set_text('Expected Makespan for each model')
+    # mts = []
+    # ems = []
+    # for model_name in res.keys():
+    #     mts.append(res[model_name]['metrics']['MTS'])
+    #     ems.append(res[model_name]['metrics']['EMS'])
+
+    # axes[0].hist(mts, alpha=0.5, label=list(res.keys()), bins=10)
+    # axes[1].hist(ems, alpha=0.5, label=list(res.keys()), bins=10)
+
+    # axes[0].legend()
+    # axes[0].set_xlabel('Mean time to success prediction [s]')
+    # axes[0].set_ylabel('Count')
+    # axes[0].text(0.2, 0.75, mts_textstr, transform=axes[0].transAxes, bbox=props)
+    # axes[1].legend()
+    # axes[1].set_xlabel('Makespan prediction [s]')
+    # axes[1].set_ylabel('Count')
+    # axes[1].text(1.5, 0.75, ems_textstr, transform=axes[0].transAxes, bbox=props)
 
     if save_plots:
-        plt.savefig('imgs/makespan_prediction/mts_ems_lineplots.png')
-        plt.clf()
-    else:
-        plt.plot()
-
-
-    fig, axes = plt.subplots(1, 2, figsize=(20, 8))
-    axes[0].title.set_text('Task Mean Time To Success for each model')
-    axes[1].title.set_text('Expected Makespan for each model')
-    mts = []
-    ems = []
-    for model_name in res.keys():
-        mts.append(res[model_name]['MTS'])
-        ems.append(res[model_name]['EMS'])
-
-    axes[0].hist(mts, alpha=0.5, label=list(res.keys()), bins=10)
-    axes[1].hist(ems, alpha=0.5, label=list(res.keys()), bins=10)
-
-    axes[0].legend()
-    axes[0].set_xlabel('Mean time to success prediction [s]')
-    axes[0].set_ylabel('Count')
-    axes[0].text(0.2, 0.75, mts_textstr, transform=axes[0].transAxes, bbox=props)
-    axes[1].legend()
-    axes[1].set_xlabel('Makespan prediction [s]')
-    axes[1].set_ylabel('Count')
-    axes[1].text(1.5, 0.75, ems_textstr, transform=axes[0].transAxes, bbox=props)
-
-    if save_plots:
-        plt.savefig('imgs/makespan_prediction/mts_ems_histograms.png')
+        plt.savefig('imgs/makespan_prediction/mts_ems_barplots.png')
         plt.clf()
     else:
         plt.plot()
@@ -319,20 +396,21 @@ def plot_mts_ems(res: dict, save_plots: bool = True):
 def plot_model_confusion_matrix(model_name: str, conf_mat: dict, save_plot: bool = True):
     arr = [
         [conf_mat['TP'], conf_mat['FP']],
-        [conf_mat['FN'], conf_mat['TP']]
+        [conf_mat['FN'], conf_mat['TN']]
     ]
 
     if save_plot:
         conf_mat = sns.heatmap(arr, annot=True).get_figure()
-        conf_mat.savefig(f'imgs/makespan/{model_name}_confusion_matrix.png')
+        conf_mat.savefig(f'imgs/makespan_prediction/{model_name}_confusion_matrix.png')
+        plt.clf()
     else:
         sns.heatmap(arr, annot=True)
 
 
 def plot_runtimes(res: dict, save_plots: bool = True):
     ems_hits = np.sum([1 if vt < fcn else 0 for vt, fcn in zip(res['VanillaTransformer']['times'], res['FCN']['times'])])
-    ems_performance = (ems_hits * 100) / total
-    ems_textstr = ''.join(f'Predicted Makespan is lower {ems_performance}% of the time with VanillaTransformer')
+    ems_performance = (ems_hits * 100) / len(res['VanillaTransformer']['times'])
+    ems_textstr = ''.join(f'Predicted Makespan is lower {ems_performance:.3f}% of the time with VanillaTransformer')
 
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
 
@@ -355,7 +433,6 @@ def plot_runtimes(res: dict, save_plots: bool = True):
         plt.plot()
 
 
-# TODO: change 0s to 1s and 1s to 0s in the true_labels
 if __name__ == '__main__':
     gpus = tensorflow.config.experimental.list_physical_devices(device_type='GPU')
     print( f"Found {len(gpus)} GPUs!" )
@@ -384,8 +461,13 @@ if __name__ == '__main__':
 
     makespan_models = {}
 
+    # If True it will run pipeline: load models, predict (if true) and generate metrics, if False it will generate metrics from saved files
     compute = True
+    # If True it will run prediction inside computation pipeline, if False it will load predictions from npy file
+    predict = False
+    # If True, it will save dicts upon metric generation
     save_dicts = True
+    # If True it will save generated plots
     save_plots = True
     res = {}
     total = 50
@@ -428,11 +510,12 @@ if __name__ == '__main__':
 
         for model_name, model in makespan_models.items():
             if model_name not in res.keys():
-                res[model_name] = {'MTS': [], 'EMS': [], 'conf_mat': {}, 'times': []}
+                res[model_name] = {'metrics': {}, 'conf_mat': {}, 'times': []}
             print(f'====> For model {model_name}:')
-            mts, ems, conf_mat, times = run_makespan_prediction_for_model(model=model, dp=dp, verbose=True)
-            res[model_name]['MTS'].append(mts)
-            res[model_name]['EMS'].append(ems)
+            if predict:
+                make_predictions(model_name=model_name, model=model, dp=dp, verbose=True)
+            makespan_metrics, conf_mat, times = run_makespan_prediction_for_model(model_name=model_name, model=model, dp=dp, verbose=True)
+            res[model_name]['metrics'] = makespan_metrics
             res[model_name]['conf_mat'] = conf_mat
             res[model_name]['times'] = times
             print()
@@ -444,14 +527,14 @@ if __name__ == '__main__':
 
     metrics = {k: {} for k in list(res.keys())}
     for model_name in res.keys():
-        metrics[model_name]['MTS_mean'] = np.mean(res[model_name]['MTS'])
-        metrics[model_name]['MTS_std'] = np.std(res[model_name]['MTS'])
+        metrics[model_name]['MTS_mean'] = np.mean(res[model_name]['metrics']['MTS'])
+        metrics[model_name]['MTS_std'] = np.std(res[model_name]['metrics']['MTS'])
 
-        metrics[model_name]['EMS_mean'] = np.mean(res[model_name]['EMS'])
-        metrics[model_name]['EMS_std'] = np.std(res[model_name]['EMS'])
+        metrics[model_name]['EMS_mean'] = np.mean(res[model_name]['metrics']['EMS'])
+        metrics[model_name]['EMS_std'] = np.std(res[model_name]['metrics']['EMS'])
 
     if save_dicts:
-        with open('makespan_metrics.txt', 'w') as f:
+        with open('makespan_results.txt', 'w') as f:
                 f.write(json.dumps(res))
 
     print(f'metrics = {metrics}\n')
