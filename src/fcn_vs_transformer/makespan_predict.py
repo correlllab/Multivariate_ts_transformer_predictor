@@ -4,6 +4,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # INFO and WARNING messages are not pri
 import glob
 import pandas as pd
 import numpy as np
+import seaborn as sns
 import tensorflow
 import matplotlib.pyplot as plt
 from matplotlib.offsetbox import AnchoredText
@@ -40,8 +41,8 @@ def scan_output_for_decision( output, trueLabel, threshold = 0.90 ):
                 ans += 'P'
             else:
                 ans += 'N'
-            return ans, i
-    return 'NC', output.shape[0]
+            return ans, i, row
+    return 'NC', output.shape[0], row
 
 
 def expected_makespan( MTF, MTN, MTS, P_TP, P_FN, P_TN, P_FP ):
@@ -111,9 +112,9 @@ def run_makespan_prediction_for_model(model: tensorflow.keras.Model, dp: DataPre
 
             # prediction = model(episode_X)
             prediction = model.predict(episode_X)
-            ans, ad_x = scan_output_for_decision(prediction, episode_label, threshold=0.9)
+            ans, ad_x, row = scan_output_for_decision(prediction, episode_label, threshold=0.9)
 
-            print(f'Window {i}/{n_windows}: Prediction = [{prediction[0][0]:.3f}, {prediction[0][1]:.3f}] | True label = {episode_label[0]} | Answer = {ans}')
+            print(f'Window {i}/{n_windows}: Prediction = [{row[0]:.3f}, {row[1]:.3f}] | True label = {episode_label[0]} | Answer = {ans}')
 
             perf.count(ans)
 
@@ -146,6 +147,10 @@ def run_makespan_prediction_for_model(model: tensorflow.keras.Model, dp: DataPre
                 N_negCls += 1
 
         timed_episodes.append(episode_obj)
+
+    times = []
+    for ep in timed_episodes:
+        times.append(sum(item.runTime for item in ep)) 
 
     confMatx = {
         # Actual Positives
@@ -246,7 +251,7 @@ def run_makespan_prediction_for_model(model: tensorflow.keras.Model, dp: DataPre
         P_FP = confMatx['FP'] * (N_failure/(N_success + N_failure))  
     )
     print( EMS, end=' [s]' )
-    return MTS, EMS, confMatx
+    return MTS, EMS, confMatx, times
 
 
 def plot_mts_ems(res: dict, save_plots: bool = True):
@@ -312,9 +317,45 @@ def plot_mts_ems(res: dict, save_plots: bool = True):
 
 
 def plot_model_confusion_matrix(model_name: str, conf_mat: dict, save_plot: bool = True):
-    pass
+    arr = [
+        [conf_mat['TP'], conf_mat['FP']],
+        [conf_mat['FN'], conf_mat['TP']]
+    ]
+
+    if save_plot:
+        conf_mat = sns.heatmap(arr, annot=True).get_figure()
+        conf_mat.savefig(f'imgs/makespan/{model_name}_confusion_matrix.png')
+    else:
+        sns.heatmap(arr, annot=True)
 
 
+def plot_runtimes(res: dict, save_plots: bool = True):
+    ems_hits = np.sum([1 if vt < fcn else 0 for vt, fcn in zip(res['VanillaTransformer']['times'], res['FCN']['times'])])
+    ems_performance = (ems_hits * 100) / total
+    ems_textstr = ''.join(f'Predicted Makespan is lower {ems_performance}% of the time with VanillaTransformer')
+
+    props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+
+    fig, axes = plt.subplots(1, 1, figsize=(20, 8))
+    axes.title.set_text('Expected Makespan for each model')
+    runtimes = []
+    for model_name in res.keys():
+        runtimes.append(res[model_name]['times'])
+    
+    axes.hist(runtimes, alpha=0.5, label=list(res.keys()), bins=10)
+    axes.legend()
+    axes.set_xlabel('Expected Makespansn [s]')
+    axes.set_ylabel('Count')
+    axes.text(0.2, 0.75, ems_textstr, transform=axes.transAxes, bbox=props)
+
+    if save_plots:
+        plt.savefig('imgs/makespan_prediction/makespan_histogram.png')
+        plt.clf()
+    else:
+        plt.plot()
+
+
+# TODO: change 0s to 1s and 1s to 0s in the true_labels
 if __name__ == '__main__':
     gpus = tensorflow.config.experimental.list_physical_devices(device_type='GPU')
     print( f"Found {len(gpus)} GPUs!" )
@@ -387,12 +428,13 @@ if __name__ == '__main__':
 
         for model_name, model in makespan_models.items():
             if model_name not in res.keys():
-                res[model_name] = {'MTS': [], 'EMS': [], 'conf_mat': {}}
+                res[model_name] = {'MTS': [], 'EMS': [], 'conf_mat': {}, 'times': []}
             print(f'====> For model {model_name}:')
-            mts, ems, conf_mat = run_makespan_prediction_for_model(model=model, dp=dp, verbose=True)
+            mts, ems, conf_mat, times = run_makespan_prediction_for_model(model=model, dp=dp, verbose=True)
             res[model_name]['MTS'].append(mts)
             res[model_name]['EMS'].append(ems)
             res[model_name]['conf_mat'] = conf_mat
+            res[model_name]['times'] = times
             print()
     else:
         with open('makespan_results.txt', 'r') as f:
@@ -415,5 +457,6 @@ if __name__ == '__main__':
     print(f'metrics = {metrics}\n')
 
     plot_mts_ems(res=res, save_plots=save_plots)
+    plot_runtimes(res=res, save_plots=save_plots)
     for model_name in res.keys():
         plot_model_confusion_matrix(model_name=model_name, conf_mat=res[model_name]['conf_mat'], save_plot=save_plots)
