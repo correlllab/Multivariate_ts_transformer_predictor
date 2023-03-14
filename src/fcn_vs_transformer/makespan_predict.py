@@ -456,6 +456,7 @@ if __name__ == '__main__':
 
     print(f'metrics = {metrics}\n')
 
+
     plot_mts_ems(res=res, save_plots=save_plots)
     plot_runtimes(res=res, save_plots=save_plots)
     for model_name in res.keys():
