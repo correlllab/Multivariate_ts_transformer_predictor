@@ -309,10 +309,10 @@ def run_makespan_prediction_for_model(model_name: str, model: tensorflow.keras.M
 
 def plot_mts_ems(res: dict, save_plots: bool = True):
     mts_time_reduction = 1 - (res['VanillaTransformer']['metrics']['MTS'][0] / res['FCN']['metrics']['MTS'][0])
-    mts_textstr = ''.join(f'Mean Time to Success is decreased by {mts_time_reduction*100:.3f}% with VanillaTransformer')
+    mts_textstr = ''.join(f'Mean Time to Success is decreased by {mts_time_reduction*100:.3f}% \nwith VanillaTransformer')
 
     ems_time_reduction = 1 - (res['VanillaTransformer']['metrics']['EMS'][0] / res['FCN']['metrics']['EMS'][0])
-    ems_textstr = ''.join(f'Makespan is decreased by {ems_time_reduction*100:.3f}% with VanillaTransformer')
+    ems_textstr = ''.join(f'Makespan is decreased by {ems_time_reduction*100:.3f}% \nwith VanillaTransformer')
 
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
 
@@ -325,11 +325,11 @@ def plot_mts_ems(res: dict, save_plots: bool = True):
     # axes[0].legend()
     axes[0].set_xlabel('Model')
     axes[0].set_ylabel('Mean time to Success [s]')
-    axes[0].text(0.25, 0.75, mts_textstr, transform=axes[0].transAxes, bbox=props)
+    axes[0].text(0.25, 0.75, mts_textstr, transform=axes[0].transAxes, bbox=props, fontsize=15)
     # axes[1].legend()
     axes[1].set_xlabel('Model')
     axes[1].set_ylabel('Expected Makespan [s]')
-    axes[1].text(1.55, 0.75, ems_textstr, transform=axes[0].transAxes, bbox=props)
+    axes[1].text(1.55, 0.75, ems_textstr, transform=axes[0].transAxes, bbox=props, fontsize=15)
 
 
     # mts_hits = np.sum([1 if vt < fcn else 0 for vt, fcn in zip(res['VanillaTransformer']['metrics']['MTS'], res['FCN']['metrics']['MTS'])])
@@ -399,6 +399,7 @@ def plot_model_confusion_matrix(model_name: str, conf_mat: dict, save_plot: bool
         [conf_mat['FN'], conf_mat['TN']]
     ]
 
+    sns.set(font_scale=2)
     if save_plot:
         conf_mat = sns.heatmap(arr, annot=True).get_figure()
         conf_mat.savefig(f'imgs/makespan_prediction/{model_name}_confusion_matrix.png')
@@ -424,7 +425,7 @@ def plot_runtimes(res: dict, save_plots: bool = True):
     axes.legend()
     axes.set_xlabel('Expected Makespansn [s]')
     axes.set_ylabel('Count')
-    axes.text(0.2, 0.75, ems_textstr, transform=axes.transAxes, bbox=props)
+    axes.text(0.2, 0.75, ems_textstr, transform=axes.transAxes, bbox=props, fontsize=20)
 
     if save_plots:
         plt.savefig('imgs/makespan_prediction/makespan_histogram.png')
@@ -462,7 +463,7 @@ if __name__ == '__main__':
     makespan_models = {}
 
     # If True it will run pipeline: load models, predict (if true) and generate metrics, if False it will generate metrics from saved files
-    compute = True
+    compute = False
     # If True it will run prediction inside computation pipeline, if False it will load predictions from npy file
     predict = False
     # If True, it will save dicts upon metric generation
