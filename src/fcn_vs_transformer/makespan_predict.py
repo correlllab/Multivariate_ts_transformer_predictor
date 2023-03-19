@@ -309,85 +309,40 @@ def run_makespan_prediction_for_model(model_name: str, model: tensorflow.keras.M
 
 def plot_mts_ems(res: dict, save_plots: bool = True):
     mts_time_reduction = 1 - (res['VanillaTransformer']['metrics']['MTS'][0] / res['FCN']['metrics']['MTS'][0])
-    mts_textstr = ''.join(f'Mean Time to Success is decreased by {mts_time_reduction*100:.3f}% \nwith VanillaTransformer')
+    mts_textstr = ''.join(f'Mean Time to Success is decreased by {mts_time_reduction*100:.3f}%\nwith VanillaTransformer')
 
     ems_time_reduction = 1 - (res['VanillaTransformer']['metrics']['EMS'][0] / res['FCN']['metrics']['EMS'][0])
-    ems_textstr = ''.join(f'Makespan is decreased by {ems_time_reduction*100:.3f}% \nwith VanillaTransformer')
+    ems_textstr = ''.join(f'Makespan is decreased by {ems_time_reduction*100:.3f}%\nwith VanillaTransformer')
 
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
 
 
-    fig, axes = plt.subplots(1, 2, figsize=(20, 8))
+    fig, axes = plt.subplots(1, 1, figsize=(20, 8))
     for model_name in res.keys():
-        axes[0].bar([model_name], res[model_name]['metrics']['MTS'], label=model_name)
-        axes[1].bar([model_name], res[model_name]['metrics']['EMS'], label=model_name)
+        axes.bar([model_name], res[model_name]['metrics']['MTS'], label=model_name)
 
-    # axes[0].legend()
-    axes[0].set_xlabel('Model')
-    axes[0].set_ylabel('Mean time to Success [s]')
-    axes[0].text(0.25, 0.75, mts_textstr, transform=axes[0].transAxes, bbox=props, fontsize=15)
-    # axes[1].legend()
-    axes[1].set_xlabel('Model')
-    axes[1].set_ylabel('Expected Makespan [s]')
-    axes[1].text(1.55, 0.75, ems_textstr, transform=axes[0].transAxes, bbox=props, fontsize=15)
-
-
-    # mts_hits = np.sum([1 if vt < fcn else 0 for vt, fcn in zip(res['VanillaTransformer']['metrics']['MTS'], res['FCN']['metrics']['MTS'])])
-    # mts_performance = (mts_hits * 100) / total
-    # mts_textstr = ''.join(f'Predicted Mean Time to Success is lower {mts_performance}% of the time with VanillaTransformer')
-
-    # ems_hits = np.sum([1 if vt < fcn else 0 for vt, fcn in zip(res['VanillaTransformer']['metrics']['EMS'], res['FCN']['metrics']['EMS'])])
-    # ems_performance = (ems_hits * 100) / total
-    # ems_textstr = ''.join(f'Predicted Makespan is lower {ems_performance}% of the time with VanillaTransformer')
-
-    # props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
-
-    # fig, axes = plt.subplots(1, 2, figsize=(20, 8))
-    # axes[0].title.set_text('Task Mean Time To Success for each model')
-    # axes[1].title.set_text('Expected Makespan for each model')
-    # for model_name in res.keys():
-    #     axes[0].plot(res[model_name]['metrics']['MTS'], label=model_name)
-    #     axes[1].plot(res[model_name]['metrics']['EMS'], label=model_name)
-
-    # axes[0].legend()
-    # axes[0].set_xlabel('Prediction index')
-    # axes[0].set_ylabel('Mean time to Success [s]')
-    # axes[0].text(0.02, 0.75, mts_textstr, transform=axes[0].transAxes, bbox=props)
-    # axes[1].legend()
-    # axes[1].set_xlabel('Prediction index')
-    # axes[1].set_ylabel('Makespan prediction [s]')
-    # axes[1].text(1.25, 0.75, ems_textstr, transform=axes[0].transAxes, bbox=props)
-
-    # if save_plots:
-    #     plt.savefig('imgs/makespan_prediction/mts_ems_lineplots.png')
-    #     plt.clf()
-    # else:
-    #     plt.plot()
-
-
-    # fig, axes = plt.subplots(1, 2, figsize=(20, 8))
-    # axes[0].title.set_text('Task Mean Time To Success for each model')
-    # axes[1].title.set_text('Expected Makespan for each model')
-    # mts = []
-    # ems = []
-    # for model_name in res.keys():
-    #     mts.append(res[model_name]['metrics']['MTS'])
-    #     ems.append(res[model_name]['metrics']['EMS'])
-
-    # axes[0].hist(mts, alpha=0.5, label=list(res.keys()), bins=10)
-    # axes[1].hist(ems, alpha=0.5, label=list(res.keys()), bins=10)
-
-    # axes[0].legend()
-    # axes[0].set_xlabel('Mean time to success prediction [s]')
-    # axes[0].set_ylabel('Count')
-    # axes[0].text(0.2, 0.75, mts_textstr, transform=axes[0].transAxes, bbox=props)
-    # axes[1].legend()
-    # axes[1].set_xlabel('Makespan prediction [s]')
-    # axes[1].set_ylabel('Count')
-    # axes[1].text(1.5, 0.75, ems_textstr, transform=axes[0].transAxes, bbox=props)
+    axes.set_xlabel('Model')
+    axes.set_ylabel('Mean time to Success [s]')
+    axes.text(0.55, 0.75, mts_textstr, transform=axes.transAxes, bbox=props, fontsize=20)
 
     if save_plots:
-        plt.savefig('imgs/makespan_prediction/mts_ems_barplots.png')
+        plt.savefig('imgs/makespan_prediction/mts_barplots.png')
+        plt.clf()
+    else:
+        plt.plot()
+
+    fig, axes = plt.subplots(1, 1, figsize=(20, 8))
+    for model_name in res.keys():
+        axes.bar([model_name], res[model_name]['metrics']['EMS'], label=model_name)
+
+    # axes[1].legend()
+    axes.set_xlabel('Model')
+    axes.set_ylabel('Expected Makespan [s]')
+    axes.text(0.55, 0.75, ems_textstr, transform=axes.transAxes, bbox=props, fontsize=20)
+
+
+    if save_plots:
+        plt.savefig('imgs/makespan_prediction/ems_barplots.png')
         plt.clf()
     else:
         plt.plot()
@@ -411,24 +366,24 @@ def plot_model_confusion_matrix(model_name: str, conf_mat: dict, save_plot: bool
 def plot_runtimes(res: dict, save_plots: bool = True):
     ems_hits = np.sum([1 if vt < fcn else 0 for vt, fcn in zip(res['VanillaTransformer']['times'], res['FCN']['times'])])
     ems_performance = (ems_hits * 100) / len(res['VanillaTransformer']['times'])
-    ems_textstr = ''.join(f'Predicted Makespan is lower {ems_performance:.3f}% of the time with VanillaTransformer')
+    ems_textstr = ''.join(f'Runtime is lower for {ems_performance:.3f}% of the epsiodes with VanillaTransformer')
 
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
 
     fig, axes = plt.subplots(1, 1, figsize=(20, 8))
-    axes.title.set_text('Expected Makespan for each model')
+    axes.title.set_text('Runtimes for each model')
     runtimes = []
     for model_name in res.keys():
         runtimes.append(res[model_name]['times'])
     
     axes.hist(runtimes, alpha=0.5, label=list(res.keys()), bins=10)
     axes.legend()
-    axes.set_xlabel('Expected Makespansn [s]')
+    axes.set_xlabel('Runtime [s]')
     axes.set_ylabel('Count')
     axes.text(0.2, 0.75, ems_textstr, transform=axes.transAxes, bbox=props, fontsize=20)
 
     if save_plots:
-        plt.savefig('imgs/makespan_prediction/makespan_histogram.png')
+        plt.savefig('imgs/makespan_prediction/runtime_histogram.png')
         plt.clf()
     else:
         plt.plot()

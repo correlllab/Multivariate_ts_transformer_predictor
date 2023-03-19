@@ -7,6 +7,7 @@ from tensorflow.keras.utils import to_categorical
 from imblearn.under_sampling import RandomUnderSampler
 from imblearn.over_sampling import RandomOverSampler, SMOTE
 from sklearn.preprocessing import RobustScaler
+from helper_functions import position_encode
 
 class DataPreprocessing:
     def __init__(self, sampling: str = 'over' or 'under') -> None:
@@ -26,8 +27,10 @@ class DataPreprocessing:
         self.Y_train = None
         self.X_train_sampled = None
         self.Y_train_sampled = None
+        self.X_train_enc = None
         self.X_test = None
         self.Y_test = None
+        self.X_test_enc = None
         self.X_winTest = None
         self.Y_winTest = None
         self.rollWinWidth = None
@@ -323,10 +326,29 @@ class DataPreprocessing:
     def scale_data(self, verbose=False):
         for index, ep in enumerate(self.data):
             transformer = RobustScaler().fit(ep[:, 1:7])
-            self.data[index][:, 1:7] = transformer.transform(ep[:, 1:7]) 
+            self.data[index][:, 1:7] = transformer.transform(ep[:, 1:7])
 
 
-    def run(self, verbose=False):
+    def add_positional_encoding(self, verbose=False):
+        positional_encode_train = position_encode(self.X_train_sampled[0])
+        positional_encode_test = position_encode(self.X_test[0])
+
+        self.X_train_enc = deepcopy(self.X_train_sampled)
+        for i in range(len(self.X_train_sampled)):
+            self.X_train_enc[i] = self.X_train_enc[i] + positional_encode_train
+
+        if verbose:
+            print('Done with X_train')
+
+        self.X_test_enc = deepcopy(self.X_test)
+        for i in range(len(self.X_test)):
+            self.X_test_enc[i] = self.X_test_enc[i] + positional_encode_test
+
+        if verbose:
+            print('Done with X_test')
+
+
+    def run(self, save_data=False, verbose=False):
         if verbose:
             print('\n====> Loading data...\n')
         self.load_data(verbose=verbose)
@@ -352,5 +374,43 @@ class DataPreprocessing:
             print('\n====> Balancing classes...\n')
         self.balance_classes(verbose=verbose)
         if verbose:
+            print('\n====> Creating positional encoded data...\n')
+        self.add_positional_encoding(verbose=verbose)
+        if verbose:
             print('\n====> Done preprocessing!\n')
             _ = input('Continue?:')
+        if save_data:
+            if verbose:
+                print('\n====> Saving data into npy files...', end='\n')
+
+            print(self.X_train_enc.shape, self.X_test_enc.shape)
+            print(self.X_train_sampled.shape, self.Y_train_sampled.shape)
+            print(self.X_test.shape, self.Y_test.shape)
+            print(len(self.X_winTest), len(self.Y_winTest))
+
+            X_data = np.array([self.X_train_enc, self.X_test_enc, self.X_train_sampled, self.X_test], dtype=object)
+            with open('preprocessing_data/X_data.npy', 'wb') as f:
+                np.save(f, X_data, allow_pickle=True)
+
+            Y_data = np.array([self.Y_train_sampled, self.Y_test], dtype=object)
+            with open('preprocessing_data/Y_data.npy', 'wb') as f:
+                np.save(f, Y_data, allow_pickle=True)
+
+            # X_pos_encoded_data = np.array([self.X_train_enc, self.X_test_enc], dtype=object)
+            # with open('preprocessing_data/X_pos_encoded_data.npy', 'wb') as f:
+            #     np.save(f, X_pos_encoded_data, allow_pickle=True)
+
+            # train_sampled_data = np.array([self.X_train_sampled, self.Y_train_sampled], dtype=object)
+            # with open('preprocessing_data/train_sampled_data.npy', 'wb') as f:
+            #     np.save(f, train_sampled_data, allow_pickle=True)
+
+            # test_data = np.array([self.X_test, self.Y_test], dtype=object)
+            # with open('preprocessing_data/test_data.npy', 'wb') as f:
+            #     np.save(f, test_data, allow_pickle=True)
+
+            win_data = np.array([self.X_winTest, self.Y_winTest], dtype=object)
+            with open('preprocessing_data/win_data.npy', 'wb') as f:
+                np.save(f, win_data, allow_pickle=True)
+
+            if verbose:
+                print('DONE\n')

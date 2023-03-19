@@ -76,7 +76,7 @@ class Transformer:
         input_shape = X_train.shape[1:]
         self.build_model(
             input_shape,
-            head_size=256,
+            head_size=128,
             num_heads=4,
             ff_dim=4,
             num_transformer_blocks=4,
@@ -114,13 +114,13 @@ class Transformer:
             )
 
         self.history = self.model.fit(
-            X_train,
-            Y_train,
+            x=X_train,
+            y=Y_train,
             validation_split=0.1,
             epochs=epochs,
             batch_size=batch_size,
             callbacks=callbacks,
-            # steps_per_epoch  = int(trainWindows/batch_size)
+            validation_data  = (X_test, Y_test),
             steps_per_epoch = len(X_train) // batch_size,
             validation_steps = len(X_test) // batch_size
         )
