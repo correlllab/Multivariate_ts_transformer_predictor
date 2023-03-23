@@ -25,15 +25,16 @@ class Transformer:
         self.model = None
         self.history = None
         self.evaluation = None
+        self.last_attn_scores = None
         self.file_name = './models/Transformer.keras'
         self.imgs_path = './imgs/transformer/'
 
     def transformer_encoder(self, inputs, head_size, num_heads, ff_dim, dropout=0):
         # Normalization and Attention
         # x = layers.LayerNormalization(epsilon=1e-6)(inputs)
-        x = layers.MultiHeadAttention(
+        x, attn_scores = layers.MultiHeadAttention(
             key_dim=head_size, num_heads=num_heads, dropout=dropout
-        )(inputs, inputs)
+        )(inputs, inputs, return_attention_scores=True)
         x = layers.Dropout(dropout)(x)
         x = layers.LayerNormalization(epsilon=1e-6)(x)
         res = x + inputs
@@ -44,7 +45,7 @@ class Transformer:
         x = layers.Dropout(dropout)(x)
         x = layers.Conv1D(filters=inputs.shape[-1], kernel_size=1)(x)
         x = layers.LayerNormalization(epsilon=1e-6)(x)
-        return x + res
+        return x + res, attn_scores
 
 
     def build_model(
@@ -62,7 +63,9 @@ class Transformer:
         inputs = tf.keras.Input(shape=input_shape)
         x = inputs
         for _ in range(num_transformer_blocks):
-            x = self.transformer_encoder(x, head_size, num_heads, ff_dim, dropout)
+            x, attn_scores = self.transformer_encoder(x, head_size, num_heads, ff_dim, dropout)
+
+        self.last_attn_scores = attn_scores
 
         x = layers.GlobalAveragePooling1D(data_format="channels_last")(x)
         for dim in mlp_units:
@@ -76,7 +79,7 @@ class Transformer:
         input_shape = X_train.shape[1:]
         self.build_model(
             input_shape,
-            head_size=128,
+            head_size=256,
             num_heads=4,
             ff_dim=4,
             num_transformer_blocks=4,

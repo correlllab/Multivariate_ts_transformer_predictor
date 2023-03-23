@@ -27,6 +27,10 @@ class EncoderLayer(layers.Layer):
     def call(self, x):
         x = self.self_attention(x)
         x = self.ffn(x)
+
+        # Cache the last attention scores for plotting later
+        self.last_attn_scores = self.self_attention.last_attn_scores
+
         return x
 
 
@@ -53,6 +57,8 @@ class Encoder(tf.keras.layers.Layer):
         ]
         self.dropout = layers.Dropout(dropout_rate)
 
+        self.last_attn_scores = None
+
     def call(self, x):
         # `x` is token-IDs shape: (batch, seq_len)
         #TODO: pos encoding
@@ -63,5 +69,7 @@ class Encoder(tf.keras.layers.Layer):
 
         for i in range(self.num_layers):
             x = self.enc_layers[i](x)
+
+        self.last_attn_scores = self.enc_layers[-1].last_attn_scores
 
         return x  # Shape `(batch_size, seq_len, d_model)`.

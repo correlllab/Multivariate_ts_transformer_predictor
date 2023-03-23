@@ -418,13 +418,13 @@ if __name__ == '__main__':
     makespan_models = {}
 
     # If True it will run pipeline: load models, predict (if true) and generate metrics, if False it will generate metrics from saved files
-    compute = False
+    compute = True
     # If True it will run prediction inside computation pipeline, if False it will load predictions from npy file
-    predict = False
+    predict = True
     # If True, it will save dicts upon metric generation
-    save_dicts = True
+    save_dicts = False
     # If True it will save generated plots
-    save_plots = True
+    save_plots = False
     res = {}
     total = 50
     if compute:

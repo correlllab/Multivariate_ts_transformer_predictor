@@ -77,5 +77,7 @@ transformer_net.plot_acc_loss()
 transformer_net.compute_confusion_matrix(X_winTest=dp.X_winTest, Y_winTest=dp.Y_winTest, plot=True)
 transformer_net.make_probabilities_plots(X_winTest=dp.X_winTest, Y_winTest=dp.Y_winTest)
 
+print(f'\nAttention scores:\n{transformer_net.last_attn_scores}\n')
+
 
 
