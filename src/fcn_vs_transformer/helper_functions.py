@@ -1,3 +1,4 @@
+import math
 import numpy as np
 import matplotlib.pyplot as plt
 import tensorflow as tf
@@ -74,18 +75,30 @@ def position_encode(x):
     Performs positional encoding of input, which must have a 2d shape: (350, 6) for example
     (if input shape is 3d, change x.shape[0] to x.shape[1] in 'mat' var declaration and aux[:, i::2] to aux[:, :, i::2])
     """
-    # pe = tf.ones_like(x)
+    # pe = tf.ones_like(x, dtype=tf.float32)
     # # position = tf.expand_dims(tf.convert_to_tensor(tf.range(0., x.shape[1]), dtype='float32'), axis=-1)
-    # position = tf.expand_dims(tf.range(0., x.shape[1]), axis=-1)
+    # position = tf.expand_dims(tf.range(0., x.shape[0]), axis=-1)
     # # temp = tf.convert_to_tensor(tf.range(0., x.shape[-1], delta=2.), dtype='float32')
     # temp = tf.range(0., x.shape[-1], delta=2.)
     # temp = tf.multiply(temp, -(tf.divide(math.log(10000), x.shape[-1])))
     # temp = tf.expand_dims(tf.math.exp(temp), axis=0)
     # temp = tf.linalg.matmul(position, temp)  # shape:[input, d_model/2]
-    # pe = tf.Variable(pe)
+    # pe = tf.Variable(pe, dtype=tf.float32)
     # pe[:, 0::2].assign(tf.math.sin(temp))
     # pe[:, 1::2].assign(tf.math.cos(temp))
-    # pe = tf.convert_to_tensor(pe)
+    # pe = tf.convert_to_tensor(pe, dtype=tf.float32)
+    # return pe
+
+    # aux = np.zeros(x.shape)
+    # mat = np.arange(x.shape[-1], dtype=np.float32).reshape(
+    #     -1,1)/np.power(10000, np.arange(
+    #     0, x.shape[0], 2, dtype=np.float32) / x.shape[0])
+    # aux[0::2, :] = np.sin(mat).transpose()
+    # aux[1::2, :] = np.cos(mat).transpose()
+    # pe = tf.convert_to_tensor(aux.transpose(), dtype=tf.float32)
+
+    # # return tf.keras.layers.Add()([x, pe])
+    # return pe
 
     aux = np.zeros(x.shape)
     mat = np.arange(x.shape[0], dtype=np.float32).reshape(
@@ -97,3 +110,11 @@ def position_encode(x):
 
     # return tf.keras.layers.Add()([x, pe])
     return pe
+
+
+
+if __name__ == '__main__':
+    p = position_encode(np.zeros((360, 6)))
+    cax = plt.matshow(p, aspect='auto')
+    plt.gcf().colorbar(cax)
+    plt.show()

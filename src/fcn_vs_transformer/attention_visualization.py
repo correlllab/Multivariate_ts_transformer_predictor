@@ -21,34 +21,8 @@ from utils import CounterDict
 from Transformer.Transformer import Transformer
 from Transformer.CustomSchedule import CustomSchedule
 
-
-def masked_loss(label, pred):
-    mask = label != 0
-    loss_object = tf.keras.losses.SparseCategoricalCrossentropy(
-        from_logits=True, reduction='none')
-    loss = loss_object(label, pred)
-
-    # mask = tf.cast(mask, dtype=loss.dtype)
-    # loss *= mask
-
-    # loss = tf.reduce_sum(loss)/tf.reduce_sum(mask)
-    return loss
-
-
-def masked_accuracy(label, pred):
-    pred = tf.argmax(pred, axis=2)
-    label = tf.cast(label, pred.dtype)
-    match = label == pred
-
-    mask = label != 0
-
-    match = match & mask
-
-    match = tf.cast(match, dtype=tf.float32)
-    mask = tf.cast(mask, dtype=tf.float32)
-    return tf.reduce_sum(match)/tf.reduce_sum(mask)
-
-
+# from tensorflow.python.framework.ops import disable_eager_execution
+# disable_eager_execution()
 
 
 if __name__ == '__main__':
@@ -71,10 +45,10 @@ if __name__ == '__main__':
     dp = DataPreprocessing(sampling='none')
     dp.run(save_data=False, verbose=True)
 
-    num_layers = 8
+    num_layers = 4
     d_model = 6
     dff = 512
-    num_heads = 8
+    num_heads = 4
     dropout_rate = 0.1
     vanilla_transformer = Transformer(
         num_layers=num_layers,
@@ -83,16 +57,29 @@ if __name__ == '__main__':
         ff_dim=dff,
         input_space_size=6,
         target_space_size=2,
-        dropout_rate=dropout_rate
+        dropout_rate=dropout_rate,
+        pos_encoding=True
     )
-    output = vanilla_transformer(dp.X_train_enc)
+    output = vanilla_transformer(dp.X_train_sampled[:100])
     print(output.shape)
     attn_scores = vanilla_transformer.encoder.enc_layers[-1].last_attn_scores
     print(attn_scores.shape)  # (batch, heads, target_seq, input_seq)
     print(vanilla_transformer.summary())
 
+    vanilla_transformer.save(filepath='./models/OOP_transformer', save_format='tf')
+
+    # vanilla_transformer = Transformer(
+    #     num_layers=num_layers,
+    #     d_model=d_model,
+    #     num_heads=num_heads,
+    #     ff_dim=dff,
+    #     input_space_size=6,
+    #     target_space_size=2,
+    #     dropout_rate=dropout_rate,
+    #     pos_encoding=True
+    # )
     learning_rate = CustomSchedule()
-    opt = tf.keras.optimizers.Adam(learning_rate, beta_1=0.9, beta_2=0.98,
+    opt = tf.keras.optimizers.legacy.Adam(learning_rate, beta_1=0.9, beta_2=0.98,
                                    epsilon=1e-9)
     # vanilla_transformer.compile(
     #     loss="binary_focal_crossentropy",
@@ -100,17 +87,17 @@ if __name__ == '__main__':
     #     metrics=["categorical_accuracy"]
     # )
     vanilla_transformer.compile(
-        loss=masked_loss,
+        loss=tf.keras.losses.CategoricalCrossentropy(),
         optimizer=opt,
-        metrics=[masked_accuracy]
+        metrics=[tf.keras.metrics.CategoricalAccuracy()]
     )
 
-    X_train = dp.X_train_enc
+    X_train = dp.X_train_sampled
     Y_train = dp.Y_train_sampled
-    X_test = dp.X_test_enc
+    X_test = dp.X_test
     Y_test = dp.Y_test
     epochs = 200
-    batch_size = 64
+    batch_size = 32
     callbacks = [
         tf.keras.callbacks.EarlyStopping(
             monitor='val_loss',
@@ -127,10 +114,14 @@ if __name__ == '__main__':
         epochs=epochs,
         batch_size=batch_size,
         callbacks=callbacks,
-        validation_data  = (X_test, Y_test),
+        validation_data = (X_test, Y_test),
         steps_per_epoch = len(X_train) // batch_size,
         validation_steps = len(X_test) // batch_size
     )
+
+    vanilla_transformer.save(filepath='./models/OOP_transformer', save_format='tf')
+
+    print(vanilla_transformer.summary())
 
 
 

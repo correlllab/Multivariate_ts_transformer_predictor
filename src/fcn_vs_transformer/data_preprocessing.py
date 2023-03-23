@@ -373,9 +373,9 @@ class DataPreprocessing:
         if verbose:
             print('\n====> Balancing classes...\n')
         self.balance_classes(verbose=verbose)
-        if verbose:
-            print('\n====> Creating positional encoded data...\n')
-        self.add_positional_encoding(verbose=verbose)
+        # if verbose:
+        #     print('\n====> Creating positional encoded data...\n')
+        # self.add_positional_encoding(verbose=verbose)
         if verbose:
             print('\n====> Done preprocessing!\n')
             _ = input('Continue?:')
