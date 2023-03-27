@@ -5,9 +5,9 @@ import tensorflow.keras as tfk
 from tensorflow.keras import layers
 from tensorflow.keras import optimizers
 from tensorflow.keras import regularizers
-from YamlLoader import YamlLoader
-from MultiHeadAttention import MultiHeadAttention
-from Transformer.AttentionLayers import BaseAttention, GlobalSelfAttention, CrossAttention, MultiHeadAttention, CausalSelfAttention
+# from YamlLoader import YamlLoader
+# from MultiHeadAttention import MultiHeadAttention
+from Transformer.AttentionLayers import CrossAttention, CausalSelfAttention
 from Transformer.FeedForwardLayer import FeedForward
 from Transformer.PositionalEncoding import PositionalEmbedding
 

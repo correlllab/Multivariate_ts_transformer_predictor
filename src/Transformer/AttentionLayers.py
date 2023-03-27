@@ -1,19 +1,15 @@
-import os, sys, yaml, re
-import numpy as np
 import tensorflow as tf
-import tensorflow.keras as tfk
-from tensorflow.keras import layers
-from YamlLoader import YamlLoader
-from MultiHeadAttention import MultiHeadAttention
+# from YamlLoader import YamlLoader
+# from MultiHeadAttention import MultiHeadAttention
 
 # from https://www.tensorflow.org/text/tutorials/transformer#define_the_components
-class BaseAttention(layers.Layer):
+class BaseAttention(tf.keras.layers.Layer):
     def __init__(self, **kwargs):
         super().__init__()
         # TODO: mha layer not in tf 2.3
-        self.mha = layers.MultiHeadAttention(**kwargs)
-        self.layernorm = layers.LayerNormalization()
-        self.add = layers.Add()
+        self.mha = tf.keras.layers.MultiHeadAttention(**kwargs)
+        self.layernorm = tf.keras.layers.LayerNormalization()
+        self.add = tf.keras.layers.Add()
 
 
 # MultiHeadAttention layer in the decoder (joints otput of encoder and output of first MHA layer of decoder)

@@ -45,10 +45,10 @@ if __name__ == '__main__':
     dp = DataPreprocessing(sampling='none')
     dp.run(save_data=False, verbose=True)
 
-    num_layers = 4
+    num_layers = 8
     d_model = 6
     dff = 512
-    num_heads = 4
+    num_heads = 8
     dropout_rate = 0.1
     vanilla_transformer = Transformer(
         num_layers=num_layers,
@@ -66,7 +66,7 @@ if __name__ == '__main__':
     print(attn_scores.shape)  # (batch, heads, target_seq, input_seq)
     print(vanilla_transformer.summary())
 
-    vanilla_transformer.save(filepath='./models/OOP_transformer', save_format='tf')
+    vanilla_transformer.save_weights(filepath='./models/OOP_transformer/')
 
     # vanilla_transformer = Transformer(
     #     num_layers=num_layers,
@@ -119,7 +119,7 @@ if __name__ == '__main__':
         validation_steps = len(X_test) // batch_size
     )
 
-    vanilla_transformer.save(filepath='./models/OOP_transformer', save_format='tf')
+    vanilla_transformer.save_weights(filepath='./models/OOP_transformer/')
 
     print(vanilla_transformer.summary())
 

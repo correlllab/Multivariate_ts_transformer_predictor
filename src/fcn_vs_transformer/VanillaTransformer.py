@@ -73,7 +73,7 @@ class Transformer:
             x = layers.Dropout(mlp_dropout)(x)
         outputs = layers.Dense(n_classes, activation="softmax")(x)
         self.model = tf.keras.Model(inputs, outputs)
-    
+
 
     def fit(self, X_train, Y_train, X_test, Y_test, trainWindows, batch_size=64, epochs=200, save_model=True):
         input_shape = X_train.shape[1:]

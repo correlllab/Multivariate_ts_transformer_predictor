@@ -1,14 +1,10 @@
 import os, sys, yaml, re
 import numpy as np
 import tensorflow as tf
-import tensorflow.keras as tfk
-from tensorflow.keras import layers
-from tensorflow.keras import optimizers
-from tensorflow.keras import regularizers
-from YamlLoader import YamlLoader
-from MultiHeadAttention import MultiHeadAttention
+# from YamlLoader import YamlLoader
+# from MultiHeadAttention import MultiHeadAttention
 from Encoder import Encoder
-from Decoder import Decoder
+# from Decoder import Decoder
 
 # from https://www.tensorflow.org/text/tutorials/transformer#define_the_components
 # Full transformer
@@ -22,8 +18,8 @@ class Transformer(tf.keras.Model):
                                 dropout_rate=dropout_rate,
                                 pos_encoding=pos_encoding)
 
-        self.flatten = layers.Flatten()
-        self.final_layer = layers.Dense(target_space_size)
+        self.flatten = tf.keras.layers.Flatten()
+        self.final_layer = tf.keras.layers.Dense(target_space_size, activation='softmax')
 
     def call(self, inputs):
         # print(f'In Transformer call, shape = {inputs.shape}')

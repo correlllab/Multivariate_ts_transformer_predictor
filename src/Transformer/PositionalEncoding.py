@@ -1,8 +1,6 @@
-import os, sys, yaml, re, math
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras import layers
-from YamlLoader import YamlLoader
+# from YamlLoader import YamlLoader
 
 # from https://www.tensorflow.org/text/tutorials/transformer#define_the_components
 # def positional_encoding(length, depth):
@@ -37,11 +35,11 @@ from YamlLoader import YamlLoader
 #     return x + pe
 
 
-class PositionalEmbedding(layers.Layer):
+class PositionalEmbedding(tf.keras.layers.Layer):
     def __init__(self, space_size, d_model, trainable=True, name=None, dtype=None, dynamic=False, **kwargs):
         super().__init__(trainable, name, dtype, dynamic, **kwargs)
         # self.d_model = d_model
-        # self.embedding = layers.Embedding(input_dim=space_size, output_dim=d_model, mask_zero=True)
+        # self.embedding = tf.keras.layers.Embedding(input_dim=space_size, output_dim=d_model, mask_zero=True)
         # self.pos_encoding = positional_encoding()
 
 

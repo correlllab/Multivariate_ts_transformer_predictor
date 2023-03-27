@@ -1,19 +1,13 @@
-import os, sys, yaml, re
-import numpy as np
 import tensorflow as tf
-import tensorflow.keras as tfk
-from tensorflow.keras import layers
-from tensorflow.keras import optimizers
-from tensorflow.keras import regularizers
-from YamlLoader import YamlLoader
-from MultiHeadAttention import MultiHeadAttention
-from Transformer.AttentionLayers import BaseAttention, GlobalSelfAttention, CrossAttention, MultiHeadAttention, CausalSelfAttention
-from Transformer.FeedForwardLayer import FeedForward
-from Transformer.PositionalEncoding import PositionalEmbedding
+# from YamlLoader import YamlLoader
+# from MultiHeadAttention import MultiHeadAttention
+from AttentionLayers import GlobalSelfAttention
+from FeedForwardLayer import FeedForward
+from PositionalEncoding import PositionalEmbedding
 
 # from https://www.tensorflow.org/text/tutorials/transformer#define_the_components
 # Encoder layer
-class EncoderLayer(layers.Layer):
+class EncoderLayer(tf.keras.layers.Layer):
     def __init__(self, *, d_model, num_heads, ff_dim, dropout_rate=0.1):
         super().__init__()
 
@@ -57,7 +51,7 @@ class Encoder(tf.keras.layers.Layer):
                             dropout_rate=dropout_rate)
             for _ in range(num_layers)
         ]
-        self.dropout = layers.Dropout(dropout_rate)
+        self.dropout = tf.keras.layers.Dropout(dropout_rate)
 
         self.last_attn_scores = None
 

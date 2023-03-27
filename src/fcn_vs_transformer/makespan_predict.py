@@ -1,4 +1,5 @@
 import os, sys, json
+sys.path.insert(1, os.path.realpath('../Transformer'))
 print(sys.version)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # INFO and WARNING messages are not printed
 import glob
@@ -12,7 +13,8 @@ from random import choice
 
 from data_preprocessing import DataPreprocessing
 from FCN import FCN
-from VanillaTransformer import Transformer
+# from VanillaTransformer import Transformer
+from Transformer.Transformer import Transformer
 from Transformer.CustomSchedule import CustomSchedule
 from utils import CounterDict
 
@@ -125,7 +127,7 @@ def run_makespan_prediction_for_model(model_name: str, model: tensorflow.keras.M
             if ans != 'NC':
                 break
 
-        print(f'Window {n_steps}/{n_windows}: Prediction = [{row[0]:.3f}, {row[1]:.3f}] | True label = {true_label} | Answer = {ans}')
+        print(f'Window {n_steps}/{n_windows}: Prediction = [{row[0]:.2f}, {row[1]:.2f}] | True label = {true_label} | Answer = {ans}')
 
         perf.count(ans)
 
@@ -309,10 +311,10 @@ def run_makespan_prediction_for_model(model_name: str, model: tensorflow.keras.M
 
 def plot_mts_ems(res: dict, save_plots: bool = True):
     mts_time_reduction = 1 - (res['VanillaTransformer']['metrics']['MTS'][0] / res['FCN']['metrics']['MTS'][0])
-    mts_textstr = ''.join(f'Mean Time to Success is decreased by {mts_time_reduction*100:.3f}%\nwith VanillaTransformer')
+    mts_textstr = ''.join(f'Mean Time to Success is decreased by {mts_time_reduction*100:.2f}%\nwith VanillaTransformer')
 
     ems_time_reduction = 1 - (res['VanillaTransformer']['metrics']['EMS'][0] / res['FCN']['metrics']['EMS'][0])
-    ems_textstr = ''.join(f'Makespan is decreased by {ems_time_reduction*100:.3f}%\nwith VanillaTransformer')
+    ems_textstr = ''.join(f'Makespan is decreased by {ems_time_reduction*100:.2f}%\nwith VanillaTransformer')
 
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
 
@@ -323,7 +325,7 @@ def plot_mts_ems(res: dict, save_plots: bool = True):
 
     axes.set_xlabel('Model')
     axes.set_ylabel('Mean time to Success [s]')
-    axes.text(0.55, 0.75, mts_textstr, transform=axes.transAxes, bbox=props, fontsize=20)
+    axes.text(0.55, 0.75, mts_textstr, transform=axes.transAxes, alpha=0.5, bbox=props, fontsize=20)
 
     if save_plots:
         plt.savefig('imgs/makespan_prediction/mts_barplots.png')
@@ -333,7 +335,7 @@ def plot_mts_ems(res: dict, save_plots: bool = True):
 
     fig, axes = plt.subplots(1, 1, figsize=(20, 8))
     for model_name in res.keys():
-        axes.bar([model_name], res[model_name]['metrics']['EMS'], label=model_name)
+        axes.bar([model_name], res[model_name]['metrics']['EMS'], alpha=0.5, label=model_name)
 
     # axes[1].legend()
     axes.set_xlabel('Model')
@@ -356,17 +358,40 @@ def plot_model_confusion_matrix(model_name: str, conf_mat: dict, save_plot: bool
 
     sns.set(font_scale=2)
     if save_plot:
-        conf_mat = sns.heatmap(arr, annot=True).get_figure()
-        conf_mat.savefig(f'imgs/makespan_prediction/{model_name}_confusion_matrix.png')
+        nc_textstr = ''.join(f'{model_name} has a {conf_mat["NC"]*100:.2f}% NC rate')
+        props = dict(boxstyle='round', facecolor='green', alpha=0.75)
+        conf_mat_plot = sns.heatmap(arr, annot=True).get_figure()
+        conf_mat_plot.text(0.43, 0.95, nc_textstr, bbox=props, fontsize=20, horizontalalignment='center', verticalalignment='top')
+        conf_mat_plot.savefig(f'imgs/makespan_prediction/{model_name}_confusion_matrix.png')
         plt.clf()
     else:
         sns.heatmap(arr, annot=True)
+
+    # NC percentage visualization through stacked plots
+    x = ['No classification', 'Actual Positives', 'Actual negatives']
+    fig, axes = plt.subplots(1, 1, figsize=(20, 8))
+    if save_plot:
+        nc = [conf_mat['NC'], 0, 0]
+        tp = np.array([0, conf_mat['TP'], 0])
+        fn = np.array([0, conf_mat['FN'], 0])
+        fp = np.array([0, 0, conf_mat['FP']])
+        tn = np.array([0, 0, conf_mat['TN']])
+        axes.bar(x, nc, label='NC')
+        axes.bar(x, tp, bottom=nc, label='TP')
+        axes.bar(x, fp, bottom=nc+tp, label='FP')
+        axes.bar(x, fn, bottom=nc+tp+fp, label='FN')
+        axes.bar(x, tn, bottom=nc+tp+fp+fn, label='TN')
+        axes.legend()
+        plt.savefig(f'imgs/makespan_prediction/{model_name}_stacked_classification_barplots.png')
+        plt.clf()
+    else:
+        plt.show()
 
 
 def plot_runtimes(res: dict, save_plots: bool = True):
     ems_hits = np.sum([1 if vt < fcn else 0 for vt, fcn in zip(res['VanillaTransformer']['times'], res['FCN']['times'])])
     ems_performance = (ems_hits * 100) / len(res['VanillaTransformer']['times'])
-    ems_textstr = ''.join(f'Runtime is lower for {ems_performance:.3f}% of the epsiodes with VanillaTransformer')
+    ems_textstr = ''.join(f'Runtime is lower for {ems_performance:.2f}% of the epsiodes with VanillaTransformer')
 
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
 
@@ -422,9 +447,9 @@ if __name__ == '__main__':
     # If True it will run prediction inside computation pipeline, if False it will load predictions from npy file
     predict = True
     # If True, it will save dicts upon metric generation
-    save_dicts = False
+    save_dicts = True
     # If True it will save generated plots
-    save_plots = False
+    save_plots = True
     res = {}
     total = 50
     if compute:
@@ -462,6 +487,35 @@ if __name__ == '__main__':
             makespan_models['VanillaTransformer'] = vanilla_transformer
         except OSError as e:
             print(f'{e}: model does not exist!\n')
+
+        try:
+            num_layers = 4
+            d_model = 6
+            dff = 512
+            num_heads = 4
+            dropout_rate = 0.1
+            oop_transformer = Transformer(
+                num_layers=num_layers,
+                d_model=d_model,
+                num_heads=num_heads,
+                ff_dim=dff,
+                input_space_size=6,
+                target_space_size=2,
+                dropout_rate=dropout_rate,
+                pos_encoding=True
+            )
+            # learning_rate = CustomSchedule()
+            opt = tensorflow.keras.optimizers.legacy.Adam(1e-4, beta_1=0.9, beta_2=0.98,
+                                                          epsilon=1e-9)
+            oop_transformer.compile(
+                loss=tensorflow.keras.losses.CategoricalCrossentropy(),
+                optimizer=opt,
+                metrics=[tensorflow.keras.metrics.CategoricalAccuracy()]
+            )
+            oop_transformer.load_weights('../fcn_vs_transformer/models/OOP_transformer').expect_partial()
+            makespan_models['OOP Transformer'] = oop_transformer
+        except OSError as e:
+            print(f'{e}: model does not exist!')
 
 
         for model_name, model in makespan_models.items():
