@@ -1,4 +1,4 @@
-import os, sys
+import os, sys, pickle
 sys.path.insert(1, os.path.realpath('../Transformer'))
 print(sys.version)
 print(sys.path)
@@ -107,7 +107,7 @@ if __name__ == '__main__':
         )
     ]
 
-    vanilla_transformer.fit(
+    history = vanilla_transformer.fit(
         x=X_train,
         y=Y_train,
         validation_split=0.1,
@@ -120,6 +120,9 @@ if __name__ == '__main__':
     )
 
     vanilla_transformer.save_weights(filepath='./models/OOP_transformer/')
+
+    with open('./OOP_transformer_history', 'wb') as file_pi:
+        pickle.dump(history.history, file_pi)
 
     print(vanilla_transformer.summary())
 
