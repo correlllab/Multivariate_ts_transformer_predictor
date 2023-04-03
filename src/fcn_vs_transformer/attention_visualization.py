@@ -50,11 +50,13 @@ if __name__ == '__main__':
     dff = 512
     num_heads = 8
     dropout_rate = 0.1
+    mlp_units = [128]
     vanilla_transformer = Transformer(
         num_layers=num_layers,
         d_model=d_model,
         num_heads=num_heads,
         ff_dim=dff,
+        mlp_units=mlp_units,
         input_space_size=6,
         target_space_size=2,
         dropout_rate=dropout_rate,

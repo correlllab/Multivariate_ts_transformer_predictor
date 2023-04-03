@@ -9,15 +9,22 @@ from Encoder import Encoder
 # from https://www.tensorflow.org/text/tutorials/transformer#define_the_components
 # Full transformer
 class Transformer(tf.keras.Model):
-    def __init__(self, *, num_layers, d_model, num_heads, ff_dim, input_space_size,
-                 target_space_size, pos_encoding=True, dropout_rate=0.1):
+    def __init__(self, *, num_layers, d_model, num_heads, ff_dim, mlp_units,
+                 input_space_size, target_space_size, pos_encoding=True, dropout_rate=0.1):
         super().__init__()
-        self.encoder = Encoder(num_layers=num_layers, d_model=d_model,
-                                num_heads=num_heads, ff_dim=ff_dim,
-                                space_size=input_space_size,
-                                dropout_rate=dropout_rate,
-                                pos_encoding=pos_encoding)
+        self.encoder = Encoder(num_layers=num_layers,
+                               d_model=d_model,
+                               num_heads=num_heads,
+                               ff_dim=ff_dim,
+                               space_size=input_space_size,
+                               dropout_rate=dropout_rate,
+                               pos_encoding=pos_encoding)
+        
+        self.mlp = tf.keras.Sequential([
+            
+        ])
 
+        self.global_average_pooling = tf.keras.layers.GlobalAveragePooling1D(data_format='channels_last')
         self.flatten = tf.keras.layers.Flatten()
         self.final_layer = tf.keras.layers.Dense(target_space_size, activation='softmax')
 
@@ -29,8 +36,15 @@ class Transformer(tf.keras.Model):
 
         x = self.encoder(inputs)  # (batch_size, context_len, d_model)
 
+        # Global average pooling for temporal data
+        x = self.global_average_pooling(x)
+
+        # Flattening data
+        # x = self.flatten(x)
+
+        # MLP net
+
         # Final linear layer output.
-        x = self.flatten(x)
         logits = self.final_layer(x)  # (batch_size, target_len, target_space_size)
         # print(f'==> In Transformer call, logits.shape = {logits.shape}')
 
