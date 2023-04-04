@@ -20,9 +20,10 @@ class Transformer(tf.keras.Model):
                                dropout_rate=dropout_rate,
                                pos_encoding=pos_encoding)
         
-        self.mlp = tf.keras.Sequential([
-            
-        ])
+        self.mlp = tf.keras.Sequential()
+        for dim in mlp_units:
+            self.mlp.add(tf.keras.layers.Dense(dim, activation='relu'))
+            self.mlp.add(tf.keras.layers.Dropout(dropout_rate))
 
         self.global_average_pooling = tf.keras.layers.GlobalAveragePooling1D(data_format='channels_last')
         self.flatten = tf.keras.layers.Flatten()
@@ -43,6 +44,7 @@ class Transformer(tf.keras.Model):
         # x = self.flatten(x)
 
         # MLP net
+        x = self.mlp(x)
 
         # Final linear layer output.
         logits = self.final_layer(x)  # (batch_size, target_len, target_space_size)
