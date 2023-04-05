@@ -33,13 +33,14 @@ class CrossAttention(BaseAttention):
 
 # MultiHeadAttention layer in the encoder
 class GlobalSelfAttention(BaseAttention):
-    def call(self, x):
+    def call(self, x, training):
         # print(f'In encoder call(), input shape = {x.shape}')
         attn_output, attn_scores = self.mha(
             query=x,
             value=x,
             key=x,
-            return_attention_scores=True)
+            return_attention_scores=True,
+            training=training)
 
         # Cache the attention scores for plotting later.
         self.last_attn_scores = attn_scores
@@ -59,7 +60,7 @@ class CausalSelfAttention(BaseAttention):
             query=x,
             value=x,
             key=x,
-            use_causal_mask = True)
+            use_causal_mask=True)
 
         # Add & Norm layer with residual connection
         x = self.add([x, attn_output])

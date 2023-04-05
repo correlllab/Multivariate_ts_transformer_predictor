@@ -6,7 +6,7 @@ from tensorflow.keras import regularizers
 
 import matplotlib.pyplot as plt
 
-import os, sys
+import os, sys, pickle
 sys.path.insert(1, os.path.realpath('..'))
 print( sys.version )
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # INFO and WARNING messages are not printed
@@ -106,6 +106,9 @@ class FCN:
         
         if save_model:
             self.model.save(self.file_name)
+
+            with open('./histories/FCN_history', 'wb') as file_pi:
+                pickle.dump(self.history.history, file_pi)
 
 
 

@@ -18,8 +18,8 @@ class EncoderLayer(tf.keras.layers.Layer):
 
         self.ffn = FeedForward(d_model, ff_dim)
 
-    def call(self, x):
-        x = self.self_attention(x)
+    def call(self, x, training):
+        x = self.self_attention(x, training)
         x = self.ffn(x)
 
         # Cache the last attention scores for plotting later
@@ -36,6 +36,8 @@ class Encoder(tf.keras.layers.Layer):
 
         self.d_model = d_model
         self.num_layers = num_layers
+
+        self.embedding = tf.keras.layers.Embedding(input_dim=d_model, output_dim=1, input_length=350)
 
         self.encode = pos_encoding
         if self.encode:
@@ -55,8 +57,13 @@ class Encoder(tf.keras.layers.Layer):
 
         self.last_attn_scores = None
 
-    def call(self, x):
+    def call(self, x, training):
         # print(f'In Encoder call, shape = {x.shape}')
+        # x = self.embedding(x)
+        # print(f'In Encoder call after embedding, shape = {x.shape}')
+        # x = tf.keras.layers.Flatten()(x)
+        # print(f'In Encoder call after flatten, shape = {x.shape}')
+
         if self.encode:
             # `x` is token-IDs shape: (batch, seq_len)
             x = self.pos_embedding(x)  # Shape `(batch_size, seq_len, d_model)`.
@@ -65,7 +72,7 @@ class Encoder(tf.keras.layers.Layer):
         x = self.dropout(x)
 
         for i in range(self.num_layers):
-            x = self.enc_layers[i](x)
+            x = self.enc_layers[i](x, training)
 
         # print(f'==> In Encoder call, last x.shape = {x.shape}')
 

@@ -1,101 +1,50 @@
-import tensorflow as tf
-from tensorflow.keras import layers
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, Dropout, Activation, SimpleRNN, LSTM, GRU, Conv1D, Flatten, MaxPooling1D
-from tensorflow.keras.optimizers import Adam, SGD
-from tensorflow.keras import regularizers
-
-import matplotlib.pyplot as plt
-
 import os, sys, pickle
-sys.path.insert(1, os.path.realpath('..'))
-print( sys.version )
+print(sys.version)
+print(sys.path)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # INFO and WARNING messages are not printed
-
+from random import choice
+import tensorflow as tf
+import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
-import pandas as pd
 
+from data_preprocessing import DataPreprocessing
 from utils import CounterDict
 from helper_functions import scan_output_for_decision, graph_episode_output
 
 
-class VanillaTransformer:
-    def __init__(self) -> None:
+class RNN:
+    def __init__(self):
         self.model = None
         self.history = None
         self.evaluation = None
-        self.last_attn_scores = None
-        self.file_name = './models/Transformer.keras'
-        self.imgs_path = './imgs/transformer/'
-
-    def transformer_encoder(self, inputs, head_size, num_heads, ff_dim, dropout=0):
-        # Normalization and Attention
-        # x = layers.LayerNormalization(epsilon=1e-6)(inputs)
-        x, attn_scores = layers.MultiHeadAttention(
-            key_dim=head_size, num_heads=num_heads, dropout=dropout
-        )(inputs, inputs, return_attention_scores=True)
-        x = layers.Dropout(dropout)(x)
-        x = layers.LayerNormalization(epsilon=1e-6)(x)
-        res = x + inputs
-
-        # Feed Forward Part
-        # x = layers.LayerNormalization(epsilon=1e-6)(res)
-        x = layers.Conv1D(filters=ff_dim, kernel_size=1, activation="relu")(x)
-        x = layers.Dropout(dropout)(x)
-        x = layers.Conv1D(filters=inputs.shape[-1], kernel_size=1)(x)
-        x = layers.LayerNormalization(epsilon=1e-6)(x)
-        return x + res, attn_scores
+        self.file_name = './models/RNN.keras'
+        self.imgs_path = './imgs/rnn/'
 
 
-    def build_model(
-        self,
-        input_shape,
-        head_size,
-        num_heads,
-        ff_dim,
-        num_transformer_blocks,
-        mlp_units,
-        dropout=0,
-        mlp_dropout=0,
-        n_classes=2
-    ):
-        inputs = tf.keras.Input(shape=input_shape)
-        x = inputs
-        for _ in range(num_transformer_blocks):
-            x, attn_scores = self.transformer_encoder(x, head_size, num_heads, ff_dim, dropout)
+    def build_model(self, input_shape, lstm_dim=128, dense_dim=2):
+        model = tf.keras.Sequential()
+        model.add(tf.keras.Input(shape=input_shape))
+        model.add(tf.keras.layers.LSTM(lstm_dim))
+        model.add(tf.keras.layers.Dense(dense_dim, activation='softmax'))
 
-        self.last_attn_scores = attn_scores
-
-        x = layers.GlobalAveragePooling1D(data_format="channels_last")(x)
-        for dim in mlp_units:
-            x = layers.Dense(dim, activation="relu")(x)
-            x = layers.Dropout(mlp_dropout)(x)
-        outputs = layers.Dense(n_classes, activation="softmax")(x)
-        self.model = tf.keras.Model(inputs, outputs)
+        self.model = model
 
 
-    def fit(self, X_train, Y_train, X_test, Y_test, trainWindows, batch_size=64, epochs=200, save_model=True):
-        input_shape = X_train.shape[1:]
+    def fit(self, X_train, Y_train, X_test, Y_test, batch_size=64, epochs=200, save_model=True):
         self.build_model(
-            input_shape,
-            head_size=256,
-            num_heads=4,
-            ff_dim=4,
-            num_transformer_blocks=4,
-            mlp_units=[128],
-            mlp_dropout=0.4,
-            dropout=0.25,
+            input_shape=X_train.shape[1:],
+            lstm_dim=128,
+            dense_dim=2
         )
 
         self.model.compile(
             loss="binary_focal_crossentropy",
             optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4),
-            metrics=["categorical_accuracy"],
+            metrics=["categorical_accuracy"]
         )
         self.model.summary()
 
-        checkpoint_filepath = './models/tmp/checkpoints/'
         callbacks = [
             tf.keras.callbacks.EarlyStopping(
                 monitor='val_loss',
@@ -104,17 +53,6 @@ class VanillaTransformer:
                 start_from_epoch=epochs*0.2
             )
         ]
-
-        if save_model:
-            callbacks.append(
-                tf.keras.callbacks.ModelCheckpoint(
-                    filepath=checkpoint_filepath,
-                    save_weights_only=False,
-                    monitor='val_categorical_accuracy',
-                    mode='max',
-                    save_best_only=True
-                )
-            )
 
         self.history = self.model.fit(
             x=X_train,
@@ -128,12 +66,10 @@ class VanillaTransformer:
             validation_steps = len(X_test) // batch_size
         )
 
-        # self.evaluation = self.model.evaluate(X_test, Y_test, verbose=1)
-
         if save_model:
             self.model.save(self.file_name)
 
-            with open('./histories/Transformer_history', 'wb') as file_pi:
+            with open('./histories/RNN_history', 'wb') as file_pi:
                 pickle.dump(self.history.history, file_pi)
 
 
@@ -159,7 +95,6 @@ class VanillaTransformer:
 
         plt.savefig(self.imgs_path + 'acc_loss_plots.png')
         plt.clf()
-
 
 
     def compute_confusion_matrix(self, X_winTest, Y_winTest, plot=False):
@@ -209,3 +144,46 @@ class VanillaTransformer:
                 print(out_decision)
                 graph_episode_output( res=res, index=epNo, ground_truth=Y_winTest[epNo][0], out_decision=out_decision, net='transformer', ts_ms = 20, save_fig=True )
                 print()
+
+
+if __name__ == '__main__':
+    gpus = tf.config.experimental.list_physical_devices(device_type='GPU')
+    print( f"Found {len(gpus)} GPUs!" )
+    for i in range( len( gpus ) ):
+        try:
+            tf.config.experimental.set_memory_growth(device=gpus[i], enable=True)
+            tf.config.experimental.VirtualDeviceConfiguration( memory_limit = 1024*3 )
+            print( f"\t{tf.config.experimental.get_device_details( device=gpus[i] )}" )
+        except RuntimeError as e:
+            print( '\n', e, '\n' )
+
+    devices = tf.config.list_physical_devices()
+    print( "Tensorflow sees the following devices:" )
+    for dev in devices:
+        print( f"\t{dev}" )
+        print
+
+    dp = DataPreprocessing(sampling='none')
+    dp.run(save_data=False, verbose=True)
+
+    X_train = dp.X_train_sampled
+    Y_train = dp.Y_train_sampled
+    X_test = dp.X_test
+    Y_test = dp.Y_test
+    batch_size = 64
+    epochs = 200
+
+    rnn = RNN()
+    rnn.fit(
+        X_train=X_train,
+        Y_train=Y_train,
+        X_test=X_test,
+        Y_test=Y_test,
+        batch_size=batch_size,
+        epochs=epochs
+    )
+
+    with open('./RNN_history', 'wb') as file_pi:
+        pickle.dump(rnn.history.history, file_pi)
+
+    rnn.model.save('./models/RNN.keras')

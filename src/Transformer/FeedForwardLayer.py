@@ -8,15 +8,15 @@ class FeedForward(tf.keras.layers.Layer):
     def __init__(self, d_model, ff_dim, dropout_rate=0.1):
         super().__init__()
         self.seq = tf.keras.Sequential([
-            tf.keras.layers.Conv1D(filters=ff_dim,
-                                   kernel_size=1,
-                                   activation='relu'),
-            tf.keras.layers.Dropout(dropout_rate),
-            tf.keras.layers.Conv1D(filters=d_model,
-                                   kernel_size=1)
-            # tf.keras.layers.Dense(ff_dim, activation='relu'),
+            # tf.keras.layers.Conv1D(filters=ff_dim,
+            #                        kernel_size=1,
+            #                        activation='relu'),
             # tf.keras.layers.Dropout(dropout_rate),
-            # tf.keras.layers.Dense(d_model, activation='relu')
+            # tf.keras.layers.Conv1D(filters=d_model,
+            #                        kernel_size=1)
+            tf.keras.layers.Dense(ff_dim, activation='relu'),
+            tf.keras.layers.Dropout(dropout_rate),
+            tf.keras.layers.Dense(d_model, activation='relu')
         ])
         self.add = tf.keras.layers.Add()
         self.layer_norm = tf.keras.layers.LayerNormalization()

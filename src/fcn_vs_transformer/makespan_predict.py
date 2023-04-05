@@ -489,18 +489,27 @@ if __name__ == '__main__':
             print(f'{e}: model does not exist!\n')
 
         try:
-            num_layers = 4
+            rnn = tensorflow.keras.models.load_model('models/RNN.keras')
+            makespan_models['RNN'] = rnn
+        except OSError as e:
+            print(f'{e}: model does not exist!\n')
+
+        try:
+            num_layers = 8
             d_model = 6
             dff = 512
-            num_heads = 4
+            num_heads = 8
             dropout_rate = 0.1
+            mlp_units = [128]
             oop_transformer = Transformer(
                 num_layers=num_layers,
                 d_model=d_model,
                 num_heads=num_heads,
                 ff_dim=dff,
+                mlp_units=mlp_units,
                 input_space_size=6,
                 target_space_size=2,
+                training=True,
                 dropout_rate=dropout_rate,
                 pos_encoding=True
             )

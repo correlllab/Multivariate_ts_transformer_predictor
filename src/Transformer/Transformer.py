@@ -10,8 +10,11 @@ from Encoder import Encoder
 # Full transformer
 class Transformer(tf.keras.Model):
     def __init__(self, *, num_layers, d_model, num_heads, ff_dim, mlp_units,
-                 input_space_size, target_space_size, pos_encoding=True, dropout_rate=0.1):
+                 input_space_size, target_space_size, training, pos_encoding=True, dropout_rate=0.1):
         super().__init__()
+
+        self.training = training
+
         self.encoder = Encoder(num_layers=num_layers,
                                d_model=d_model,
                                num_heads=num_heads,
@@ -35,7 +38,7 @@ class Transformer(tf.keras.Model):
         # first argument.
         # x = tf.keras.Input(shape=inputs.shape)
 
-        x = self.encoder(inputs)  # (batch_size, context_len, d_model)
+        x = self.encoder(inputs, self.training)  # (batch_size, context_len, d_model)
 
         # Global average pooling for temporal data
         x = self.global_average_pooling(x)

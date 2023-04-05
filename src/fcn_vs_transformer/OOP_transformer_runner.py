@@ -3,13 +3,6 @@ sys.path.insert(1, os.path.realpath('../Transformer'))
 print(sys.version)
 print(sys.path)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # INFO and WARNING messages are not printed
-import glob
-import pandas as pd
-import numpy as np
-import seaborn as sns
-import tensorflow
-import matplotlib.pyplot as plt
-from matplotlib.offsetbox import AnchoredText
 from random import choice
 import tensorflow as tf
 
@@ -26,17 +19,17 @@ from Transformer.CustomSchedule import CustomSchedule
 
 
 if __name__ == '__main__':
-    gpus = tensorflow.config.experimental.list_physical_devices(device_type='GPU')
+    gpus = tf.config.experimental.list_physical_devices(device_type='GPU')
     print( f"Found {len(gpus)} GPUs!" )
     for i in range( len( gpus ) ):
         try:
-            tensorflow.config.experimental.set_memory_growth(device=gpus[i], enable=True)
-            tensorflow.config.experimental.VirtualDeviceConfiguration( memory_limit = 1024*3 )
-            print( f"\t{tensorflow.config.experimental.get_device_details( device=gpus[i] )}" )
+            tf.config.experimental.set_memory_growth(device=gpus[i], enable=True)
+            tf.config.experimental.VirtualDeviceConfiguration( memory_limit = 1024*3 )
+            print( f"\t{tf.config.experimental.get_device_details( device=gpus[i] )}" )
         except RuntimeError as e:
             print( '\n', e, '\n' )
 
-    devices = tensorflow.config.list_physical_devices()
+    devices = tf.config.list_physical_devices()
     print( "Tensorflow sees the following devices:" )
     for dev in devices:
         print( f"\t{dev}" )
@@ -50,7 +43,7 @@ if __name__ == '__main__':
     dff = 512
     num_heads = 8
     dropout_rate = 0.1
-    mlp_units = [128]
+    mlp_units = [128, 256, 64]
     vanilla_transformer = Transformer(
         num_layers=num_layers,
         d_model=d_model,
@@ -59,10 +52,11 @@ if __name__ == '__main__':
         mlp_units=mlp_units,
         input_space_size=6,
         target_space_size=2,
+        training=True,
         dropout_rate=dropout_rate,
         pos_encoding=True
     )
-    output = vanilla_transformer(dp.X_train_sampled[:100])
+    output = vanilla_transformer(dp.X_train_sampled[:32])
     print(output.shape)
     attn_scores = vanilla_transformer.encoder.enc_layers[-1].last_attn_scores
     print(attn_scores.shape)  # (batch, heads, target_seq, input_seq)
