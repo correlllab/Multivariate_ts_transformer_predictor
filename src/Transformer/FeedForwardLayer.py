@@ -23,6 +23,7 @@ class FeedForward(tf.keras.layers.Layer):
 
     def call(self, x):
         # print(f'X shape = {x.shape}; self.seq(x) shape = {self.seq(x).shape}')
-        x = self.add([x, self.seq(x)])
-        x = self.layer_norm(x) 
+        seq_out = self.seq(x)
+        x = self.add([x, self.layer_norm(seq_out)])
+        # x = self.layer_norm(x)
         return x

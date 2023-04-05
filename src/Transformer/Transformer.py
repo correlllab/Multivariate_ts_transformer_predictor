@@ -1,6 +1,8 @@
-import os, sys, yaml, re
-import numpy as np
+import os, sys
+sys.path.append(os.path.realpath('../Transformer'))
+
 import tensorflow as tf
+
 # from YamlLoader import YamlLoader
 # from MultiHeadAttention import MultiHeadAttention
 from Encoder import Encoder
@@ -13,6 +15,7 @@ class Transformer(tf.keras.Model):
                  input_space_size, target_space_size, training, pos_encoding=True, dropout_rate=0.1):
         super().__init__()
 
+        self.model_name = 'OOP_Transformer'
         self.training = training
 
         self.encoder = Encoder(num_layers=num_layers,

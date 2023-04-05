@@ -1,0 +1,113 @@
+import sys, os, pickle
+sys.path.append(os.path.realpath('../'))
+# print(sys.path)
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # INFO and WARNING messages are not printed
+
+import numpy as np
+import seaborn as sns
+import pandas as pd
+import matplotlib.pyplot as plt
+
+import tensorflow
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, Dropout, Activation, SimpleRNN, LSTM, GRU, Conv1D, Flatten, MaxPooling1D
+from tensorflow.keras.optimizers import Adam, SGD
+from tensorflow.keras import regularizers
+
+from utils.utils import CounterDict
+from utils.helper_functions import scan_output_for_decision, graph_episode_output
+
+
+class FCN:
+    def __init__(self, rolling_window_width) -> None:
+        self.model_name = 'FCN'
+        self.model = None
+        self.history = None
+        self.file_name = '../saved_models/FCN.keras'
+        self.imgs_path = '../saved_data/imgs/fcn/'
+        self.rollWinWidth = rolling_window_width
+
+
+    def build(self):
+        self.model = Sequential()
+
+        # https://machinelearningmastery.com/how-to-develop-convolutional-neural-network-models-for-time-series-forecasting/
+        self.model.add(Conv1D( # "Dilated Convolution Layer 1 (No. of filters = 8, Filter Size = 2, Dilation Rate = 2)"
+            filters       = 16, #32 #16 #8, 
+            kernel_size   =  4, #2, 
+            dilation_rate =  4, #2,
+            activation  = 'relu', # -------- "a sequence of layers of dilated convolutional layers with ReLU"
+            input_shape = (self.rollWinWidth, 6,) #(n_steps, n_features)
+        ))
+
+        self.model.add(Conv1D( # "Dilated Convolution Layer 2 (No. of filters = 8, Filter Size = 2, Dilation Rate = 4)"
+            filters       = 16, #32 #16 # 8, 
+            kernel_size   =  4, #2, 
+            dilation_rate =  8, #4,
+            activation  = 'relu', # -------- "a sequence of layers of dilated convolutional layers with ReLU"
+            input_shape = (self.rollWinWidth, 6,) #(n_steps, n_features)
+        ))
+
+        # https://machinelearningmastery.com/how-to-develop-convolutional-neural-network-models-for-time-series-forecasting/
+        self.model.add( MaxPooling1D( pool_size = 4 ) ) #"Max Pooling Layer"
+
+        self.model.add( Flatten() )
+
+        self.model.add( Dense(50) ) # 50 # 200 #100 # fully connected layer
+        self.model.add( Activation('relu') )
+
+        self.model.add( Dropout( rate = 0.5 ) ) # "We used drop out at a rate of 0.5"
+
+        self.model.add( Dense( 2 ) ) # "The softmax layer computes the probability values for the predicted class."
+        self.model.add( Activation( "softmax" ) )
+        self.model.summary()
+
+        self.model.compile(
+            # optimizer=Adam(
+            #     beta_1 = 0.9, #0.7,#0.8, #0.9, # - "β1 = 0.9"
+            #     beta_2 = 0.999, #0.799,#0.85, #0.999, # "β2 = 0.999"
+            # ),
+            optimizer = SGD( 
+                learning_rate = 0.0010, # 0.0015 #0.002 # 0.004
+                momentum      = 0.125 #0.25 # 0.50 # 0.75
+            ),
+            loss      = 'binary_focal_crossentropy', #'MSE' 
+            metrics=['categorical_accuracy']
+        )
+
+
+    def fit(self, X_train, Y_train, X_test, Y_test, trainWindows, epochs=200, save_model=True):
+        batchSize = 256 #128 #256 #512 (out of mem) #256 #128
+
+        callbacks = [
+            tensorflow.keras.callbacks.EarlyStopping(
+                monitor='val_loss',
+                patience=10,
+                restore_best_weights=True,
+                start_from_epoch=epochs*0.2
+            )
+        ]
+
+        with tensorflow.device('/GPU:0'):
+            self.history = self.model.fit( 
+                # X_train, Y_train.reshape((-1,2)), 
+                X_train, Y_train, 
+                # validation_data  = (X_test, Y_test.reshape((-1,2)) ),
+                validation_data  = (X_test, Y_test),
+                batch_size       = batchSize, 
+                epochs           = epochs, #250, #50, #250, # 2022-09-12: Trained for 250 total
+                verbose          = True, 
+                validation_split = 0.1,
+                # steps_per_epoch  = int(trainWindows/batchSize), # https://stackoverflow.com/a/49924566
+                steps_per_epoch = len(X_train) // batchSize,
+                validation_steps = len(X_test) // batchSize,
+                callbacks        = callbacks
+            )
+        
+        if save_model:
+            self.model.save(self.file_name)
+
+            with open('../saved_data/histories/FCN_history', 'wb') as file_pi:
+                pickle.dump(self.history.history, file_pi)
+

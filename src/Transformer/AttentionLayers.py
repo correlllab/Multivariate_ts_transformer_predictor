@@ -25,8 +25,8 @@ class CrossAttention(BaseAttention):
         self.last_attn_scores = attn_scores
 
         # Add & Norm layer with residual connections
-        x = self.add([x, attn_output])
-        x = self.layernorm(x)
+        x = self.add([x, self.layer_norm(attn_output)])
+        # x = self.layernorm(x)
 
         return x
 
@@ -46,8 +46,8 @@ class GlobalSelfAttention(BaseAttention):
         self.last_attn_scores = attn_scores
 
         # Add & Norm layer with residual connections
-        x = self.add([x, attn_output])
-        x = self.layernorm(x)
+        x = self.add([x, self.layer_norm(attn_output)])
+        # x = self.layernorm(x)
 
         return x
 
@@ -63,7 +63,7 @@ class CausalSelfAttention(BaseAttention):
             use_causal_mask=True)
 
         # Add & Norm layer with residual connection
-        x = self.add([x, attn_output])
-        x = self.layernorm(x)
+        x = self.add([x, self.layer_norm(attn_output)])
+        # x = self.layernorm(x)
 
         return x
