@@ -48,14 +48,28 @@ class Embedding(tf.Module):
 
 
 def position_encode(x):
-
-    pe = tf.ones_like(x[0])
-    position = tf.range(0, x.shape[1]).unsqueeze(-1)
-    temp = tf.Tensor(range(0, x.shape[-1], 2))
-    temp = temp * -(math.log(10000) / x.shape[-1])
-    temp = tf.math.exp(temp).unsqueeze(0)
-    temp = tf.linalg.matmul(position.float(), temp)  # shape:[input, d_model/2]
-    pe[:, 0::2] = tf.math.sin(temp)
-    pe[:, 1::2] = tf.math.cos(temp)
-
+    pe = tf.ones_like(x, dtype=tf.float32)
+    position = tf.expand_dims(tf.range(0., x.shape[0]), axis=-1)
+    temp = tf.range(0., x.shape[-1], delta=2.)
+    temp = tf.multiply(temp, -(tf.divide(math.log(10000), x.shape[-1])))
+    temp = tf.expand_dims(tf.math.exp(temp), axis=0)
+    temp = tf.linalg.matmul(position, temp)  # shape:[input, d_model/2]
+    pe = tf.Variable(pe, dtype=tf.float32)
+    pe[:, 0::2].assign(tf.math.sin(temp))
+    pe[:, 1::2].assign(tf.math.cos(temp))
+    pe = tf.convert_to_tensor(pe, dtype=tf.float32)
+    
     return x + pe
+
+# def position_encode(x):
+
+#     pe = tf.ones_like(x[0])
+#     position = tf.range(0, x.shape[1]).unsqueeze(-1)
+#     temp = tf.Tensor(range(0, x.shape[-1], 2))
+#     temp = temp * -(math.log(10000) / x.shape[-1])
+#     temp = tf.math.exp(temp).unsqueeze(0)
+#     temp = tf.linalg.matmul(position.float(), temp)  # shape:[input, d_model/2]
+#     pe[:, 0::2] = tf.math.sin(temp)
+#     pe[:, 1::2] = tf.math.cos(temp)
+
+#     return x + pe

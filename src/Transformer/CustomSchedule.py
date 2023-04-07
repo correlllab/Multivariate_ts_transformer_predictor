@@ -9,12 +9,23 @@ from tensorflow.keras import regularizers
 
 
 class CustomSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
-    def __init__(self, d_model, warmup_steps=4000):
+    def __init__(self, d_model=1, warmup_steps=4000):
         super().__init__()
 
         self.d_model = d_model
         self.d_model = tf.cast(self.d_model, tf.float32)
         self.warmup_steps = warmup_steps
+
+
+
+    def get_config(self):
+        config = {
+        'd_model': self.d_model,
+        'warmup_steps': self.warmup_steps,
+
+            }
+        return config
+
 
 
     def __call__(self, step):

@@ -15,6 +15,7 @@ src/fcnn_vs_transformers/models/tmp
 
 # Npy files
 src/fcnn_vs_transformers/comp_data/*.npy
+src/fcn_vs_transformer/preprocessing_data/*.npy
 
 # C extensions
 *.so

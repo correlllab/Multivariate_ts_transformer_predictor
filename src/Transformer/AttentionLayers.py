@@ -1,19 +1,15 @@
-import os, sys, yaml, re
-import numpy as np
 import tensorflow as tf
-import tensorflow.keras as tfk
-from tensorflow.keras import layers
-from YamlLoader import YamlLoader
-from MultiHeadAttention import MultiHeadAttention
+# from YamlLoader import YamlLoader
+# from MultiHeadAttention import MultiHeadAttention
 
 # from https://www.tensorflow.org/text/tutorials/transformer#define_the_components
-class BaseAttention(layers.Layer):
+class BaseAttention(tf.keras.layers.Layer):
     def __init__(self, **kwargs):
         super().__init__()
         # TODO: mha layer not in tf 2.3
-        self.mha = layers.MultiHeadAttention(**kwargs)
-        self.layernorm = layers.LayerNormalization()
-        self.add = layers.Add()
+        self.mha = tf.keras.layers.MultiHeadAttention(**kwargs)
+        self.layernorm = tf.keras.layers.LayerNormalization()
+        self.add = tf.keras.layers.Add()
 
 
 # MultiHeadAttention layer in the decoder (joints otput of encoder and output of first MHA layer of decoder)
@@ -29,24 +25,29 @@ class CrossAttention(BaseAttention):
         self.last_attn_scores = attn_scores
 
         # Add & Norm layer with residual connections
-        x = self.add([x, attn_output])
-        x = self.layernorm(x)
+        x = self.add([x, self.layernorm(attn_output)])
+        # x = self.layernorm(x)
 
         return x
 
 
 # MultiHeadAttention layer in the encoder
 class GlobalSelfAttention(BaseAttention):
-    def call(self, x):
-        print(f'In encoder call(), input shape = {x.shape}')
-        attn_output = self.mha(
+    def call(self, x, training):
+        # print(f'In encoder call(), input shape = {x.shape}')
+        attn_output, attn_scores = self.mha(
             query=x,
             value=x,
-            key=x)
+            key=x,
+            return_attention_scores=True,
+            training=training)
+
+        # Cache the attention scores for plotting later.
+        self.last_attn_scores = attn_scores
 
         # Add & Norm layer with residual connections
-        x = self.add([x, attn_output])
-        x = self.layernorm(x)
+        x = self.add([x, self.layernorm(attn_output)])
+        # x = self.layernorm(x)
 
         return x
 
@@ -59,10 +60,10 @@ class CausalSelfAttention(BaseAttention):
             query=x,
             value=x,
             key=x,
-            use_causal_mask = True)
+            use_causal_mask=True)
 
         # Add & Norm layer with residual connection
-        x = self.add([x, attn_output])
-        x = self.layernorm(x)
+        x = self.add([x, self.layernorm(attn_output)])
+        # x = self.layernorm(x)
 
         return x

@@ -1,19 +1,13 @@
-import os, sys, yaml, re
-import numpy as np
 import tensorflow as tf
-import tensorflow.keras as tfk
-from tensorflow.keras import layers
-from tensorflow.keras import optimizers
-from tensorflow.keras import regularizers
-from YamlLoader import YamlLoader
-from MultiHeadAttention import MultiHeadAttention
-from Transformer.AttentionLayers import BaseAttention, GlobalSelfAttention, CrossAttention, MultiHeadAttention, CausalSelfAttention
-from Transformer.FeedForwardLayer import FeedForward
-from Transformer.PositionalEncoding import PositionalEmbedding
+# from YamlLoader import YamlLoader
+# from MultiHeadAttention import MultiHeadAttention
+from AttentionLayers import GlobalSelfAttention
+from FeedForwardLayer import FeedForward
+from PositionalEncoding import PositionalEmbedding
 
 # from https://www.tensorflow.org/text/tutorials/transformer#define_the_components
 # Encoder layer
-class EncoderLayer(layers.Layer):
+class EncoderLayer(tf.keras.layers.Layer):
     def __init__(self, *, d_model, num_heads, ff_dim, dropout_rate=0.1):
         super().__init__()
 
@@ -24,25 +18,33 @@ class EncoderLayer(layers.Layer):
 
         self.ffn = FeedForward(d_model, ff_dim)
 
-    def call(self, x):
-        x = self.self_attention(x)
+    def call(self, x, training):
+        x = self.self_attention(x, training)
         x = self.ffn(x)
+
+        # Cache the last attention scores for plotting later
+        self.last_attn_scores = self.self_attention.last_attn_scores
+
         return x
 
 
 # Full encoder
 class Encoder(tf.keras.layers.Layer):
     def __init__(self, *, num_layers, d_model, num_heads,
-                ff_dim, space_size, dropout_rate=0.1):
+                ff_dim, space_size, dropout_rate=0.1, pos_encoding=True):
         super().__init__()
 
         self.d_model = d_model
         self.num_layers = num_layers
 
-        # self.pos_embedding = PositionalEmbedding(
-        #     space_size=space_size,
-        #     d_model=d_model
-        # )
+        self.embedding = tf.keras.layers.Embedding(input_dim=d_model, output_dim=1, input_length=350)
+
+        self.encode = pos_encoding
+        if self.encode:
+            self.pos_embedding = PositionalEmbedding(
+                space_size=space_size,
+                d_model=d_model
+            )
 
         self.enc_layers = [
             EncoderLayer(d_model=d_model,
@@ -51,17 +53,29 @@ class Encoder(tf.keras.layers.Layer):
                             dropout_rate=dropout_rate)
             for _ in range(num_layers)
         ]
-        self.dropout = layers.Dropout(dropout_rate)
+        self.dropout = tf.keras.layers.Dropout(dropout_rate)
 
-    def call(self, x):
-        # `x` is token-IDs shape: (batch, seq_len)
-        #TODO: pos encoding
-        # x = self.pos_embedding(x)  # Shape `(batch_size, seq_len, d_model)`.
+        self.last_attn_scores = None
+
+    def call(self, x, training):
+        # print(f'In Encoder call, shape = {x.shape}')
+        # x = self.embedding(x)
+        # print(f'In Encoder call after embedding, shape = {x.shape}')
+        # x = tf.keras.layers.Flatten()(x)
+        # print(f'In Encoder call after flatten, shape = {x.shape}')
+
+        if self.encode:
+            # `x` is token-IDs shape: (batch, seq_len)
+            x = self.pos_embedding(x)  # Shape `(batch_size, seq_len, d_model)`.
 
         # Add dropout.
         x = self.dropout(x)
 
         for i in range(self.num_layers):
-            x = self.enc_layers[i](x)
+            x = self.enc_layers[i](x, training)
+
+        # print(f'==> In Encoder call, last x.shape = {x.shape}')
+
+        self.last_attn_scores = self.enc_layers[-1].last_attn_scores
 
         return x  # Shape `(batch_size, seq_len, d_model)`.
