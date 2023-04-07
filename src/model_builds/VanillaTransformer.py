@@ -90,7 +90,7 @@ class VanillaTransformer:
         )
         self.model.summary()
 
-        checkpoint_filepath = './models/tmp/checkpoints/'
+        checkpoint_filepath = '../saved_models/tmp/vanilla_transformer_checkpoints/'
         callbacks = [
             tf.keras.callbacks.EarlyStopping(
                 monitor='val_loss',
