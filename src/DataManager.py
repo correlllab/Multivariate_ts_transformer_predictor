@@ -1,4 +1,8 @@
 import os, sys
+sys.path.append(os.path.realpath('..'))
+print( sys.version )
+print(sys.path)
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # INFO and WARNING messages are not printed
 import glob
 import pandas as pd
 import numpy as np
@@ -362,11 +366,14 @@ if __name__ == '__main__':
         print( f"\t{dev}" )
     # ---------------------------------------------------------------------------------------------
     
-    MAIN_PATH = os.path.dirname(os.path.dirname(__file__))
+    MAIN_PATH = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
     SRC_PATH = os.path.dirname(os.path.realpath(__file__))
 
+
+    print(SRC_PATH)
+
     yl = YamlLoader()
-    conf = yl.load_yaml(path='src/config/data_config.yaml')
+    conf = yl.load_yaml(path=SRC_PATH + '/config/data_config.yaml')
     """ with open('src/config/data_config.yaml', 'r') as config_file:
         try:
             conf = yaml.safe_load(config_file)
@@ -390,6 +397,13 @@ if __name__ == '__main__':
 
     (x_train, y_train), (x_test, y_test) = dm.load_train_test_data(data_dict=data_dict)
     x_train, x_val, y_train, y_val = dm.load_train_val_data(x=x_train, y=y_train, shuffle=True)
+
+
+    plot = True
+
+    if plot:
+        pre = data_dict['preemptive']
+        make_plot(pre['data'], pre['st_data'], pre['pad_data'])
 
 
     # data_dict = {k: None for k in conf['targets']}

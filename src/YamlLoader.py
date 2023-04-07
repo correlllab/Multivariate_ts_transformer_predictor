@@ -1,4 +1,5 @@
 import os, sys, yaml, re
+sys.path.insert(1, os.path.realpath('../'))
 
 class YamlLoader():
     def __init__(self) -> None:
