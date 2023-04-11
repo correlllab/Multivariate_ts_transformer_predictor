@@ -21,8 +21,37 @@ class VanillaTransformer:
         self.history = None
         self.evaluation = None
         self.last_attn_scores = None
-        self.file_name = '../saved_models/Transformer.keras'
-        self.imgs_path = '../saved_data/imgs/transformer/'
+        self.file_name = f'../saved_models/{self.model_name}.keras'
+        self.imgs_path = f'../saved_data/imgs/{self.model_name}/'
+        self.histories_path = f'../saved_data/histories/{self.model_name}_history'
+
+
+    def positional_encoding(self, s):
+        # x = np.zeros(s)
+        # pe = tf.ones_like(x, dtype=tf.float32)
+        # position = tf.expand_dims(tf.range(0., x.shape[0]), axis=-1)
+        # temp = tf.range(0., x.shape[-1], delta=2.)
+        # temp = tf.multiply(temp, -(tf.divide(math.log(10000), x.shape[-1])))
+        # temp = tf.expand_dims(tf.math.exp(temp), axis=0)
+        # temp = tf.linalg.matmul(position, temp)  # shape:[input, d_model/2]
+        # pe = tf.Variable(pe, dtype=tf.float32, validate_shape=False)
+        # pe[:, 0::2].assign(tf.math.sin(temp))
+        # pe[:, 1::2].assign(tf.math.cos(temp))
+        # pe = tf.convert_to_tensor(pe, dtype=tf.float32)
+
+        # return pe
+
+        aux = np.zeros(s)
+        mat = np.arange(s[0], dtype=np.float32).reshape(
+            -1,1)/np.power(10000, np.arange(
+            0, s[-1], 2, dtype=np.float32) / s[-1])
+        aux[:, 0::2] = np.sin(mat)
+        aux[:, 1::2] = np.cos(mat)
+        pe = tf.convert_to_tensor(aux, dtype=tf.float32)
+
+        # return tf.keras.layers.Add()([x, pe])
+        return pe
+
 
     def transformer_encoder(self, inputs, head_size, num_heads, ff_dim, dropout=0):
         # Normalization and Attention
@@ -56,7 +85,7 @@ class VanillaTransformer:
         n_classes=2
     ):
         inputs = tf.keras.Input(shape=input_shape)
-        x = inputs
+        x += self.positional_encoding(input_shape[-2:])
         for _ in range(num_transformer_blocks):
             x, attn_scores = self.transformer_encoder(x, head_size, num_heads, ff_dim, dropout)
 
@@ -128,5 +157,5 @@ class VanillaTransformer:
         if save_model:
             self.model.save(self.file_name)
 
-            with open('../saved_data/histories/Transformer_history', 'wb') as file_pi:
+            with open(self.histories_path, 'wb') as file_pi:
                 pickle.dump(self.history.history, file_pi)

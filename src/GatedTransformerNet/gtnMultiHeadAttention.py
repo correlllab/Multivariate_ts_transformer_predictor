@@ -9,12 +9,8 @@ class GTN_MultiHeadAttention(tf.keras.layers.Layer):
                  q: int,
                  v: int,
                  h: int,
-                 trainable: bool = True,
-                 name: str = None,
-                 dtype: str = None,
-                 dynamic: bool = False,
-                 **kwargs):
-        super(GTN_MultiHeadAttention, self).__init__(trainable, name, dtype, dynamic, **kwargs)
+    ):
+        super().__init__()
 
         # self.W_Q = tfl.layers.Linear(num_input_dims=d_model, units=q * h)
         # self.W_K = tfl.layers.Linear(num_input_dims=d_model, units=q * h)

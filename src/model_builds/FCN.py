@@ -24,8 +24,9 @@ class FCN:
         self.model_name = 'FCN'
         self.model = None
         self.history = None
-        self.file_name = '../saved_models/FCN.keras'
-        self.imgs_path = '../saved_data/imgs/fcn/'
+        self.file_name = f'../saved_models/{self.model_name}.keras'
+        self.imgs_path = f'../saved_data/imgs/{self.model_name}/'
+        self.histories_path = f'../saved_data/histories/{self.model_name}_history'
         self.rollWinWidth = rolling_window_width
 
 
@@ -108,6 +109,6 @@ class FCN:
         if save_model:
             self.model.save(self.file_name)
 
-            with open('../saved_data/histories/FCN_history', 'wb') as file_pi:
+            with open(self.histories_path, 'wb') as file_pi:
                 pickle.dump(self.history.history, file_pi)
 

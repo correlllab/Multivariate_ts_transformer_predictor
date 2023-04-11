@@ -80,10 +80,10 @@ if __name__ == '__main__':
         optimizer=opt,
         metrics=[tf.keras.metrics.CategoricalAccuracy()]
     )
-    transformer.load_weights('../fcn_vs_transformer/models/OOP_transformer').expect_partial()
+    transformer.load_weights('../fcn_vs_transformer/models/OOP_Transformer').expect_partial()
     predictor = Predictor(model=transformer)
 
-    dp = DataPreprocessing(sampling='none')
+    dp = DataPreprocessing(sampling='none', data='reactive')
     dp.shuffle = False
     dp.load_data(verbose=True)
     dp.scale_data(verbose=True)

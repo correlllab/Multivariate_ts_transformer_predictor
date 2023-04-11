@@ -36,8 +36,8 @@ import tensorflow as tf
 
 
 class PositionalEmbedding(tf.keras.layers.Layer):
-    def __init__(self, space_size, d_model, trainable=True, name=None, dtype=None, dynamic=False, **kwargs):
-        super().__init__(trainable, name, dtype, dynamic, **kwargs)
+    def __init__(self):
+        super().__init__()
         # self.d_model = d_model
         # self.embedding = tf.keras.layers.Embedding(input_dim=space_size, output_dim=d_model, mask_zero=True)
         # self.pos_encoding = positional_encoding()

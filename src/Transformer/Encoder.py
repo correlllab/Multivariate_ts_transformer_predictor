@@ -41,10 +41,7 @@ class Encoder(tf.keras.layers.Layer):
 
         self.encode = pos_encoding
         if self.encode:
-            self.pos_embedding = PositionalEmbedding(
-                space_size=space_size,
-                d_model=d_model
-            )
+            self.pos_embedding = PositionalEmbedding()
 
         self.enc_layers = [
             EncoderLayer(d_model=d_model,

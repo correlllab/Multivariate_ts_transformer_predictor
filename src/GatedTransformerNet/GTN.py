@@ -1,6 +1,7 @@
-import os, sys, math
-sys.path.insert(1, os.path.realpath('..'))
-print( sys.version )
+import sys, os, pickle, json
+sys.path.append(os.path.realpath('../'))
+# print(sys.path)
+
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # INFO and WARNING messages are not printed
 
 import tensorflow as tf
@@ -11,10 +12,10 @@ import pandas as pd
 
 from keras import backend as K
 
-from utils import CounterDict
-from helper_functions import scan_output_for_decision, graph_episode_output
+from utils.utils import CounterDict
+from utils.helper_functions import scan_output_for_decision, graph_episode_output
 from Transformer.AttentionLayers import *
-from fcnn_vs_transformer.data_preprocessing import DataPreprocessing
+from data_management.data_preprocessing import DataPreprocessing
 
 
 

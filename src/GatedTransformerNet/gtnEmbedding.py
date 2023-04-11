@@ -11,12 +11,8 @@ class GTN_Embedding(tf.keras.layers.Layer):
                  d_timestep: int,
                  d_model: int,
                  wise: str = 'timestep' or 'feature',
-                 trainable: bool = True,
-                 name: str = None,
-                 dtype: str = None,
-                 dynamic: bool = False,
-                 **kwargs):
-        super(GTN_Embedding, self).__init__(trainable, name, dtype, dynamic, **kwargs)
+    ):
+        super().__init__()
 
         assert wise == 'timestep' or wise == 'feature', 'ERROR: embedding wise parameter'
         self.wise = wise
@@ -30,39 +26,39 @@ class GTN_Embedding(tf.keras.layers.Layer):
             self.embedding = tf.keras.layers.Dense(d_model, input_shape=(d_timestep,), activation='relu')
 
 
-    def call(self,
-                x: tf.Tensor):
+    def positional_encoding(self, s):
+        # x = np.zeros(s)
+        # pe = tf.ones_like(x, dtype=tf.float32)
+        # position = tf.expand_dims(tf.range(0., x.shape[0]), axis=-1)
+        # temp = tf.range(0., x.shape[-1], delta=2.)
+        # temp = tf.multiply(temp, -(tf.divide(math.log(10000), x.shape[-1])))
+        # temp = tf.expand_dims(tf.math.exp(temp), axis=0)
+        # temp = tf.linalg.matmul(position, temp)  # shape:[input, d_model/2]
+        # pe = tf.Variable(pe, dtype=tf.float32, validate_shape=False)
+        # pe[:, 0::2].assign(tf.math.sin(temp))
+        # pe[:, 1::2].assign(tf.math.cos(temp))
+        # pe = tf.convert_to_tensor(pe, dtype=tf.float32)
+
+        # return pe
+
+        aux = np.zeros(s)
+        mat = np.arange(s[0], dtype=np.float32).reshape(
+            -1,1)/np.power(10000, np.arange(
+            0, s[-1], 2, dtype=np.float32) / s[-1])
+        aux[:, 0::2] = np.sin(mat)
+        aux[:, 1::2] = np.cos(mat)
+        pe = tf.convert_to_tensor(aux, dtype=tf.float32)
+
+        # return tf.keras.layers.Add()([x, pe])
+        return pe
+
+
+    def call(self, x: tf.Tensor):
         if self.wise == 'feature':
             x = self.embedding(x)
         elif self.wise == 'timestep':
             x = self.embedding(tf.transpose(x))
             # x = self.embedding(x)
-            x = position_encode(x)
+            x += self.positional_encoding(x.shape[-2:])
 
-        return tf.convert_to_tensor(x)
-
-
-
-def position_encode(x):
-    # pe = tf.ones_like(x)
-    # # position = tf.expand_dims(tf.convert_to_tensor(tf.range(0., x.shape[1]), dtype='float32'), axis=-1)
-    # position = tf.expand_dims(tf.range(0., x.shape[1]), axis=-1)
-    # # temp = tf.convert_to_tensor(tf.range(0., x.shape[-1], delta=2.), dtype='float32')
-    # temp = tf.range(0., x.shape[-1], delta=2.)
-    # temp = tf.multiply(temp, -(tf.divide(math.log(10000), x.shape[-1])))
-    # temp = tf.expand_dims(tf.math.exp(temp), axis=0)
-    # temp = tf.linalg.matmul(position, temp)  # shape:[input, d_model/2]
-    # pe = tf.Variable(pe)
-    # pe[:, 0::2].assign(tf.math.sin(temp))
-    # pe[:, 1::2].assign(tf.math.cos(temp))
-    # pe = tf.convert_to_tensor(pe)
-
-    aux = np.zeros(x.shape)
-    mat = np.arange(x.shape[1], dtype=np.float32).reshape(
-        -1,1)/np.power(10000, np.arange(
-        0, x.shape[-1], 2, dtype=np.float32) / x.shape[-1])
-    aux[:, :, 0::2] = np.sin(mat)
-    aux[:, :, 1::2] = np.cos(mat)
-    pe = tf.convert_to_tensor(aux, dtype=tf.float32)
-
-    return tf.keras.layers.Add()([x, pe])
+        return x

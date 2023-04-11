@@ -14,7 +14,7 @@ class BaseAttention(tf.keras.layers.Layer):
 
 # MultiHeadAttention layer in the decoder (joints otput of encoder and output of first MHA layer of decoder)
 class CrossAttention(BaseAttention):
-    def call(self, x, context):
+    def call(self, x: tf.Tensor, context):
         attn_output, attn_scores = self.mha(
             query=x,
             key=context,
@@ -33,7 +33,7 @@ class CrossAttention(BaseAttention):
 
 # MultiHeadAttention layer in the encoder
 class GlobalSelfAttention(BaseAttention):
-    def call(self, x, training):
+    def call(self, x: tf.Tensor, training):
         # print(f'In encoder call(), input shape = {x.shape}')
         attn_output, attn_scores = self.mha(
             query=x,
@@ -55,12 +55,16 @@ class GlobalSelfAttention(BaseAttention):
 # Masked MultiHeadAttention layer in the decoder (the mask prevents from predictions looking
 # into the future, only considers past observations)
 class CausalSelfAttention(BaseAttention):
-    def call(self, x):
-        attn_output = self.mha(
+    def call(self, x: tf.Tensor):
+        attn_output, attn_scores = self.mha(
             query=x,
             value=x,
             key=x,
+            return_attention_scores=True,
             use_causal_mask=True)
+
+        # Cache the attention scores for plotting later.
+        self.last_attn_scores = attn_scores
 
         # Add & Norm layer with residual connection
         x = self.add([x, self.layernorm(attn_output)])
