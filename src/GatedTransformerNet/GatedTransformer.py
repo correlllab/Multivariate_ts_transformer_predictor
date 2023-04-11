@@ -55,9 +55,7 @@ class GatedTransformer(tf.keras.Model):
         self.linear_out = tf.keras.layers.Dense(class_num, input_shape=(d_timestep * d_model + d_feature * d_model,), activation='softmax')
 
 
-    def call(self,
-                x: tf.Tensor,
-                stage: str = 'train' or 'test'):
+    def call(self, x: tf.Tensor, stage: str = 'train' or 'test'):
         # x = tf.keras.Input(shape=x.shape[1:], dtype=tf.float32, batch_size=16)
         x_timestep = self.timestep_embedding(x)
         x_feature = self.feature_embedding(x)
@@ -74,7 +72,6 @@ class GatedTransformer(tf.keras.Model):
 
         x_timestep = tf.reshape(x_timestep, shape=(x_timestep.shape[0], -1))
         x_feature = tf.reshape(x_feature, shape=(x_feature.shape[0], -1))
-
 
         gate = self.gate(tf.concat([x_timestep, x_feature], axis=-1))
         gate_out = tf.concat([tf.multiply(x_timestep, gate[:, 0:1]), tf.multiply(x_feature, gate[:, 1:2])], axis=-1)

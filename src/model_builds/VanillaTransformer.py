@@ -85,6 +85,7 @@ class VanillaTransformer:
         n_classes=2
     ):
         inputs = tf.keras.Input(shape=input_shape)
+        x = inputs
         x += self.positional_encoding(input_shape[-2:])
         for _ in range(num_transformer_blocks):
             x, attn_scores = self.transformer_encoder(x, head_size, num_heads, ff_dim, dropout)

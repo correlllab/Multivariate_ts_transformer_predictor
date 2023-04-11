@@ -23,7 +23,6 @@ class RNN:
         self.imgs_path = f'../saved_data/imgs/{self.model_name}/'
         self.histories_path = f'../saved_data/histories/{self.model_name}_history'
 
-
     def build_model(self, input_shape, lstm_dim=128, dense_dim=2):
         model = tf.keras.Sequential()
         model.add(tf.keras.Input(shape=input_shape))
@@ -31,7 +30,6 @@ class RNN:
         model.add(tf.keras.layers.Dense(dense_dim, activation='softmax'))
 
         self.model = model
-
 
     def fit(self, X_train, Y_train, X_test, Y_test, batch_size=64, epochs=200, save_model=True):
         self.build_model(
@@ -63,9 +61,9 @@ class RNN:
             epochs=epochs,
             batch_size=batch_size,
             callbacks=callbacks,
-            validation_data  = (X_test, Y_test),
-            steps_per_epoch = len(X_train) // batch_size,
-            validation_steps = len(X_test) // batch_size
+            validation_data=(X_test, Y_test),
+            steps_per_epoch=len(X_train) // batch_size,
+            validation_steps=len(X_test) // batch_size
         )
 
         if save_model:
@@ -73,7 +71,6 @@ class RNN:
 
             with open(self.histories_path, 'wb') as file_pi:
                 pickle.dump(self.history.history, file_pi)
-
 
 
 if __name__ == '__main__':
@@ -91,7 +88,7 @@ if __name__ == '__main__':
     print( "Tensorflow sees the following devices:" )
     for dev in devices:
         print( f"\t{dev}" )
-        print
+        print()
 
     dp = DataPreprocessing(sampling='none')
     dp.run(save_data=False, verbose=True)

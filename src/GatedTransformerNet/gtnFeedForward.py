@@ -23,8 +23,7 @@ class GTN_FeedForward(tf.keras.layers.Layer):
         self.add = tf.keras.layers.Add()
 
 
-    def call(self,
-                x: tf.Tensor):
+    def call(self, x: tf.Tensor):
         seq_out = self.seq(x)
         x = self.add([x, self.layer_norm(seq_out)])
 

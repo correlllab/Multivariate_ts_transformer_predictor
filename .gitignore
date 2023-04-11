@@ -4,6 +4,12 @@
 __pycache__/
 *.py[cod]
 
+# PyCharm things
+.idea/
+
+# Data for eval
+data/eval_data/
+
 # Python notebooks stuff
 .ipynb_checkpoints
 src/notebooks/*.npy

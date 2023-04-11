@@ -45,6 +45,8 @@ class GTN_EncoderLayer(tf.keras.layers.Layer):
         # Cache the last attention scores for plotting later
         self.last_attn_scores = self.attention.last_attn_scores
 
+        return x
+
 
 class GTN_Encoder(tf.keras.layers.Layer):
     def __init__(self,

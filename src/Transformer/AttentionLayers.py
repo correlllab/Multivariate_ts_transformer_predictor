@@ -33,7 +33,7 @@ class CrossAttention(BaseAttention):
 
 # MultiHeadAttention layer in the encoder
 class GlobalSelfAttention(BaseAttention):
-    def call(self, x: tf.Tensor, training):
+    def call(self, x: tf.Tensor, training: bool = True):
         # print(f'In encoder call(), input shape = {x.shape}')
         attn_output, attn_scores = self.mha(
             query=x,
@@ -56,10 +56,12 @@ class GlobalSelfAttention(BaseAttention):
 # into the future, only considers past observations)
 class CausalSelfAttention(BaseAttention):
     def call(self, x: tf.Tensor):
+        mask = 1 - tf.linalg.band_part(tf.ones((x.shape[1], x.shape[1])), -1, 0)
         attn_output, attn_scores = self.mha(
             query=x,
             value=x,
             key=x,
+            attention_mask=mask,
             return_attention_scores=True,
             use_causal_mask=True)
 

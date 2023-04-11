@@ -91,9 +91,9 @@ if __name__ == '__main__':
         epochs=epochs,
         batch_size=batch_size,
         callbacks=callbacks,
-        validation_data = (X_test, Y_test),
-        steps_per_epoch = len(X_train) // batch_size,
-        validation_steps = len(X_test) // batch_size
+        validation_data=(X_test, Y_test),
+        steps_per_epoch=len(X_train) // batch_size,
+        validation_steps=len(X_test) // batch_size
     )
     
     # print(f'CALLING GTN()')

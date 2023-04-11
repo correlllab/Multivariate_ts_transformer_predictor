@@ -57,7 +57,7 @@ class GTN_Embedding(tf.keras.layers.Layer):
         if self.wise == 'feature':
             x = self.embedding(x)
         elif self.wise == 'timestep':
-            x = self.embedding(tf.transpose(x))
+            x = self.embedding(x)
             # x = self.embedding(x)
             x += self.positional_encoding(x.shape[-2:])
 
