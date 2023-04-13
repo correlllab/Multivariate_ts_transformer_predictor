@@ -10,8 +10,8 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-from utils.utils import CounterDict
-from utils.helper_functions import scan_output_for_decision, graph_episode_output
+from utilities.utils import CounterDict
+from utilities.helper_functions import scan_output_for_decision, graph_episode_output
 
 
 class VanillaTransformer:

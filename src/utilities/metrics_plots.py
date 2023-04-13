@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 import seaborn as sns
 
-from utils.utils import CounterDict
+from utilities.utils import CounterDict
 from helper_functions import scan_output_for_decision, graph_episode_output
 
 

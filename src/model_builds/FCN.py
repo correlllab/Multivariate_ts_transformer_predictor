@@ -15,8 +15,8 @@ from tensorflow.keras.layers import Dense, Dropout, Activation, SimpleRNN, LSTM,
 from tensorflow.keras.optimizers import Adam, SGD
 from tensorflow.keras import regularizers
 
-from utils.utils import CounterDict
-from utils.helper_functions import scan_output_for_decision, graph_episode_output
+from utilities.utils import CounterDict
+from utilities.helper_functions import scan_output_for_decision, graph_episode_output
 
 
 class FCN:
