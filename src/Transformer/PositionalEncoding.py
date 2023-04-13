@@ -64,7 +64,7 @@ class PositionalEmbedding(tf.keras.layers.Layer):
             0, s[-1], 2, dtype=np.float32) / s[-1])
         aux[:, 0::2] = np.sin(mat)
         aux[:, 1::2] = np.cos(mat)
-        pe = tf.convert_to_tensor(aux, dtype=tf.float32)
+        pe = tf.convert_to_tensor(aux, dtype=tf.float16)
 
         # return tf.keras.layers.Add()([x, pe])
         return pe

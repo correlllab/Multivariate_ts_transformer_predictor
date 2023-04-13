@@ -106,7 +106,7 @@ class VanillaTransformer:
             input_shape,
             head_size=256,
             num_heads=4,
-            ff_dim=4,
+            ff_dim=256,
             num_transformer_blocks=4,
             mlp_units=[128],
             mlp_dropout=0.4,

@@ -9,7 +9,7 @@ from tensorflow.keras import regularizers
 
 
 class CustomSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
-    def __init__(self, d_model=1, warmup_steps=4000):
+    def __init__(self, d_model=6, warmup_steps=4000):
         super().__init__()
 
         self.d_model = d_model

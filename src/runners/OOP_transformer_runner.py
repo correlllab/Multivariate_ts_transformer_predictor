@@ -8,12 +8,7 @@ from random import choice
 import tensorflow as tf
 
 from data_management.data_preprocessing import DataPreprocessing
-from model_builds.FCN import FCN
-# from VanillaTransformer import Transformer
-from Transformer.CustomSchedule import CustomSchedule
-from utils.utils import CounterDict
-from Transformer.Transformer import Transformer
-from Transformer.CustomSchedule import CustomSchedule
+from model_builds.OOPTransformer import OOPTransformer
 
 # from tensorflow.python.framework.ops import disable_eager_execution
 # disable_eager_execution()
@@ -36,8 +31,13 @@ if __name__ == '__main__':
         print( f"\t{dev}" )
         print
 
-    dp = DataPreprocessing(sampling='none')
+    dp = DataPreprocessing(sampling='none', data='reactive')
     dp.run(save_data=False, verbose=True)
+
+    policy = tf.keras.mixed_precision.Policy('mixed_float16')
+    tf.keras.mixed_precision.set_global_policy(policy)
+
+    transformer_net = OOPTransformer()
 
     num_layers = 8
     d_model = 6
@@ -45,49 +45,19 @@ if __name__ == '__main__':
     num_heads = 8
     dropout_rate = 0.1
     mlp_units = [128, 256, 64]
-    vanilla_transformer = Transformer(
+
+    transformer_net.build(
+        X_sample=dp.X_train_sampled[:32],
         num_layers=num_layers,
         d_model=d_model,
+        dff=dff,
         num_heads=num_heads,
-        ff_dim=dff,
-        mlp_units=mlp_units,
-        input_space_size=6,
-        target_space_size=2,
-        training=True,
         dropout_rate=dropout_rate,
-        pos_encoding=True
+        mlp_units=mlp_units,
+        save_model=True
     )
-    output = vanilla_transformer(dp.X_train_sampled[:32])
-    print(output.shape)
-    attn_scores = vanilla_transformer.encoder.enc_layers[-1].last_attn_scores
-    print(attn_scores.shape)  # (batch, heads, target_seq, input_seq)
-    print(vanilla_transformer.summary())
 
-    vanilla_transformer.save_weights(filepath='./models/OOP_transformer/')
-
-    # vanilla_transformer = Transformer(
-    #     num_layers=num_layers,
-    #     d_model=d_model,
-    #     num_heads=num_heads,
-    #     ff_dim=dff,
-    #     input_space_size=6,
-    #     target_space_size=2,
-    #     dropout_rate=dropout_rate,
-    #     pos_encoding=True
-    # )
-    learning_rate = CustomSchedule()
-    opt = tf.keras.optimizers.legacy.Adam(learning_rate, beta_1=0.9, beta_2=0.98,
-                                   epsilon=1e-9)
-    # vanilla_transformer.compile(
-    #     loss="binary_focal_crossentropy",
-    #     optimizer=opt,
-    #     metrics=["categorical_accuracy"]
-    # )
-    vanilla_transformer.compile(
-        loss=tf.keras.losses.CategoricalCrossentropy(),
-        optimizer=opt,
-        metrics=[tf.keras.metrics.CategoricalAccuracy()]
-    )
+    transformer_net.compile()
 
     X_train = dp.X_train_sampled
     Y_train = dp.Y_train_sampled
@@ -100,28 +70,33 @@ if __name__ == '__main__':
             monitor='val_loss',
             patience=10,
             restore_best_weights=True,
-            start_from_epoch=epochs*0.2
+            start_from_epoch=epochs * 0.2
+        ),
+        tf.keras.callbacks.ReduceLROnPlateau(
+            monitor='val_loss',
+            factor=0.2,
+            patience=2,
+            min_lr=1e-4,
+            verbose=2
         )
     ]
-
-    history = vanilla_transformer.fit(
-        x=X_train,
-        y=Y_train,
-        validation_split=0.1,
+    transformer_net.fit(
+        X_train=X_train,
+        Y_train=Y_train,
+        X_test=X_test,
+        Y_test=Y_test,
+        callbacks=callbacks,
         epochs=epochs,
         batch_size=batch_size,
-        callbacks=callbacks,
-        validation_data = (X_test, Y_test),
-        steps_per_epoch = len(X_train) // batch_size,
-        validation_steps = len(X_test) // batch_size
+        save_model=True
     )
 
-    vanilla_transformer.save_weights(filepath='./models/OOP_transformer/')
+    transformer_net.model.save_weights(filepath=transformer_net.file_name)
 
-    with open('../saved_data/histories/OOP_transformer_history', 'wb') as file_pi:
-        pickle.dump(history.history, file_pi)
+    with open(transformer_net.histories_path, 'wb') as file_pi:
+        pickle.dump(transformer_net.history.history, file_pi)
 
-    print(vanilla_transformer.summary())
+    print(transformer_net.model.summary())
 
 
 

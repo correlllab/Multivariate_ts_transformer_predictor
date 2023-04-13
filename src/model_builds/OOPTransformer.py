@@ -13,8 +13,8 @@ from Transformer.CustomSchedule import CustomSchedule
 
 
 class OOPTransformer:
-    def __init__(self) -> None:
-        self.model_name = 'OOP_Transformer'
+    def __init__(self, model_name: str = 'OOP_Transformer') -> None:
+        self.model_name = model_name
         self.model = None
         self.history = None
         self.evaluation = None
@@ -62,12 +62,15 @@ class OOPTransformer:
 
 
     def compile(self):
-        learning_rate = CustomSchedule()
+        # learning_rate = CustomSchedule()
+        learning_rate = 0.01
         opt = tf.keras.optimizers.legacy.Adam(learning_rate, beta_1=0.9, beta_2=0.98,
-                                    epsilon=1e-9)
+                                              epsilon=1e-9)
+        opt = tf.keras.mixed_precision.LossScaleOptimizer(opt)
+        loss_object = tf.keras.losses.CategoricalCrossentropy()
 
         self.model.compile(
-            loss=tf.keras.losses.CategoricalCrossentropy(),
+            loss=loss_object,
             optimizer=opt,
             metrics=[tf.keras.metrics.CategoricalAccuracy()]
         )
@@ -91,9 +94,9 @@ class OOPTransformer:
             epochs=epochs,
             batch_size=batch_size,
             callbacks=callbacks,
-            validation_data = (X_test, Y_test),
-            steps_per_epoch = len(X_train) // batch_size,
-            validation_steps = len(X_test) // batch_size
+            validation_data=(X_test, Y_test),
+            steps_per_epoch=len(X_train) // batch_size,
+            validation_steps=len(X_test) // batch_size
         )
 
         self.last_attn_scores = self.model.encoder.enc_layers[-1].last_attn_scores

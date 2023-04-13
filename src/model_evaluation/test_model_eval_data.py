@@ -13,7 +13,7 @@ import tensorflow as tf
 
 from data_management.data_preprocessing import DataPreprocessing
 from model_builds.OOPTransformer import OOPTransformer
-from utils.helper_functions import scan_output_for_decision
+from utilities.helper_functions import scan_output_for_decision
 
 
 MODE = 'load_data'    # modes: ['create_data', 'load_data']
@@ -69,10 +69,10 @@ if __name__ == '__main__':
                 negative +=1
         print(f'\nNumber of windows = {X_data.shape[0]}; Positive pctg = {(positive * 100) / X_data.shape[0]}%; Negative pctg = {(negative * 100) / X_data.shape[0]}%\n')
 
-        model_names = ['FCN']
+        # model_names = ['FCN']
         # model_names = ['RNN']
         # model_names = ['VanillaTransformer']
-        # model_names = ['OOP_Transformer']
+        model_names = ['OOP_Transformer']
 
         results = dict.fromkeys(
             model_names,

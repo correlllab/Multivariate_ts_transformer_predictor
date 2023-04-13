@@ -1,5 +1,5 @@
 import sys, os
-sys.path.append(os.path.realpath('../utils'))
+sys.path.append(os.path.realpath('../utilities'))
 # print(sys.path)
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # INFO and WARNING messages are not printed

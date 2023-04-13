@@ -13,7 +13,7 @@ from sklearn.preprocessing import RobustScaler
 
 from random import shuffle
 from copy import deepcopy
-from utils.helper_functions import position_encode
+from utilities.helper_functions import position_encode
 
 class DataPreprocessing:
     def __init__(self, sampling: str = 'over' or 'under', data: str = 'preemptive' or 'reactive' or 'training') -> None:

@@ -33,7 +33,7 @@ class Transformer(tf.keras.Model):
 
         self.global_average_pooling = tf.keras.layers.GlobalAveragePooling1D(data_format='channels_last')
         self.flatten = tf.keras.layers.Flatten()
-        self.final_layer = tf.keras.layers.Dense(target_space_size, activation='softmax')
+        self.final_layer = tf.keras.layers.Dense(target_space_size, activation='softmax', dtype='float32', kernel_regularizer=tf.keras.regularizers.l2(l2=0.01))
 
     def call(self, inputs):
         # print(f'In Transformer call, shape = {inputs.shape}')

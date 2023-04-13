@@ -10,6 +10,9 @@ __pycache__/
 # Data for eval
 data/eval_data/
 
+# Attention heads visualization
+src/saved_data/imgs/attention/
+
 # Python notebooks stuff
 .ipynb_checkpoints
 src/notebooks/*.npy

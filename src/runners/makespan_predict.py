@@ -17,7 +17,7 @@ from model_builds.FCN import FCN
 # from VanillaTransformer import Transformer
 from Transformer.Transformer import Transformer
 from Transformer.CustomSchedule import CustomSchedule
-from utils.utils import CounterDict
+from utilities.utils import CounterDict
 
 
 class EpisodePerf:
@@ -69,16 +69,9 @@ def make_predictions(model_name: str, model: tf.keras.Model, dp: DataPreprocessi
                 # TODO: make the window centered (i.e. i +- (window_width / 2)) ??
                 episode_window = episode[i:i + rolling_window_width, :]
                 episode_X_list.append(episode_window[:, 1:7])
-                # Need to change this because it is also done in training data
-                # if episode_window[0, 7] == 0.0:
-                #     episode_label_list.append(1.0)
-                # elif episode_window[0, 7] == 1.0:
-                #     episode_label_list.append(0.0)
-                # episode_X = episode_window[:, 1:7]
-                # episode_label = episode_window[0, 7]
 
             episode_X = tf.stack(episode_X_list)
-            # episode_label = tf.stack(tf.keras.utils.to_categorical(episode_label_list, num_classes=2))
+            # episode_label = tf.stack(tf.keras.utilities.to_categorical(episode_label_list, num_classes=2))
             if episode_window[0, 7] == 0.0:
                 true_label = 1.0
             elif episode_window[0, 7] == 1.0:
@@ -162,70 +155,6 @@ def run_makespan_prediction_for_model(model_name: str, model: tf.keras.Model, dp
             N_negCls += 1
 
         timed_episodes.append(episode_obj)
-
-
-
-    # for ep_index, episode in enumerate(dp.truncData):
-    #     with tf.device('/GPU:0'):
-    #         print(f'Episode {ep_index}')
-    #         time_steps = episode.shape[0]
-    #         n_windows = time_steps - rolling_window_width + 1
-    #         episode_X_list = []
-    #         episode_label_list = []
-    #         true_label = None
-    #         for i in range(n_windows):
-    #             # TODO: make the window centered (i.e. i +- (window_width / 2)) ??
-    #             episode_window = episode[i:i + rolling_window_width, :]
-    #             episode_X_list.append(episode_window[:, 1:7])
-    #             # Need to change this because it is also done in training data
-    #             if episode_window[0, 7] == 0.0:
-    #                 episode_label_list.append(1.0)
-    #             elif episode_window[0, 7] == 1.0:
-    #                 episode_label_list.append(0.0)
-    #             # episode_X = episode_window[:, 1:7]
-    #             # episode_label = episode_window[0, 7]
-
-    #         episode_X = tf.stack(episode_X_list)
-    #         episode_label = tf.stack(tf.keras.utils.to_categorical(episode_label_list, num_classes=2))
-    #         true_label = episode_window[0, 7]
-
-    #         # prediction = model(episode_X)
-    #         prediction = model.predict(episode_X)
-    #         ans, ad_x, row = scan_output_for_decision(prediction, episode_label, threshold=0.9)
-
-    #         print(f'Window {i}/{n_windows}: Prediction = [{row[0]:.3f}, {row[1]:.3f}] | True label = {episode_label[0]} | Answer = {ans}')
-
-    #         perf.count(ans)
-
-    #         # Measure time performance
-    #         episode_len_s = (rolling_window_width + episode_X.shape[0] - 1) * ts_s
-    #         # episode_len_s = (rolling_window_width + X_episodes.shape[0] - 1) * ts_s
-
-    #         episode_obj = EpisodePerf()
-    #         episode_obj.trueLabel = true_label
-    #         episode_obj.answer = ans
-    #         episode_obj.runTime = episode_len_s
-
-    #         if true_label == 1.0:
-    #             MTS += episode_len_s
-    #             N_success += 1
-    #             episode_obj.TTS = episode_len_s
-    #         elif true_label == 0.0:
-    #             MTF += episode_len_s
-    #             N_failure += 1
-    #             episode_obj.TTF = episode_len_s
-
-    #         tAns_s = (ad_x + rolling_window_width - 1) * ts_s
-    #         if ans in ( 'TP', 'FP' ):
-    #             MTP += tAns_s
-    #             episode_obj.TTP = tAns_s
-    #             N_posCls += 1
-    #         elif ans in ( 'TN', 'FN' ):
-    #             MTN += tAns_s
-    #             episode_obj.TTN = tAns_s
-    #             N_negCls += 1
-
-    #     timed_episodes.append(episode_obj)
 
     times = []
     for ep in timed_episodes:
@@ -558,7 +487,6 @@ if __name__ == '__main__':
                 f.write(json.dumps(res))
 
     print(f'metrics = {metrics}\n')
-
 
     plot_mts_ems(res=res, save_plots=save_plots)
     plot_runtimes(res=res, save_plots=save_plots)

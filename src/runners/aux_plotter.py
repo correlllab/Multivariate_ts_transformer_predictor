@@ -8,7 +8,7 @@ import tensorflow as tf
 
 from data_management.data_preprocessing import DataPreprocessing
 from Transformer.Transformer import Transformer
-from utils.metrics_plots import plot_acc_loss, compute_confusion_matrix, make_probabilities_plots
+from utilities.metrics_plots import plot_acc_loss, compute_confusion_matrix, make_probabilities_plots
 
 
 MODEL_WEIGHTS_PATH = '../saved_models/OOP_transformer/'
