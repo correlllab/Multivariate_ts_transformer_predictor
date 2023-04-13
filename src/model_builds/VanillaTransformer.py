@@ -53,7 +53,7 @@ class VanillaTransformer:
         return pe
 
 
-    def transformer_encoder(self, inputs, head_size, num_heads, ff_dim, dropout=0):
+    def transformer_encoder(self, inputs, head_size, num_heads, ff_dim, dropout=0.):
         # Normalization and Attention
         # x = tf.keras.layers.LayerNormalization(epsilon=1e-6)(inputs)
         x, attn_scores = tf.keras.layers.MultiHeadAttention(
@@ -80,8 +80,8 @@ class VanillaTransformer:
         ff_dim,
         num_transformer_blocks,
         mlp_units,
-        dropout=0,
-        mlp_dropout=0,
+        dropout=0.,
+        mlp_dropout=0.,
         n_classes=2
     ):
         inputs = tf.keras.Input(shape=input_shape)
