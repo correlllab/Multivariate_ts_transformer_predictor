@@ -15,6 +15,42 @@ from model_builds.OOPTransformer import OOPTransformer
 from utilities.metrics_plots import plot_acc_loss, compute_confusion_matrix, make_probabilities_plots
 
 
+DATA = 'reactive'
+DATA_DIR = f'../../data/data_manager/{DATA}'
+SAVE_DATA = True
+LOAD_DATA_FROM_FILES = True
+
+
+def run_model(model, X_train, Y_train, X_test, Y_test, X_window_test, Y_window_test, model_n_params):
+    model.fit(
+        X_train=X_train,
+        Y_train=Y_train,
+        X_test=X_test,
+        Y_test=Y_test,
+        epochs=200,
+        save_model=True
+    )
+    model_n_params[model.model_name] = int(np.sum([np.prod(v.get_shape().as_list()) for v in model.model.trainable_variables]))
+    plot_acc_loss(history=model.history, imgs_path=model.imgs_path)
+    compute_confusion_matrix(
+        model=model.model,
+        file_name=model.file_name,
+        imgs_path=model.imgs_path,
+        X_winTest=X_window_test,
+        Y_winTest=Y_window_test,
+        plot=True
+    )
+    make_probabilities_plots(
+        model=model.model,
+        model_name=model.model_name,
+        imgs_path=model.imgs_path,
+        X_winTest=X_window_test,
+        Y_winTest=Y_window_test
+    )
+
+    return model_n_params
+
+
 if __name__ == '__main__':
     gpus = tf.config.experimental.list_physical_devices(device_type='GPU')
     print( f"Found {len(gpus)} GPUs!" )
@@ -31,288 +67,171 @@ if __name__ == '__main__':
     for dev in devices:
         print( f"\t{dev}" )
 
-    load_data_from_file = False
-    save_data = False
+    dp = DataPreprocessing(sampling='none', data=DATA)
+    if LOAD_DATA_FROM_FILES:
+        print('\nLoading data from files...', end='')
+        with open(f'{DATA_DIR}/{DATA}_X_train_sampled.npy', 'rb') as f:
+            X_train_sampled = np.load(f, allow_pickle=True)
 
-    dp = DataPreprocessing(sampling='none', data='reactive')
-    if load_data_from_file:
-        # with open('X_pos_encoded_data.npy', 'r') as f:
-        #     X_pos_encoded_data = np.load(f, allow_pickle=True)
+        with open(f'{DATA_DIR}/{DATA}_Y_train_sampled.npy', 'rb') as f:
+            Y_train_sampled = np.load(f, allow_pickle=True)
 
-        # with open('train_sampled_data.npy', 'r') as f:
-        #     train_sampled_data = np.load(f, allow_pickle=True)
+        with open(f'{DATA_DIR}/{DATA}_X_test.npy', 'rb') as f:
+            X_test = np.load(f, allow_pickle=True)
 
-        # with open('test_data.npy', 'r') as f:
-        #     test_data = np.load(f, allow_pickle=True)
+        with open(f'{DATA_DIR}/{DATA}_Y_test.npy', 'rb') as f:
+            Y_test = np.load(f, allow_pickle=True)
 
-        with open('preprocessing_data/X_data.npy', 'rb') as f:
-            X_data = np.load(f)
+        with open(f'{DATA_DIR}/{DATA}_X_winTest.npy', 'rb') as f:
+            X_winTest = np.load(f, allow_pickle=True)
 
-        with open('preprocessing_data/Y_data.npy', 'rb') as f:
-            Y_data = np.load(f)
-
-        with open('preprocessing_data/win_data.npy', 'rb') as f:
-            win_data = np.load(f, allow_pickle=True)
-
-        x_train_sampled = X_data[2]
-        y_train_sampled = Y_data[0]
-        x_test = X_data[3]
-        y_test = Y_data[1]
-        x_train_enc = X_data[0]
-        x_test_enc = X_data[1]
-        x_win_test = win_data[0]
-        y_win_test = win_data[1]
+        with open(f'{DATA_DIR}/{DATA}_Y_winTest.npy', 'rb') as f:
+            Y_winTest = np.load(f, allow_pickle=True)
+        roll_win_width = int(7.0 * 50)
+        print('DONE\n')
     else:
-        dp.run(save_data=save_data, verbose=True)
+        print('\nCreating data with DataPreprocessng class...', end='')
+        dp.run(save_data=SAVE_DATA, verbose=True)
+        X_train_sampled = dp.X_train_sampled
+        Y_train_sampled = dp.Y_train_sampled
+        X_test = dp.X_test
+        Y_test = dp.Y_test
+        X_winTest = dp.X_winTest
+        Y_winTest = dp.Y_winTest
+        roll_win_width = dp.rollWinWidth
+        print('DONE\n')
 
-    model_n_params = {}
+    if os.path.exists('../saved_data/model_sizes.json'):
+        with open('../saved_data/model_sizes.json', 'r') as f:
+            model_n_params = json.load(f)
+    else:
+        model_n_params = {}
+
+    print(model_n_params)
+
+    models_to_run = ['VanillaTransformer', 'OOP_Transformer', 'OOP_Transformer_small']
 
     # FCN --------------------------------------------------------
-    fcn_net = FCN(rolling_window_width=dp.rollWinWidth)
-    fcn_net.build()
-    fcn_net.fit(
-        X_train=dp.X_train_sampled,
-        Y_train=dp.Y_train_sampled,
-        X_test=dp.X_test,
-        Y_test=dp.Y_test,
-        trainWindows=dp.trainWindows,
-        epochs=200,
-        save_model=True
-    )
-    model_n_params['FCN'] = int(np.sum([np.prod(v.get_shape().as_list()) for v in fcn_net.model.trainable_variables]))
-    plot_acc_loss(history=fcn_net.history, imgs_path=fcn_net.imgs_path)
-    compute_confusion_matrix(
-        model=fcn_net.model,
-        file_name=fcn_net.file_name,
-        imgs_path=fcn_net.imgs_path,
-        X_winTest=dp.X_winTest,
-        Y_winTest=dp.Y_winTest,
-        plot=True
-    )
-    make_probabilities_plots(
-        model=fcn_net.model,
-        model_name=fcn_net.model_name,
-        imgs_path=fcn_net.imgs_path,
-        X_winTest=dp.X_winTest,
-        Y_winTest=dp.Y_winTest
-    )
+    fcn_net = FCN(rolling_window_width=roll_win_width)
+    if fcn_net.model_name in models_to_run:
+        fcn_net.build()
+        model_n_params = run_model(
+            model=fcn_net,
+            X_train=X_train_sampled,
+            Y_train=Y_train_sampled,
+            X_test=X_test,
+            Y_test=Y_test,
+            X_window_test=X_winTest,
+            Y_window_test=Y_winTest,
+            model_n_params=model_n_params
+        )
 
     tf.keras.backend.clear_session()
     # RNN --------------------------------------------------------
     rnn_net = RNN()
-    rnn_net.fit(
-        X_train=dp.X_train_sampled,
-        Y_train=dp.Y_train_sampled,
-        X_test=dp.X_test,
-        Y_test=dp.Y_test,
-        batch_size=64,
-        epochs=200,
-        save_model=True
-    )
-    model_n_params['RNN'] = int(np.sum([np.prod(v.get_shape().as_list()) for v in rnn_net.model.trainable_variables]))
-    plot_acc_loss(history=rnn_net.history, imgs_path=rnn_net.imgs_path)
-    compute_confusion_matrix(
-        model=rnn_net.model,
-        file_name=rnn_net.file_name,
-        imgs_path=rnn_net.imgs_path,
-        X_winTest=dp.X_winTest,
-        Y_winTest=dp.Y_winTest,
-        plot=True
-    )
-    make_probabilities_plots(
-        model=rnn_net.model,
-        model_name=rnn_net.model_name,
-        imgs_path=rnn_net.imgs_path,
-        X_winTest=dp.X_winTest,
-        Y_winTest=dp.Y_winTest
-    )
+    if rnn_net.model_name in models_to_run:
+        model_n_params = run_model(
+            model=rnn_net,
+            X_train=X_train_sampled,
+            Y_train=Y_train_sampled,
+            X_test=X_test,
+            Y_test=Y_test,
+            X_window_test=X_winTest,
+            Y_window_test=Y_winTest,
+            model_n_params=model_n_params
+        )
 
     tf.keras.backend.clear_session()
     # VanillaTransformer --------------------------------------------------------
     vanilla_transformer_net = VanillaTransformer()
-    vanilla_transformer_net.fit(
-        X_train=dp.X_train_sampled,
-        Y_train=dp.Y_train_sampled,
-        X_test=dp.X_test,
-        Y_test=dp.Y_test,
-        trainWindows=dp.trainWindows,
-        epochs=200,
-        save_model=True
-    )
-    model_n_params['VanillaTransformer'] = int(np.sum([np.prod(v.get_shape().as_list()) for v in vanilla_transformer_net.model.trainable_variables]))
-    plot_acc_loss(history=vanilla_transformer_net.history, imgs_path=vanilla_transformer_net.imgs_path)
-    compute_confusion_matrix(
-        model=vanilla_transformer_net.model,
-        file_name=vanilla_transformer_net.file_name,
-        imgs_path=vanilla_transformer_net.imgs_path,
-        X_winTest=dp.X_winTest,
-        Y_winTest=dp.Y_winTest,
-        plot=True
-    )
-    make_probabilities_plots(
-        model=vanilla_transformer_net.model,
-        model_name=vanilla_transformer_net.model_name,
-        imgs_path=vanilla_transformer_net.imgs_path,
-        X_winTest=dp.X_winTest,
-        Y_winTest=dp.Y_winTest
-    )
+    if vanilla_transformer_net.model_name in models_to_run:
+        model_n_params = run_model(
+            model=vanilla_transformer_net,
+            X_train=X_train_sampled,
+            Y_train=Y_train_sampled,
+            X_test=X_test,
+            Y_test=Y_test,
+            X_window_test=X_winTest,
+            Y_window_test=Y_winTest,
+            model_n_params=model_n_params
+        )
 
-    print(f'\nAttention scores:\n{vanilla_transformer_net.last_attn_scores}\n')
+        print(f'\nAttention scores:\n{vanilla_transformer_net.last_attn_scores}\n')
 
     tf.keras.backend.clear_session()
     # OOP Transformer --------------------------------------------------------
     transformer_net = OOPTransformer()
+    if transformer_net.model_name in models_to_run:
+        num_layers = 8
+        d_model = 6
+        ff_dim = 512
+        num_heads = 8
+        head_size = 256
+        dropout_rate = 0.25
+        mlp_units = [128, 256, 64]
 
-    num_layers = 8
-    d_model = 6
-    dff = 512
-    num_heads = 8
-    dropout_rate = 0.25
-    mlp_units = [128, 256, 64]
-
-    transformer_net.build(
-        X_sample=dp.X_train_sampled[:32],
-        num_layers=num_layers,
-        d_model=d_model,
-        dff=dff,
-        num_heads=num_heads,
-        dropout_rate=dropout_rate,
-        mlp_units=mlp_units,
-        save_model=True
-    )
-
-    transformer_net.compile()
-
-    X_train = dp.X_train_sampled
-    Y_train = dp.Y_train_sampled
-    X_test = dp.X_test
-    Y_test = dp.Y_test
-    epochs = 200
-    batch_size = 32
-    callbacks = [
-        tf.keras.callbacks.EarlyStopping(
-            monitor='val_loss',
-            patience=10,
-            restore_best_weights=True,
-            start_from_epoch=epochs*0.2
+        transformer_net.build(
+            X_sample=X_train_sampled[:32],
+            num_layers=num_layers,
+            d_model=d_model,
+            ff_dim=ff_dim,
+            num_heads=num_heads,
+            head_size=head_size,
+            dropout_rate=dropout_rate,
+            mlp_units=mlp_units,
+            save_model=True,
+            verbose=True
         )
-    ]
-    transformer_net.fit(
-        X_train=X_train,
-        Y_train=Y_train,
-        X_test=X_test,
-        Y_test=Y_test,
-        callbacks=callbacks,
-        epochs=epochs,
-        batch_size=batch_size,
-        save_model=True
-    )
 
-    model_n_params['OOP_transformer'] = int(np.sum([np.prod(v.get_shape().as_list()) for v in transformer_net.model.trainable_variables]))
-
-    transformer_net.model.save_weights(filepath='../saved_models/OOP_transformer/')
-
-    with open('../saved_data/histories/OOP_transformer_history', 'wb') as file_pi:
-        pickle.dump(transformer_net.history.history, file_pi)
-
-    print(transformer_net.model.summary())
-
-    plot_acc_loss(history=transformer_net.history, imgs_path=transformer_net.imgs_path)
-    compute_confusion_matrix(
-        model=transformer_net.model,
-        file_name=transformer_net.file_name,
-        imgs_path=transformer_net.imgs_path,
-        X_winTest=dp.X_winTest,
-        Y_winTest=dp.Y_winTest,
-        plot=True
-    )
-    make_probabilities_plots(
-        model=transformer_net.model,
-        model_name=transformer_net.model_name,
-        imgs_path=transformer_net.imgs_path,
-        X_winTest=dp.X_winTest,
-        Y_winTest=dp.Y_winTest
-    )
-
-
-    with open('../saved_data/model_sizes.json', 'w') as f:
-        json.dump(model_n_params, f)
+        transformer_net.compile()
+        model_n_params = run_model(
+            model=transformer_net,
+            X_train=X_train_sampled,
+            Y_train=Y_train_sampled,
+            X_test=X_test,
+            Y_test=Y_test,
+            X_window_test=X_winTest,
+            Y_window_test=Y_winTest,
+            model_n_params=model_n_params
+        )
 
     tf.keras.backend.clear_session()
     # OOP Transformer (Small) --------------------------------------------------------
     transformer_net_small = OOPTransformer(model_name='OOP_Transformer_small')
+    if transformer_net_small.model_name in models_to_run:
+        num_layers = 4
+        d_model = 6
+        ff_dim = 256
+        num_heads = 4
+        herad_size = 128
+        dropout_rate = 0.25
+        mlp_units = [128]
 
-    num_layers = 4
-    d_model = 6
-    dff = 256
-    num_heads = 4
-    dropout_rate = 0.25
-    mlp_units = [128]
-
-    transformer_net_small.build(
-        X_sample=dp.X_train_sampled[:32],
-        num_layers=num_layers,
-        d_model=d_model,
-        dff=dff,
-        num_heads=num_heads,
-        dropout_rate=dropout_rate,
-        mlp_units=mlp_units,
-        save_model=True
-    )
-
-    transformer_net_small.compile()
-
-    X_train = dp.X_train_sampled
-    Y_train = dp.Y_train_sampled
-    X_test = dp.X_test
-    Y_test = dp.Y_test
-    epochs = 200
-    batch_size = 32
-    callbacks = [
-        tf.keras.callbacks.EarlyStopping(
-            monitor='val_loss',
-            patience=10,
-            restore_best_weights=True,
-            start_from_epoch=epochs * 0.2
+        transformer_net_small.build(
+            X_sample=X_train_sampled[:32],
+            num_layers=num_layers,
+            d_model=d_model,
+            ff_dim=ff_dim,
+            num_heads=num_heads,
+            head_size=head_size,
+            dropout_rate=dropout_rate,
+            mlp_units=mlp_units,
+            save_model=True,
+            verbose=True
         )
-    ]
-    transformer_net_small.fit(
-        X_train=X_train,
-        Y_train=Y_train,
-        X_test=X_test,
-        Y_test=Y_test,
-        callbacks=callbacks,
-        epochs=epochs,
-        batch_size=batch_size,
-        save_model=True
-    )
 
-    model_n_params[transformer_net_small.model_name] = int(
-        np.sum([np.prod(v.get_shape().as_list()) for v in transformer_net_small.model.trainable_variables]))
+        transformer_net_small.compile()
 
-    transformer_net_small.model.save_weights(filepath=transformer_net_small.file_name)
-
-    with open(transformer_net_small.histories_path, 'wb') as file_pi:
-        pickle.dump(transformer_net_small.history.history, file_pi)
-
-    print(transformer_net_small.model.summary())
-
-    plot_acc_loss(history=transformer_net_small.history, imgs_path=transformer_net_small.imgs_path)
-    compute_confusion_matrix(
-        model=transformer_net_small.model,
-        file_name=transformer_net_small.file_name,
-        imgs_path=transformer_net_small.imgs_path,
-        X_winTest=dp.X_winTest,
-        Y_winTest=dp.Y_winTest,
-        plot=True
-    )
-    make_probabilities_plots(
-        model=transformer_net_small.model,
-        model_name=transformer_net_small.model_name,
-        imgs_path=transformer_net_small.imgs_path,
-        X_winTest=dp.X_winTest,
-        Y_winTest=dp.Y_winTest
-    )
+        model_n_params = run_model(
+            model=transformer_net_small,
+            X_train=X_train_sampled,
+            Y_train=Y_train_sampled,
+            X_test=X_test,
+            Y_test=Y_test,
+            X_window_test=X_winTest,
+            Y_window_test=Y_winTest,
+            model_n_params=model_n_params
+        )
 
     with open('../saved_data/model_sizes.json', 'w') as f:
         json.dump(model_n_params, f)

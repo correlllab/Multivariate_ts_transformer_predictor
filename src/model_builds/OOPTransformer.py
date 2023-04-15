@@ -29,8 +29,9 @@ class OOPTransformer:
             X_sample: Any,
             num_layers: int,
             d_model: int,
-            dff: int,
+            ff_dim: int,
             num_heads: int,
+            head_size: int,
             dropout_rate: float,
             mlp_units: List[int],
             save_model: bool = True,
@@ -40,7 +41,8 @@ class OOPTransformer:
             num_layers=num_layers,
             d_model=d_model,
             num_heads=num_heads,
-            ff_dim=dff,
+            head_size=head_size,
+            ff_dim=ff_dim,
             mlp_units=mlp_units,
             input_space_size=6,
             target_space_size=2,
@@ -82,11 +84,18 @@ class OOPTransformer:
             Y_train: Any,
             X_test: Any,
             Y_test: Any,
-            callbacks: List[Any],
             epochs: int = 200,
             batch_size: int = 32,
             save_model: bool = True
     ):
+        callbacks = [
+            tf.keras.callbacks.EarlyStopping(
+                monitor='val_loss',
+                patience=10,
+                restore_best_weights=True,
+                start_from_epoch=epochs*0.2
+            )
+        ]
         self.history = self.model.fit(
             x=X_train,
             y=Y_train,

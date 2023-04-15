@@ -14,9 +14,10 @@ from random import choice
 
 from data_management.data_preprocessing import DataPreprocessing
 from model_builds.FCN import FCN
-# from VanillaTransformer import Transformer
-from Transformer.Transformer import Transformer
-from Transformer.CustomSchedule import CustomSchedule
+from model_builds.RNN import RNN
+from model_builds.VanillaTransformer import VanillaTransformer
+from model_builds.OOPTransformer import OOPTransformer
+
 from utilities.utils import CounterDict
 
 
@@ -364,15 +365,16 @@ if __name__ == '__main__':
     print('FETCHING DATA...')
     # dp = DataPreprocessing(sampling='none')
     # dp.run(verbose=True)
-    dp = DataPreprocessing(sampling='none')
+    dp = DataPreprocessing(sampling='none', data='reactive')
     dp.shuffle = False
-    dp.load_data(verbose=True)
-    dp.scale_data(verbose=True)
-    dp.set_episode_beginning(verbose=True)
+    # dp.load_data(verbose=True)
+    # dp.scale_data(verbose=True)
+    # dp.set_episode_beginning(verbose=True)
+    dp.run(save_data=False, verbose=True)
 
     makespan_models = {}
 
-    # If True it will run pipeline: load models, predict (if true) and generate metrics, if False it will generate metrics from saved files
+    # If True it will run pipeline: load models, predict (if True) and generate metrics, if False it will generate metrics from saved files
     compute = True
     # If True it will run prediction inside computation pipeline, if False it will load predictions from npy file
     predict = True
@@ -381,7 +383,6 @@ if __name__ == '__main__':
     # If True it will save generated plots
     save_plots = True
     res = {}
-    total = 50
     if compute:
         print('LOADING MODELS...')
         try:
@@ -425,34 +426,58 @@ if __name__ == '__main__':
             print(f'{e}: model does not exist!\n')
 
         try:
+            oop_transformer = OOPTransformer()
             num_layers = 8
             d_model = 6
-            dff = 512
+            ff_dim = 512
             num_heads = 8
-            dropout_rate = 0.1
-            mlp_units = [128]
-            oop_transformer = Transformer(
+            head_size = 256
+            dropout_rate = 0.25
+            mlp_units = [128, 256, 64]
+
+            oop_transformer.build(
+                X_sample=dp.X_train_sampled[:32],
                 num_layers=num_layers,
                 d_model=d_model,
+                ff_dim=ff_dim,
                 num_heads=num_heads,
-                ff_dim=dff,
-                mlp_units=mlp_units,
-                input_space_size=6,
-                target_space_size=2,
-                training=True,
+                head_size=head_size,
                 dropout_rate=dropout_rate,
-                pos_encoding=True
+                mlp_units=mlp_units,
+                save_model=True,
+                verbose=True
             )
-            # learning_rate = CustomSchedule()
-            opt = tf.keras.optimizers.legacy.Adam(1e-4, beta_1=0.9, beta_2=0.98,
-                                                          epsilon=1e-9)
-            oop_transformer.compile(
-                loss=tf.keras.losses.CategoricalCrossentropy(),
-                optimizer=opt,
-                metrics=[tf.keras.metrics.CategoricalAccuracy()]
+            oop_transformer.compile()
+            oop_transformer.model.load_weights('../saved_models/OOP_transformer').expect_partial()
+            makespan_models['OOP_Transformer'] = oop_transformer.model
+        except OSError as e:
+            print(f'{e}: model does not exist!')
+
+        try:
+            oop_transformer_small = OOPTransformer()
+            num_layers = 4
+            d_model = 6
+            ff_dim = 256
+            num_heads = 4
+            herad_size = 128
+            dropout_rate = 0.25
+            mlp_units = [128]
+
+            oop_transformer_small.build(
+                X_sample=dp.X_train_sampled[:32],
+                num_layers=num_layers,
+                d_model=d_model,
+                ff_dim=ff_dim,
+                num_heads=num_heads,
+                head_size=head_size,
+                dropout_rate=dropout_rate,
+                mlp_units=mlp_units,
+                save_model=True,
+                verbose=True
             )
-            oop_transformer.load_weights('../fcn_vs_transformer/models/OOP_transformer').expect_partial()
-            makespan_models['OOP Transformer'] = oop_transformer
+            oop_transformer_small.compile()
+            oop_transformer_small.model.load_weights('../saved_models/OOP_transformer_small').expect_partial()
+            makespan_models['OOP_Transformer_small'] = oop_transformer_small.model
         except OSError as e:
             print(f'{e}: model does not exist!')
 

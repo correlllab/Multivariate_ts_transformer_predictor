@@ -4,7 +4,8 @@ import sys
 import json
 import numpy as np
 import matplotlib.pyplot as plt
-from pylab import *
+import matplotlib.cm as cm
+from matplotlib.colors import rgb2hex
 
 sys.path.append(os.path.realpath('../'))
 # print(sys.path)
@@ -16,7 +17,9 @@ def plot_model_sizes(sizes: dict):
     fig, ax = plt.subplots(figsize=(15, 10))
     # sort dict (greater to lower)
     sizes = sorted(sizes.items(), key=lambda item: item[1], reverse=False)
-    colors = ['b', 'r', 'g', 'y']
+    # colors = ['r', 'g', 'b', 'y']
+    cmap = cm.get_cmap('Spectral', len(sizes))
+    colors = [rgb2hex(cmap(i)[:3]) for i in range(cmap.N)]
     space = 10000
     extra_spacing = 0
     for i in range(len(sizes)):

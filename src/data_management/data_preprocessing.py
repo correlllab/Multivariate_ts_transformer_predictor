@@ -18,6 +18,7 @@ from utilities.helper_functions import position_encode
 class DataPreprocessing:
     def __init__(self, sampling: str = 'over' or 'under', data: str = 'preemptive' or 'reactive' or 'training') -> None:
         self.sampling = sampling
+        self.data_name = data
         self.datadir = os.path.join(os.path.dirname(os.path.abspath('../')), f'data/Npy_files/{data}/')
         self.shuffle = True
         self.data = None
@@ -298,8 +299,11 @@ class DataPreprocessing:
             if verbose:
                 print( '>', end=' ' )
 
+        self.X_winTest = np.asanyarray(self.X_winTest, dtype=object)
+        self.Y_winTest = np.asanyarray(self.Y_winTest, dtype=object)
+
         if verbose:
-            print( f"\nDONE! Captured {len(self.X_winTest)}/{len(self.Y_winTest)} TEST episodes." )
+            print( f"\nDONE! Captured {self.X_winTest.shape}/{self.Y_winTest.shape} TEST episodes." )
 
 
     def balance_classes(self, verbose=False):
@@ -336,25 +340,6 @@ class DataPreprocessing:
             self.data[index][:, 1:7] = transformer.transform(ep[:, 1:7])
 
 
-    def add_positional_encoding(self, verbose=False):
-        positional_encode_train = position_encode(self.X_train_sampled[0])
-        positional_encode_test = position_encode(self.X_test[0])
-
-        self.X_train_enc = deepcopy(self.X_train_sampled)
-        for i in range(len(self.X_train_sampled)):
-            self.X_train_enc[i] = self.X_train_enc[i] + positional_encode_train
-
-        if verbose:
-            print('Done with X_train')
-
-        self.X_test_enc = deepcopy(self.X_test)
-        for i in range(len(self.X_test)):
-            self.X_test_enc[i] = self.X_test_enc[i] + positional_encode_test
-
-        if verbose:
-            print('Done with X_test')
-
-
     def run(self, save_data=False, verbose=False):
         if verbose:
             print('\n====> Loading data...\n')
@@ -380,9 +365,6 @@ class DataPreprocessing:
         if verbose:
             print('\n====> Balancing classes...\n')
         self.balance_classes(verbose=verbose)
-        # if verbose:
-        #     print('\n====> Creating positional encoded data...\n')
-        # self.add_positional_encoding(verbose=verbose)
         if verbose:
             print('\n====> Done preprocessing!\n')
             _ = input('Continue?:')
@@ -390,34 +372,27 @@ class DataPreprocessing:
             if verbose:
                 print('\n====> Saving data into npy files...', end='\n')
 
-            print(self.X_train_enc.shape, self.X_test_enc.shape)
-            print(self.X_train_sampled.shape, self.Y_train_sampled.shape)
-            print(self.X_test.shape, self.Y_test.shape)
-            print(len(self.X_winTest), len(self.Y_winTest))
+            save_dir = f'../../data/data_manager/{self.data_name}'
+            if not os.path.exists(save_dir):
+                os.makedirs(save_dir)
 
-            X_data = np.array([self.X_train_enc, self.X_test_enc, self.X_train_sampled, self.X_test], dtype=object)
-            with open('preprocessing_data/X_data.npy', 'wb') as f:
-                np.save(f, X_data, allow_pickle=True)
+            with open(f'{save_dir}/{self.data_name}_X_train_sampled.npy', 'wb') as f:
+                np.save(f, self.X_train_sampled, allow_pickle=True)
 
-            Y_data = np.array([self.Y_train_sampled, self.Y_test], dtype=object)
-            with open('preprocessing_data/Y_data.npy', 'wb') as f:
-                np.save(f, Y_data, allow_pickle=True)
+            with open(f'{save_dir}/{self.data_name}_Y_train_sampled.npy', 'wb') as f:
+                np.save(f, self.Y_train_sampled, allow_pickle=True)
 
-            # X_pos_encoded_data = np.array([self.X_train_enc, self.X_test_enc], dtype=object)
-            # with open('preprocessing_data/X_pos_encoded_data.npy', 'wb') as f:
-            #     np.save(f, X_pos_encoded_data, allow_pickle=True)
+            with open(f'{save_dir}/{self.data_name}_X_test.npy', 'wb') as f:
+                np.save(f, self.X_test, allow_pickle=True)
 
-            # train_sampled_data = np.array([self.X_train_sampled, self.Y_train_sampled], dtype=object)
-            # with open('preprocessing_data/train_sampled_data.npy', 'wb') as f:
-            #     np.save(f, train_sampled_data, allow_pickle=True)
+            with open(f'{save_dir}/{self.data_name}_Y_test.npy', 'wb') as f:
+                np.save(f, self.Y_test, allow_pickle=True)
 
-            # test_data = np.array([self.X_test, self.Y_test], dtype=object)
-            # with open('preprocessing_data/test_data.npy', 'wb') as f:
-            #     np.save(f, test_data, allow_pickle=True)
+            with open(f'{save_dir}/{self.data_name}_X_winTest.npy', 'wb') as f:
+                np.save(f, self.X_winTest, allow_pickle=True)
 
-            win_data = np.array([self.X_winTest, self.Y_winTest], dtype=object)
-            with open('preprocessing_data/win_data.npy', 'wb') as f:
-                np.save(f, win_data, allow_pickle=True)
+            with open(f'{save_dir}/{self.data_name}_Y_winTest.npy', 'wb') as f:
+                np.save(f, self.Y_winTest, allow_pickle=True)
 
             if verbose:
                 print('DONE\n')
@@ -425,4 +400,5 @@ class DataPreprocessing:
 
 if __name__ == '__main__':
     dp = DataPreprocessing(sampling='none', data='reactive')
+    dp.run(save_data=True, verbose=True)
     print('ALL OK')

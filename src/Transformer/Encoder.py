@@ -8,12 +8,12 @@ from PositionalEncoding import PositionalEmbedding
 # from https://www.tensorflow.org/text/tutorials/transformer#define_the_components
 # Encoder layer
 class EncoderLayer(tf.keras.layers.Layer):
-    def __init__(self, *, d_model, num_heads, ff_dim, dropout_rate=0.1):
+    def __init__(self, *, d_model, num_heads, head_size, ff_dim, dropout_rate=0.1):
         super().__init__()
 
         self.self_attention = GlobalSelfAttention(
             num_heads=num_heads,
-            key_dim=d_model,
+            key_dim=head_size,
             dropout=dropout_rate)
 
         self.ffn = FeedForward(d_model, ff_dim)
@@ -30,7 +30,7 @@ class EncoderLayer(tf.keras.layers.Layer):
 
 # Full encoder
 class Encoder(tf.keras.layers.Layer):
-    def __init__(self, *, num_layers, d_model, num_heads,
+    def __init__(self, *, num_layers, d_model, num_heads, head_size,
                 ff_dim, space_size, dropout_rate=0.1, pos_encoding=True):
         super().__init__()
 
@@ -44,10 +44,12 @@ class Encoder(tf.keras.layers.Layer):
             self.pos_embedding = PositionalEmbedding()
 
         self.enc_layers = [
-            EncoderLayer(d_model=d_model,
-                            num_heads=num_heads,
-                            ff_dim=ff_dim,
-                            dropout_rate=dropout_rate)
+            EncoderLayer(
+                d_model=d_model,
+                num_heads=num_heads,
+                head_size=head_size,
+                ff_dim=ff_dim,
+                dropout_rate=dropout_rate)
             for _ in range(num_layers)
         ]
         self.dropout = tf.keras.layers.Dropout(dropout_rate)

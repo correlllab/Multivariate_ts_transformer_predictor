@@ -11,7 +11,7 @@ from Encoder import Encoder
 # from https://www.tensorflow.org/text/tutorials/transformer#define_the_components
 # Full transformer
 class Transformer(tf.keras.Model):
-    def __init__(self, *, num_layers, d_model, num_heads, ff_dim, mlp_units,
+    def __init__(self, *, num_layers, d_model, num_heads, head_size, ff_dim, mlp_units,
                  input_space_size, target_space_size, training, pos_encoding=True, dropout_rate=0.1):
         super().__init__()
 
@@ -21,6 +21,7 @@ class Transformer(tf.keras.Model):
         self.encoder = Encoder(num_layers=num_layers,
                                d_model=d_model,
                                num_heads=num_heads,
+                               head_size=head_size,
                                ff_dim=ff_dim,
                                space_size=input_space_size,
                                dropout_rate=dropout_rate,

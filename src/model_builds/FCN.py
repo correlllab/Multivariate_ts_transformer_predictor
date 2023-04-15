@@ -4,19 +4,11 @@ sys.path.append(os.path.realpath('../'))
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # INFO and WARNING messages are not printed
 
-import numpy as np
-import seaborn as sns
-import pandas as pd
-import matplotlib.pyplot as plt
-
 import tensorflow
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, Dropout, Activation, SimpleRNN, LSTM, GRU, Conv1D, Flatten, MaxPooling1D
+from tensorflow.keras.layers import Dense, Dropout, Activation, Conv1D, Flatten, MaxPooling1D
 from tensorflow.keras.optimizers import Adam, SGD
 from tensorflow.keras import regularizers
-
-from utilities.utils import CounterDict
-from utilities.helper_functions import scan_output_for_decision, graph_episode_output
 
 
 class FCN:
@@ -78,9 +70,7 @@ class FCN:
         )
 
 
-    def fit(self, X_train, Y_train, X_test, Y_test, trainWindows, epochs=200, save_model=True):
-        batchSize = 256 #128 #256 #512 (out of mem) #256 #128
-
+    def fit(self, X_train, Y_train, X_test, Y_test, batch_size=256, epochs=200, save_model=True):
         callbacks = [
             tensorflow.keras.callbacks.EarlyStopping(
                 monitor='val_loss',
@@ -96,13 +86,13 @@ class FCN:
                 X_train, Y_train, 
                 # validation_data  = (X_test, Y_test.reshape((-1,2)) ),
                 validation_data  = (X_test, Y_test),
-                batch_size       = batchSize, 
+                batch_size       = batch_size, 
                 epochs           = epochs, #250, #50, #250, # 2022-09-12: Trained for 250 total
                 verbose          = True, 
                 validation_split = 0.1,
-                # steps_per_epoch  = int(trainWindows/batchSize), # https://stackoverflow.com/a/49924566
-                steps_per_epoch = len(X_train) // batchSize,
-                validation_steps = len(X_test) // batchSize,
+                # steps_per_epoch  = int(trainWindows/batch_size), # https://stackoverflow.com/a/49924566
+                steps_per_epoch = len(X_train) // batch_size,
+                validation_steps = len(X_test) // batch_size,
                 callbacks        = callbacks
             )
         
