@@ -19,6 +19,13 @@ DATA = 'reactive'
 DATA_DIR = f'../../data/data_manager/{DATA}'
 SAVE_DATA = True
 LOAD_DATA_FROM_FILES = True
+MODELS_TO_RUN = [
+    # 'FCN',
+    # 'RNN',
+    # 'VanillaTransformer',
+    'OOP_Transformer',
+    'OOP_Transformer_small'
+    ]
 
 
 def run_model(model, X_train, Y_train, X_test, Y_test, X_window_test, Y_window_test, model_n_params):
@@ -109,11 +116,9 @@ if __name__ == '__main__':
 
     print(model_n_params)
 
-    models_to_run = ['VanillaTransformer', 'OOP_Transformer', 'OOP_Transformer_small']
-
     # FCN --------------------------------------------------------
     fcn_net = FCN(rolling_window_width=roll_win_width)
-    if fcn_net.model_name in models_to_run:
+    if fcn_net.model_name in MODELS_TO_RUN:
         fcn_net.build()
         model_n_params = run_model(
             model=fcn_net,
@@ -126,10 +131,13 @@ if __name__ == '__main__':
             model_n_params=model_n_params
         )
 
+        with open('../saved_data/model_sizes.json', 'w') as f:
+            json.dump(model_n_params, f)
+
     tf.keras.backend.clear_session()
     # RNN --------------------------------------------------------
     rnn_net = RNN()
-    if rnn_net.model_name in models_to_run:
+    if rnn_net.model_name in MODELS_TO_RUN:
         model_n_params = run_model(
             model=rnn_net,
             X_train=X_train_sampled,
@@ -141,10 +149,13 @@ if __name__ == '__main__':
             model_n_params=model_n_params
         )
 
+        with open('../saved_data/model_sizes.json', 'w') as f:
+            json.dump(model_n_params, f)
+
     tf.keras.backend.clear_session()
     # VanillaTransformer --------------------------------------------------------
     vanilla_transformer_net = VanillaTransformer()
-    if vanilla_transformer_net.model_name in models_to_run:
+    if vanilla_transformer_net.model_name in MODELS_TO_RUN:
         model_n_params = run_model(
             model=vanilla_transformer_net,
             X_train=X_train_sampled,
@@ -158,13 +169,57 @@ if __name__ == '__main__':
 
         print(f'\nAttention scores:\n{vanilla_transformer_net.last_attn_scores}\n')
 
+        with open('../saved_data/model_sizes.json', 'w') as f:
+            json.dump(model_n_params, f)
+
+    tf.keras.backend.clear_session()
+    # OOP Transformer (Small) --------------------------------------------------------
+    transformer_net_small = OOPTransformer(model_name='OOP_Transformer_small')
+    if transformer_net_small.model_name in MODELS_TO_RUN:
+        num_layers = 4
+        d_model = 6
+        ff_dim = 256
+        num_heads = 4
+        head_size = 128
+        dropout_rate = 0.25
+        mlp_units = [128]
+
+        transformer_net_small.build(
+            X_sample=X_train_sampled[:32],
+            num_layers=num_layers,
+            d_model=d_model,
+            ff_dim=ff_dim,
+            num_heads=num_heads,
+            head_size=head_size,
+            dropout_rate=dropout_rate,
+            mlp_units=mlp_units,
+            save_model=True,
+            verbose=True
+        )
+
+        transformer_net_small.compile()
+
+        model_n_params = run_model(
+            model=transformer_net_small,
+            X_train=X_train_sampled,
+            Y_train=Y_train_sampled,
+            X_test=X_test,
+            Y_test=Y_test,
+            X_window_test=X_winTest,
+            Y_window_test=Y_winTest,
+            model_n_params=model_n_params
+        )
+
+        with open('../saved_data/model_sizes.json', 'w') as f:
+            json.dump(model_n_params, f)
+
     tf.keras.backend.clear_session()
     # OOP Transformer --------------------------------------------------------
     transformer_net = OOPTransformer()
-    if transformer_net.model_name in models_to_run:
-        num_layers = 8
+    if transformer_net.model_name in MODELS_TO_RUN:
+        num_layers = 4
         d_model = 6
-        ff_dim = 512
+        ff_dim = 256
         num_heads = 8
         head_size = 256
         dropout_rate = 0.25
@@ -195,43 +250,5 @@ if __name__ == '__main__':
             model_n_params=model_n_params
         )
 
-    tf.keras.backend.clear_session()
-    # OOP Transformer (Small) --------------------------------------------------------
-    transformer_net_small = OOPTransformer(model_name='OOP_Transformer_small')
-    if transformer_net_small.model_name in models_to_run:
-        num_layers = 4
-        d_model = 6
-        ff_dim = 256
-        num_heads = 4
-        herad_size = 128
-        dropout_rate = 0.25
-        mlp_units = [128]
-
-        transformer_net_small.build(
-            X_sample=X_train_sampled[:32],
-            num_layers=num_layers,
-            d_model=d_model,
-            ff_dim=ff_dim,
-            num_heads=num_heads,
-            head_size=head_size,
-            dropout_rate=dropout_rate,
-            mlp_units=mlp_units,
-            save_model=True,
-            verbose=True
-        )
-
-        transformer_net_small.compile()
-
-        model_n_params = run_model(
-            model=transformer_net_small,
-            X_train=X_train_sampled,
-            Y_train=Y_train_sampled,
-            X_test=X_test,
-            Y_test=Y_test,
-            X_window_test=X_winTest,
-            Y_window_test=Y_winTest,
-            model_n_params=model_n_params
-        )
-
-    with open('../saved_data/model_sizes.json', 'w') as f:
-        json.dump(model_n_params, f)
+        with open('../saved_data/model_sizes.json', 'w') as f:
+            json.dump(model_n_params, f)
