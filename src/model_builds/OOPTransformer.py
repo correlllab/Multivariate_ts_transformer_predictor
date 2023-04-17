@@ -33,6 +33,7 @@ class OOPTransformer:
             num_heads: int,
             head_size: int,
             dropout_rate: float,
+            mlp_dropout: float,
             mlp_units: List[int],
             save_model: bool = True,
             verbose: bool = False
@@ -48,6 +49,7 @@ class OOPTransformer:
             target_space_size=2,
             training=True,
             dropout_rate=dropout_rate,
+            mlp_dropout=mlp_dropout,
             pos_encoding=True
         )
 
@@ -65,9 +67,8 @@ class OOPTransformer:
 
     def compile(self):
         # learning_rate = CustomSchedule()
-        learning_rate = 0.01
-        opt = tf.keras.optimizers.legacy.Adam(learning_rate, beta_1=0.9, beta_2=0.98,
-                                              epsilon=1e-9)
+        learning_rate = 1e-4
+        opt = tf.keras.optimizers.legacy.Adam(learning_rate)
         opt = tf.keras.mixed_precision.LossScaleOptimizer(opt)
         loss_object = tf.keras.losses.CategoricalCrossentropy()
 
@@ -85,7 +86,7 @@ class OOPTransformer:
             X_test: Any,
             Y_test: Any,
             epochs: int = 200,
-            batch_size: int = 32,
+            batch_size: int = 64,
             save_model: bool = True
     ):
         callbacks = [

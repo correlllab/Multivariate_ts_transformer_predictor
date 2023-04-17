@@ -18,10 +18,10 @@ from utilities.makespan_utils import *
 
 
 MODELS_TO_RUN = [
-    'FCN',
-    'RNN',
-    'VanillaTransformer',
-    # 'OOP_Transformer',
+    # 'FCN',
+    # 'RNN',
+    # 'VanillaTransformer',
+    'OOP_Transformer',
     # 'OOP_Transformer_small'
     ]
 
@@ -83,7 +83,8 @@ if __name__ == '__main__':
     save_dicts = True
     # If True it will save generated plots
     save_plots = True
-    res = {}
+    with open('../saved_data/makespan/makespan_results.txt', 'r') as f:
+        res = json.loads(f.read())
     if compute:
         print('LOADING MODELS...')
         if 'FCN' in MODELS_TO_RUN:
@@ -103,6 +104,7 @@ if __name__ == '__main__':
             num_heads = 8
             head_size = 256
             dropout_rate = 0.25
+            mlp_dropout = 0.4
             mlp_units = [128, 256, 64]
 
             oop_transformer.build(
@@ -113,6 +115,7 @@ if __name__ == '__main__':
                 num_heads=num_heads,
                 head_size=head_size,
                 dropout_rate=dropout_rate,
+                mlp_dropout=mlp_dropout,
                 mlp_units=mlp_units,
                 save_model=True,
                 verbose=False
@@ -128,6 +131,7 @@ if __name__ == '__main__':
             num_heads = 4
             head_size = 128
             dropout_rate = 0.25
+            mlp_dropout = 0.4
             mlp_units = [128]
 
             oop_transformer_small.build(
@@ -138,6 +142,7 @@ if __name__ == '__main__':
                 num_heads=num_heads,
                 head_size=head_size,
                 dropout_rate=dropout_rate,
+                mlp_dropout=mlp_dropout,
                 mlp_units=mlp_units,
                 save_model=True,
                 verbose=False
@@ -156,9 +161,6 @@ if __name__ == '__main__':
             res[model_name]['conf_mat'] = conf_mat
             res[model_name]['times'] = times
             print()
-    else:
-        with open('../saved_data/makespan/makespan_results.txt', 'r') as f:
-            res = json.loads(f.read())
 
     print(f'res = {res}\n')
 
@@ -172,7 +174,7 @@ if __name__ == '__main__':
 
     if save_dicts:
         with open('../saved_data/makespan/makespan_results.txt', 'w') as f:
-                f.write(json.dumps(res))
+            f.write(json.dumps(res))
 
     print(f'metrics = {metrics}\n')
 

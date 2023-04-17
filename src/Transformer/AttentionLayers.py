@@ -8,7 +8,7 @@ class BaseAttention(tf.keras.layers.Layer):
         super().__init__()
         # TODO: mha layer not in tf 2.3
         self.mha = tf.keras.layers.MultiHeadAttention(**kwargs)
-        self.layernorm = tf.keras.layers.LayerNormalization()
+        self.layernorm = tf.keras.layers.LayerNormalization(epsilon=1e-6)
         self.add = tf.keras.layers.Add()
 
 
@@ -38,7 +38,7 @@ class GlobalSelfAttention(BaseAttention):
         attn_output, attn_scores = self.mha(
             query=x,
             value=x,
-            key=x,
+            # key=x,
             return_attention_scores=True,
             training=training)
 

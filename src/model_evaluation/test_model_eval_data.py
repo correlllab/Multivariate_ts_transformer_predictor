@@ -72,7 +72,8 @@ if __name__ == '__main__':
         # model_names = ['FCN']
         # model_names = ['RNN']
         # model_names = ['VanillaTransformer']
-        model_names = ['OOP_Transformer']
+        model_names = ['OOP_Transformer_small']
+        # model_names = ['OOP_Transformer']
 
         results = dict.fromkeys(
             model_names,
@@ -85,21 +86,53 @@ if __name__ == '__main__':
             # Load model
             if model_name == 'OOP_Transformer':
                 transformer = OOPTransformer()
-                num_layers = 8
+                num_layers = 4
                 d_model = 6
-                dff = 512
+                ff_dim = 256
                 num_heads = 8
-                dropout_rate = 0.1
+                head_size = 256
+                dropout_rate = 0.25
+                mlp_dropout = 0.4
                 mlp_units = [128, 256, 64]
                 transformer.build(
                     X_sample=X_data[:32],
                     num_layers=num_layers,
                     d_model=d_model,
-                    dff=dff,
+                    ff_dim=ff_dim,
                     num_heads=num_heads,
+                    head_size=head_size,
                     dropout_rate=dropout_rate,
+                    mlp_dropout=mlp_dropout,
                     mlp_units=mlp_units,
-                    save_model=True
+                    save_model=True,
+                    verbose=True
+                )
+                transformer.compile()
+                model = transformer.model
+                model.load_weights(f'../saved_models/{model_name}/').expect_partial()
+            elif model_name == 'OOP_Transformer_small':
+                transformer = OOPTransformer(model_name='OOP_Transformer_small')
+                num_layers = 4
+                d_model = 6
+                ff_dim = 256
+                num_heads = 4
+                head_size = 128
+                dropout_rate = 0.25
+                mlp_dropout = 0.4
+                mlp_units = [128]
+
+                transformer.build(
+                    X_sample=X_data[:32],
+                    num_layers=num_layers,
+                    d_model=d_model,
+                    ff_dim=ff_dim,
+                    num_heads=num_heads,
+                    head_size=head_size,
+                    dropout_rate=dropout_rate,
+                    mlp_dropout=mlp_dropout,
+                    mlp_units=mlp_units,
+                    save_model=True,
+                    verbose=True
                 )
                 transformer.compile()
                 model = transformer.model

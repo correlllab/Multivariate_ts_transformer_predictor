@@ -182,6 +182,7 @@ if __name__ == '__main__':
         num_heads = 4
         head_size = 128
         dropout_rate = 0.25
+        mlp_dropout = 0.4
         mlp_units = [128]
 
         transformer_net_small.build(
@@ -192,6 +193,7 @@ if __name__ == '__main__':
             num_heads=num_heads,
             head_size=head_size,
             dropout_rate=dropout_rate,
+            mlp_dropout=mlp_dropout,
             mlp_units=mlp_units,
             save_model=True,
             verbose=True
@@ -223,6 +225,7 @@ if __name__ == '__main__':
         num_heads = 8
         head_size = 256
         dropout_rate = 0.25
+        mlp_dropout = 0.4
         mlp_units = [128, 256, 64]
 
         transformer_net.build(
@@ -233,6 +236,7 @@ if __name__ == '__main__':
             num_heads=num_heads,
             head_size=head_size,
             dropout_rate=dropout_rate,
+            mlp_dropout=mlp_dropout,
             mlp_units=mlp_units,
             save_model=True,
             verbose=True

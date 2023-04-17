@@ -71,7 +71,7 @@ def stacked_conf_mat_bar_plot(conf_mat: dict, model_name: str, save_plot: bool =
 
 
 if __name__ == '__main__':
-    model_names = ['FCN', 'RNN', 'VanillaTransformer', 'OOP_Transformer']
+    model_names = ['FCN', 'RNN', 'VanillaTransformer', 'OOP_Transformer_small', 'OOP_Transformer']
     confusion_matrices = dict.fromkeys(model_names)
 
     counter = 0

@@ -13,6 +13,15 @@ sys.path.append(os.path.realpath('../'))
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # INFO and WARNING messages are not printed
 
 
+model_name_table = {
+    'FCN': 'FCN', 
+    'RNN': 'RNN',
+    'VanillaTransformer': 'Vanilla\nTransformer',
+    'OOP_Transformer_small': 'OOP Transformer\n(small)',
+    'OOP_Transformer': 'OOP Transformer (big)'
+    }
+
+
 def plot_model_sizes(sizes: dict):
     fig, ax = plt.subplots(figsize=(15, 10))
     # sort dict (greater to lower)
@@ -36,7 +45,7 @@ def plot_model_sizes(sizes: dict):
             )
         )
         ax.annotate(
-            f'{sizes[i][0]}\n{sizes[i][1]}',
+            f'{model_name_table[sizes[i][0]]}\n{sizes[i][1]}',
             xy=(extra_spacing + sizes[i][1], 0),
             fontsize=15,
             ha='center',
@@ -46,7 +55,7 @@ def plot_model_sizes(sizes: dict):
     ax.set_aspect('equal')
     plt.axis('off')
     plt.xlim((-space, extra_spacing + 2 * sizes[-1][1] + space))
-    plt.ylim((-sizes[0][-1] * 2, sizes[0][-1] * 2))
+    plt.ylim((-sizes[-1][-1] * 1.15, sizes[-1][-1] * 1.15))
     # plt.legend()
     plt.title('Number of parameters')
     plt.savefig('../saved_data/imgs/evaluation/model_sizes.png')

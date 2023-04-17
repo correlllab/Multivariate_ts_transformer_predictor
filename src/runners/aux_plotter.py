@@ -7,13 +7,17 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # INFO and WARNING messages are not pri
 import tensorflow as tf
 
 from data_management.data_preprocessing import DataPreprocessing
-from Transformer.Transformer import Transformer
+from model_builds.FCN import FCN
+from model_builds.RNN import RNN
+from model_builds.VanillaTransformer import VanillaTransformer
+from model_builds.OOPTransformer import OOPTransformer
 from utilities.metrics_plots import plot_acc_loss, compute_confusion_matrix, make_probabilities_plots
 
 
-MODEL_WEIGHTS_PATH = '../saved_models/OOP_transformer/'
-HISTORY_PATH = '../saved_data/histories/OOP_transformer_history'
-IMAGES_PATH = '../saved_data/imgs/oop_transformer/'
+MODEL_NAME = 'OOP_Transformer_small'
+MODEL_WEIGHTS_PATH = f'../saved_models/{MODEL_NAME}/'
+HISTORY_PATH = f'../saved_data/histories/{MODEL_NAME}_history'
+IMAGES_PATH = f'../saved_data/imgs/{MODEL_NAME}/'
 
 
 class hist_class:
@@ -40,33 +44,29 @@ if __name__ == '__main__':
     dp = DataPreprocessing(sampling='none', data='reactive')
     dp.run()
 
-    num_layers = 8
+    transformer = OOPTransformer(model_name=MODEL_NAME)
+    num_layers = 4
     d_model = 6
-    dff = 512
-    num_heads = 8
-    dropout_rate = 0.1
-    mlp_units = [128, 256, 64]
-    transformer = Transformer(
+    ff_dim = 256
+    num_heads = 4
+    head_size = 128
+    dropout_rate = 0.25
+    mlp_units = [128]
+    transformer.build(
+        X_sample=dp.X_train_sampled[:32],
         num_layers=num_layers,
         d_model=d_model,
+        ff_dim=ff_dim,
         num_heads=num_heads,
-        ff_dim=dff,
-        mlp_units=mlp_units,
-        input_space_size=6,
-        target_space_size=2,
-        training=True,
+        head_size=head_size,
         dropout_rate=dropout_rate,
-        pos_encoding=True
+        mlp_units=mlp_units,
+        save_model=True,
+        verbose=True
     )
-    # learning_rate = CustomSchedule()
-    opt = tf.keras.optimizers.legacy.Adam(1e-4, beta_1=0.9, beta_2=0.98,
-                                   epsilon=1e-9)
-    transformer.compile(
-        loss=tf.keras.losses.CategoricalCrossentropy(),
-        optimizer=opt,
-        metrics=[tf.keras.metrics.CategoricalAccuracy()]
-    )
-    transformer.load_weights(MODEL_WEIGHTS_PATH).expect_partial()
+
+    transformer.compile()
+    transformer.model.load_weights(MODEL_WEIGHTS_PATH).expect_partial()
 
     with open(HISTORY_PATH, 'rb') as f:
         history = pickle.load(f)
@@ -75,7 +75,7 @@ if __name__ == '__main__':
 
     plot_acc_loss(history=hist_obj, imgs_path=IMAGES_PATH)
     compute_confusion_matrix(
-        model=transformer,
+        model=transformer.model,
         file_name=MODEL_WEIGHTS_PATH,
         imgs_path=IMAGES_PATH,
         X_winTest=dp.X_winTest,
@@ -83,7 +83,7 @@ if __name__ == '__main__':
         plot=True
     )
     make_probabilities_plots(
-        model=transformer,
+        model=transformer.model,
         model_name=transformer.model_name,
         imgs_path=IMAGES_PATH,
         X_winTest=dp.X_winTest,

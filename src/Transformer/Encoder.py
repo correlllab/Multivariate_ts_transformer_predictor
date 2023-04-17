@@ -8,7 +8,7 @@ from PositionalEncoding import PositionalEmbedding
 # from https://www.tensorflow.org/text/tutorials/transformer#define_the_components
 # Encoder layer
 class EncoderLayer(tf.keras.layers.Layer):
-    def __init__(self, *, d_model, num_heads, head_size, ff_dim, dropout_rate=0.1):
+    def __init__(self, *, d_model, num_heads, head_size, ff_dim, dropout_rate=0.1, mlp_dropout=0.4):
         super().__init__()
 
         self.self_attention = GlobalSelfAttention(
@@ -16,10 +16,12 @@ class EncoderLayer(tf.keras.layers.Layer):
             key_dim=head_size,
             dropout=dropout_rate)
 
-        self.ffn = FeedForward(d_model, ff_dim)
+        self.ffn = FeedForward(d_model, ff_dim, mlp_dropout)
+        self.dropout = tf.keras.layers.Dropout(dropout_rate)
 
     def call(self, x, training):
         x = self.self_attention(x, training)
+        x = self.dropout(x)
         x = self.ffn(x)
 
         # Cache the last attention scores for plotting later
@@ -30,8 +32,8 @@ class EncoderLayer(tf.keras.layers.Layer):
 
 # Full encoder
 class Encoder(tf.keras.layers.Layer):
-    def __init__(self, *, num_layers, d_model, num_heads, head_size,
-                ff_dim, space_size, dropout_rate=0.1, pos_encoding=True):
+    def __init__(self, *, num_layers, d_model, num_heads, head_size, ff_dim,
+                space_size, dropout_rate=0.1, mlp_dropout=0.4, pos_encoding=True):
         super().__init__()
 
         self.d_model = d_model
@@ -49,7 +51,8 @@ class Encoder(tf.keras.layers.Layer):
                 num_heads=num_heads,
                 head_size=head_size,
                 ff_dim=ff_dim,
-                dropout_rate=dropout_rate)
+                dropout_rate=dropout_rate,
+                mlp_dropout=mlp_dropout)
             for _ in range(num_layers)
         ]
         self.dropout = tf.keras.layers.Dropout(dropout_rate)

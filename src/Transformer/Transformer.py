@@ -11,8 +11,8 @@ from Encoder import Encoder
 # from https://www.tensorflow.org/text/tutorials/transformer#define_the_components
 # Full transformer
 class Transformer(tf.keras.Model):
-    def __init__(self, *, num_layers, d_model, num_heads, head_size, ff_dim, mlp_units,
-                 input_space_size, target_space_size, training, pos_encoding=True, dropout_rate=0.1):
+    def __init__(self, *, num_layers, d_model, num_heads, head_size, ff_dim, mlp_units, input_space_size,
+                 target_space_size, training, dropout_rate=0.1, mlp_dropout=0.4, pos_encoding=True):
         super().__init__()
 
         self.model_name = 'OOP_Transformer'
@@ -25,15 +25,16 @@ class Transformer(tf.keras.Model):
                                ff_dim=ff_dim,
                                space_size=input_space_size,
                                dropout_rate=dropout_rate,
+                               mlp_dropout=mlp_dropout,
                                pos_encoding=pos_encoding)
         
         self.mlp = tf.keras.Sequential()
         for dim in mlp_units:
             self.mlp.add(tf.keras.layers.Dense(dim, activation='relu'))
-            self.mlp.add(tf.keras.layers.Dropout(dropout_rate))
+            self.mlp.add(tf.keras.layers.Dropout(mlp_dropout))
 
         self.global_average_pooling = tf.keras.layers.GlobalAveragePooling1D(data_format='channels_last')
-        self.flatten = tf.keras.layers.Flatten()
+        # self.flatten = tf.keras.layers.Flatten()
         self.final_layer = tf.keras.layers.Dense(target_space_size, activation='softmax', dtype='float32', kernel_regularizer=tf.keras.regularizers.l2(l2=0.01))
 
     def call(self, inputs):
