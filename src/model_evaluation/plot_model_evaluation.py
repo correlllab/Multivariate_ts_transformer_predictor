@@ -56,7 +56,8 @@ def stacked_conf_mat_bar_plot(conf_mat: dict, model_name: str, save_plot: bool =
                 bar.get_height() + bar.get_y() - (bar.get_height() / 2),
                 f'{bar.get_height() * 100:.2f}%',
                 ha='center',
-                bbox=dict(facecolor='white', alpha=.5)
+                bbox=dict(facecolor='white', alpha=.5),
+                fontsize=15
             )
 
     axes.legend()

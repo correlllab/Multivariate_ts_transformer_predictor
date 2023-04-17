@@ -61,10 +61,6 @@ class OOPTransformer:
             print(self.model.summary())
 
 
-        if save_model:
-            self.model.save_weights(filepath=self.file_name)
-
-
     def compile(self):
         # learning_rate = CustomSchedule()
         learning_rate = 1e-4

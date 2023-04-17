@@ -38,6 +38,9 @@ if __name__ == '__main__':
     X_data, Y_data = None, None
 
     if MODE == 'create_data':
+        if not os.path.exists('../../data/eval_data/'):
+            os.makedirs('../../data/eval_data/')
+
         dp = DataPreprocessing(sampling='none', data='preemptive')
         dp.run(verbose=True)
 
@@ -72,8 +75,8 @@ if __name__ == '__main__':
         # model_names = ['FCN']
         # model_names = ['RNN']
         # model_names = ['VanillaTransformer']
-        model_names = ['OOP_Transformer_small']
-        # model_names = ['OOP_Transformer']
+        # model_names = ['OOP_Transformer_small']
+        model_names = ['OOP_Transformer']
 
         results = dict.fromkeys(
             model_names,
@@ -105,7 +108,7 @@ if __name__ == '__main__':
                     mlp_dropout=mlp_dropout,
                     mlp_units=mlp_units,
                     save_model=True,
-                    verbose=True
+                    verbose=False
                 )
                 transformer.compile()
                 model = transformer.model
@@ -120,7 +123,6 @@ if __name__ == '__main__':
                 dropout_rate = 0.25
                 mlp_dropout = 0.4
                 mlp_units = [128]
-
                 transformer.build(
                     X_sample=X_data[:32],
                     num_layers=num_layers,
@@ -132,8 +134,9 @@ if __name__ == '__main__':
                     mlp_dropout=mlp_dropout,
                     mlp_units=mlp_units,
                     save_model=True,
-                    verbose=True
+                    verbose=False
                 )
+
                 transformer.compile()
                 model = transformer.model
                 model.load_weights(f'../saved_models/{model_name}/').expect_partial()
