@@ -13,9 +13,6 @@ data/eval_data/
 # Data from data_manager class
 data/data_manager/
 
-# Attention heads visualization
-src/saved_data/imgs/attention/
-
 # Python notebooks stuff
 .ipynb_checkpoints
 src/notebooks/*.npy

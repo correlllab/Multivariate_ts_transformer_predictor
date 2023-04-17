@@ -61,7 +61,7 @@ def plot_attention_weights(window, attention_heads, episode_num):
         if not os.path.isdir(dir_path):
             os.makedirs(dir_path)
 
-        plt.savefig(dir_path + f'attention_mat_head_{h}.png')
+        plt.savefig(dir_path + f'attention_mat_ep_{episode_num}_head_{h}.png')
 
 
 class Predictor(tf.Module):
@@ -88,28 +88,29 @@ if __name__ == '__main__':
     # transformer = tf.saved_model.load('../fcn_vs_transformer/models/OOP_transformer')
     transformer_net = OOPTransformer()
 
-    num_layers = 8
+    num_layers = 4
     d_model = 6
-    dff = 512
-    num_heads = 8
-    dropout_rate = 0.1
-    mlp_units = [128, 256, 64]
+    ff_dim = 256
+    num_heads = 4
+    head_size = 128
+    dropout_rate = 0.25
+    mlp_dropout = 0.4
+    mlp_units = [128]
 
     transformer_net.build(
         X_sample=dp.X_train_sampled[:32],
         num_layers=num_layers,
         d_model=d_model,
-        dff=dff,
+        ff_dim=ff_dim,
         num_heads=num_heads,
+        head_size=head_size,
         dropout_rate=dropout_rate,
+        mlp_dropout=mlp_dropout,
         mlp_units=mlp_units,
-        save_model=True
+        save_model=True,
+        verbose=True
     )
-    # learning_rate = CustomSchedule()
-    # opt = tf.keras.optimizers.legacy.Adam(1e-4, beta_1=0.9, beta_2=0.98,
-    #                                       epsilon=1e-9)
-    transformer_net.compile()
-    transformer_net.model.load_weights('../saved_models/OOP_Transformer/').expect_partial()
+    transformer_net.model.load_weights('../saved_models/OOP_Transformer_small/').expect_partial()
     predictor = Predictor(model=transformer_net.model)
 
     print(type(transformer_net.model))
