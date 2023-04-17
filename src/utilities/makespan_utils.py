@@ -70,7 +70,7 @@ def make_predictions(model_name: str, model: tf.keras.Model, dp: DataPreprocessi
                 true_label = 1.0
             elif episode_window[0, 7] == 1.0:
                 true_label = 0.0
-            prediction = model.predict(episode_X)
+            prediction = model.predict(episode_X, use_multiprocessing=True)
             episode_predictions.append([prediction, true_label])
 
     np.save(f'../saved_data/episode_predictions/{model_name}_episode_predictions.npy', episode_predictions, allow_pickle=True)
