@@ -1,5 +1,6 @@
 import sys
 import os
+import shutil
 import numpy as np
 sys.path.append(os.path.realpath('../'))
 # print(sys.path)
@@ -136,10 +137,16 @@ def plot_attention_on_time_series(episode, attention_heads, episode_num, time_st
                 ax[1].axvspan(i, i, color=colors[head_num], alpha=0.7)
 
     fig.legend()
-    fig.suptitle(f'Episode {episode_num}, Head {head_num}: At time step {max_val_coords[1]}, attention is focused on red/yellow strips')
+    fig.suptitle(f'Episode {episode_num}, Head {head_num}: At time step {max_val_coords[1]}, attention is focused on colored strips')
     plt.savefig(f'../saved_data/imgs/attention/episode_{episode_num}/head_{head_num}_ep_{episode_num}_truncated.png')
     plt.clf()
     plt.close("all")
+
+
+def clean_imgs_dir(directory='../saved_data/imgs/attention/'):
+    for folder in os.listdir(directory):
+        shutil.rmtree(directory + folder)
+
 
 class Predictor(tf.Module):
     def __init__(self, model, name='Predictor'):
@@ -191,6 +198,11 @@ if __name__ == '__main__':
     predictor = Predictor(model=transformer_net.model)
 
     print(type(transformer_net.model))
+
+    print(f'Cleaning images directory...', end='')
+    clean_imgs_dir()
+    print('DONE')
+    print(f'Contents of dir: {os.listdir("../saved_data/imgs/attention/")}')
 
     ep = None
     episode_predictions = []
