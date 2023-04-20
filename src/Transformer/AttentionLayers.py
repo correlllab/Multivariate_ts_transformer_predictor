@@ -4,12 +4,12 @@ import tensorflow as tf
 
 # from https://www.tensorflow.org/text/tutorials/transformer#define_the_components
 class BaseAttention(tf.keras.layers.Layer):
-    def __init__(self, **kwargs):
+    def __init__(self, dropout_rate=0.2, **kwargs):
         super().__init__()
-        # TODO: mha layer not in tf 2.3
         self.mha = tf.keras.layers.MultiHeadAttention(**kwargs)
         self.layernorm = tf.keras.layers.LayerNormalization(epsilon=1e-6)
-        self.add = tf.keras.layers.Add()
+        # self.add = tf.keras.layers.Add()
+        self.dropout = tf.keras.layers.Dropout(dropout_rate)
 
 
 # MultiHeadAttention layer in the decoder (joints otput of encoder and output of first MHA layer of decoder)
@@ -24,9 +24,11 @@ class CrossAttention(BaseAttention):
         # Cache the attention scores for plotting later.
         self.last_attn_scores = attn_scores
 
+        attn_output = self.dropout(attn_output)
+
         # Add & Norm layer with residual connections
-        x = self.layernorm(self.add([x, attn_output]))
-        # x = self.layernorm(x)
+        # x = self.layernorm(self.add([x, attn_output]))
+        x = self.layernorm(x + attn_output)
 
         return x
 
@@ -45,9 +47,11 @@ class GlobalSelfAttention(BaseAttention):
         # Cache the attention scores for plotting later.
         self.last_attn_scores = attn_scores
 
+        attn_output = self.dropout(attn_output)
+
         # Add & Norm layer with residual connections
-        x = self.layernorm(self.add([x, attn_output]))
-        # x = self.layernorm(x)
+        # x = self.layernorm(self.add([x, attn_output]))
+        x = self.layernorm(x + attn_output)
 
         return x
 
@@ -68,8 +72,10 @@ class CausalSelfAttention(BaseAttention):
         # Cache the attention scores for plotting later.
         self.last_attn_scores = attn_scores
 
+        attn_output = self.dropout(attn_output)
+
         # Add & Norm layer with residual connection
-        x = self.layernorm(self.add([x, attn_output]))
-        # x = self.layernorm(x)
+        # x = self.layernorm(self.add([x, attn_output]))
+        x = self.layernorm(x + attn_output)
 
         return x

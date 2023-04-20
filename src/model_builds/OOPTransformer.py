@@ -90,7 +90,7 @@ class OOPTransformer:
                 monitor='val_loss',
                 patience=10,
                 restore_best_weights=True,
-                start_from_epoch=epochs*0.2
+                start_from_epoch=epochs*0.1
             )
         ]
         self.history = self.model.fit(

@@ -133,7 +133,7 @@ class DataPreprocessing:
 
 
     def balance_window_data(self, verbose=False):
-        window_limit = 75000
+        window_limit = 100000
         positive_windows = []
         negative_windows = []
         positive_sum = 0.

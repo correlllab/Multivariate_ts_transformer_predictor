@@ -22,7 +22,7 @@ LOAD_DATA_FROM_FILES = True
 MODELS_TO_RUN = [
     # 'FCN',
     # 'RNN',
-    # 'VanillaTransformer',
+    'VanillaTransformer',
     'OOP_Transformer',
     'OOP_Transformer_small'
     ]
@@ -181,12 +181,12 @@ if __name__ == '__main__':
         ff_dim = 256
         num_heads = 4
         head_size = 128
-        dropout_rate = 0.25
+        dropout_rate = 0.2
         mlp_dropout = 0.4
         mlp_units = [128]
 
         transformer_net_small.build(
-            X_sample=X_train_sampled[:32],
+            X_sample=X_train_sampled[:64],
             num_layers=num_layers,
             d_model=d_model,
             ff_dim=ff_dim,
@@ -224,12 +224,12 @@ if __name__ == '__main__':
         ff_dim = 256
         num_heads = 8
         head_size = 256
-        dropout_rate = 0.25
+        dropout_rate = 0.2
         mlp_dropout = 0.4
         mlp_units = [128, 256, 64]
 
         transformer_net.build(
-            X_sample=X_train_sampled[:32],
+            X_sample=X_train_sampled[:64],
             num_layers=num_layers,
             d_model=d_model,
             ff_dim=ff_dim,

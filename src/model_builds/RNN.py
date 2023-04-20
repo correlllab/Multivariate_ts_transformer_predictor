@@ -38,10 +38,14 @@ class RNN:
             dense_dim=2
         )
 
+        learning_rate = 1e-4
+        opt = tf.keras.optimizers.legacy.Adam(learning_rate)
+        opt = tf.keras.mixed_precision.LossScaleOptimizer(opt)
+        loss_object = tf.keras.losses.CategoricalCrossentropy()
         self.model.compile(
-            loss="binary_focal_crossentropy",
-            optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4),
-            metrics=["categorical_accuracy"]
+            loss=loss_object,
+            optimizer=opt,
+            metrics=[tf.keras.metrics.CategoricalAccuracy()]
         )
         self.model.summary()
 
@@ -50,7 +54,7 @@ class RNN:
                 monitor='val_loss',
                 patience=10,
                 restore_best_weights=True,
-                start_from_epoch=epochs*0.2
+                start_from_epoch=epochs*0.1
             )
         ]
 

@@ -85,18 +85,19 @@ class VanillaTransformer:
         n_classes=2
     ):
         inputs = tf.keras.Input(shape=input_shape)
-        x = inputs
+        x = tf.keras.layers.Dense(6, activation='relu')(inputs)
         x += self.positional_encoding(input_shape[-2:])
+        x = tf.keras.layers.Dropout(dropout)(x)
         for _ in range(num_transformer_blocks):
             x, attn_scores = self.transformer_encoder(x, head_size, num_heads, ff_dim, dropout)
 
         self.last_attn_scores = attn_scores
 
         x = tf.keras.layers.GlobalAveragePooling1D(data_format="channels_last")(x)
-        for dim in mlp_units:
-            x = tf.keras.layers.Dense(dim, activation="relu")(x)
-            x = tf.keras.layers.Dropout(mlp_dropout)(x)
-        outputs = tf.keras.layers.Dense(n_classes, activation="softmax")(x)
+        # for dim in mlp_units:
+        #     x = tf.keras.layers.Dense(dim, activation="relu")(x)
+        #     x = tf.keras.layers.Dropout(mlp_dropout)(x)
+        outputs = tf.keras.layers.Dense(n_classes, activation='softmax', dtype='float32', kernel_regularizer=tf.keras.regularizers.l2(l2=0.01))(x)
         self.model = tf.keras.Model(inputs, outputs)
 
 
@@ -110,13 +111,18 @@ class VanillaTransformer:
             num_transformer_blocks=4,
             mlp_units=[128],
             mlp_dropout=0.4,
-            dropout=0.25,
+            dropout=0.2,
         )
 
+
+        learning_rate = 1e-4
+        opt = tf.keras.optimizers.legacy.Adam(learning_rate)
+        opt = tf.keras.mixed_precision.LossScaleOptimizer(opt)
+        loss_object = tf.keras.losses.CategoricalCrossentropy()
         self.model.compile(
-            loss="binary_focal_crossentropy",
-            optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4),
-            metrics=["categorical_accuracy"],
+            loss=loss_object,
+            optimizer=opt,
+            metrics=[tf.keras.metrics.CategoricalAccuracy()],
         )
         self.model.summary()
 
@@ -126,7 +132,7 @@ class VanillaTransformer:
                 monitor='val_loss',
                 patience=10,
                 restore_best_weights=True,
-                start_from_epoch=epochs*0.2
+                start_from_epoch=epochs*0.1
             )
         ]
 

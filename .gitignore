@@ -10,6 +10,9 @@ __pycache__/
 # Data for eval
 data/eval_data/
 
+# Data for makespan
+data/makespan_data/
+
 # Data from data_manager class
 data/data_manager/
 

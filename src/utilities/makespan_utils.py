@@ -47,11 +47,16 @@ def expected_makespan( MTF, MTN, MTS, P_TP, P_FN, P_TN, P_FP ):
     return -( MTF*P_FP + MTN*P_FN + MTN*P_TN + MTS*P_TP + 1) / (P_FN + P_FP + P_TN - 1)
 
 
-def make_predictions(model_name: str, model: tf.keras.Model, dp: DataPreprocessing, verbose: bool = False):
+def monitored_makespan( MTS, MTF, MTN, P_TP, P_FN, P_TN, P_FP, P_NCS, P_NCF ):
+    """ Closed form makespan for monitored case, symbolic simplification from Mathematica """
+    return (1 + MTF*(P_FP + P_NCF) + MTS*(P_NCS + P_TP) + MTN*(P_FN + P_TN) ) / (1 - P_FN - P_FP - P_TN)
+
+
+def make_predictions(model_name: str, model: tf.keras.Model, trunc_data, verbose: bool = False):
     episode_predictions = []
     rolling_window_width = int(7.0 * 50)
     print( f"Each window is {rolling_window_width} timesteps long!" )
-    for ep_index, episode in enumerate(dp.truncData):
+    for ep_index, episode in enumerate(trunc_data):
         with tf.device('/GPU:0'):
             print(f'Episode {ep_index}')
             time_steps = episode.shape[0]
@@ -76,7 +81,7 @@ def make_predictions(model_name: str, model: tf.keras.Model, dp: DataPreprocessi
     np.save(f'../saved_data/episode_predictions/{model_name}_episode_predictions.npy', episode_predictions, allow_pickle=True)
 
 
-def run_makespan_prediction_for_model(model_name: str, model: tf.keras.Model, dp: DataPreprocessing, verbose: bool = False):
+def run_makespan_prediction_for_model(model_name: str, verbose: bool = False):
     perf = CounterDict()
 
     N_posCls  = 0 # --------- Number of positive classifications
@@ -117,7 +122,16 @@ def run_makespan_prediction_for_model(model_name: str, model: tf.keras.Model, dp
 
         print(f'Window {n_steps}/{n_windows}: Prediction = [{row[0]:.2f}, {row[1]:.2f}] | True label = {true_label} | Answer = {ans}')
 
-        perf.count(ans)
+        # perf.count(ans)
+        if ans == 'NC':
+            if true_label == 0.0:
+                perf.count('NCS')
+            elif true_label == 1.0:
+                perf.count('NCF')
+        else:
+            perf.count(ans)
+
+
 
         # Measure time performance
         # episode_len_s = n_steps * ts_s
@@ -129,11 +143,11 @@ def run_makespan_prediction_for_model(model_name: str, model: tf.keras.Model, dp
         episode_obj.answer = ans
         episode_obj.runTime = episode_len_s
 
-        if true_label == 1.0:
+        if true_label == 0.0:
             MTS += episode_len_s
             N_success += 1
             episode_obj.TTS = episode_len_s
-        elif true_label == 0.0:
+        elif true_label == 1.0:
             MTF += episode_len_s
             N_failure += 1
             episode_obj.TTF = episode_len_s
@@ -161,7 +175,7 @@ def run_makespan_prediction_for_model(model_name: str, model: tf.keras.Model, dp
         # Actual Negatives
         'TN' : (perf['TN'] if ('TN' in perf) else 0) / ((perf['TN'] if ('TN' in perf) else 0) + (perf['FP'] if ('FP' in perf) else 0)),
         'FP' : (perf['FP'] if ('FP' in perf) else 0) / ((perf['TN'] if ('TN' in perf) else 0) + (perf['FP'] if ('FP' in perf) else 0)),
-        'NC' : (perf['NC'] if ('NC' in perf) else 0) / len(dp.truncData),
+        'NC' : (perf['NCS'] + perf['NCF'] if ('NCS' in perf and 'NCF' in perf) else 0) / len(episode_predictions),
     }
 
     print()
@@ -209,14 +223,27 @@ def run_makespan_prediction_for_model(model_name: str, model: tf.keras.Model, dp
 
 
     print('    Expected makespan:', end=' ')
-    EMS = expected_makespan( 
+    # EMS = expected_makespan( 
+    #     MTF = MTF, 
+    #     MTN = MTN, 
+    #     MTS = MTS, 
+    #     P_TP = confMatx['TP'] * (N_success/(N_success + N_failure)) , 
+    #     P_FN = confMatx['FN'] * (N_success/(N_success + N_failure)) , 
+    #     P_TN = confMatx['TN'] * (N_failure/(N_success + N_failure)) , 
+    #     P_FP = confMatx['FP'] * (N_failure/(N_success + N_failure))  
+    # )
+    EMS = monitored_makespan(
         MTF = MTF, 
         MTN = MTN, 
         MTS = MTS, 
-        P_TP = confMatx['TP'] * (N_success/(N_success + N_failure)) , 
-        P_FN = confMatx['FN'] * (N_success/(N_success + N_failure)) , 
-        P_TN = confMatx['TN'] * (N_failure/(N_success + N_failure)) , 
-        P_FP = confMatx['FP'] * (N_failure/(N_success + N_failure))  
+        P_TP = confMatx['TP'] * (N_success/(N_success + N_failure)), 
+        P_FN = confMatx['FN'] * (N_success/(N_success + N_failure)), 
+        P_TN = confMatx['TN'] * (N_failure/(N_success + N_failure)), 
+        P_FP = confMatx['FP'] * (N_failure/(N_success + N_failure)),
+        # P_NCS = perf['NCS'] / (confMatx['NC']),
+        # P_NCF = perf['NCF'] / (confMatx['NC'])
+        P_NCS = perf['NCS'] / len(episode_predictions),
+        P_NCF = perf['NCF'] / len(episode_predictions)
     )
     print( EMS, end=' [s]' )
     metrics = {
@@ -228,7 +255,9 @@ def run_makespan_prediction_for_model(model_name: str, model: tf.keras.Model, dp
         'P_TP': confMatx['TP'] * (N_success/(N_success + N_failure)),
         'P_FN': confMatx['FN'] * (N_success/(N_success + N_failure)),
         'P_TN': confMatx['TN'] * (N_failure/(N_success + N_failure)),
-        'P_FP': confMatx['FP'] * (N_failure/(N_success + N_failure))
+        'P_FP': confMatx['FP'] * (N_failure/(N_success + N_failure)),
+        'P_NCS': perf['NCS'] / len(episode_predictions),
+        'P_NCF': perf['NCF'] / len(episode_predictions)
     }
     return metrics, confMatx, times
 

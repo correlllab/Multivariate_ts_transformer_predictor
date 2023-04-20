@@ -18,12 +18,14 @@ from utilities.makespan_utils import *
 
 
 MODELS_TO_RUN = [
-    # 'FCN',
-    # 'RNN',
+    'FCN',
+    'RNN',
     # 'VanillaTransformer',
-    'OOP_Transformer',
+    # 'OOP_Transformer',
     # 'OOP_Transformer_small'
     ]
+# MODE = 'create_data'
+MODE = 'load_data'
 
 
 def load_keras_model(model_name: str, makespan_models: dict, verbose: bool = True):
@@ -63,22 +65,39 @@ if __name__ == '__main__':
         print( f"\t{dev}" )
         print
 
-    print('FETCHING DATA...')
-    # dp = DataPreprocessing(sampling='none')
-    # dp.run(verbose=True)
-    dp = DataPreprocessing(sampling='none', data='reactive')
-    dp.shuffle = False
-    # dp.load_data(verbose=True)
-    # dp.scale_data(verbose=True)
-    # dp.set_episode_beginning(verbose=True)
-    dp.run(save_data=False, verbose=True)
+    if MODE == 'create_data':
+        print('FETCHING DATA...')
+        dp = DataPreprocessing(sampling='none', data='reactive')
+        dp.shuffle = False
+        dp.run(save_data=False, verbose=True)
+
+        X_train_sampled = dp.X_train_sampled
+        trunc_data = dp.truncData
+
+        print('Creating X_train_sampled...', end='')
+        with open('../../data/makespan_data/X_train_sampled.npy', 'wb') as f:
+            np.save(f, dp.X_train_sampled, allow_pickle=True)
+        print('DONE')
+
+        print('Creating trunc_data...', end='')
+        with open('../../data/makespan_data/trunc_data.npy', 'wb') as f:
+            np.save(f, np.asarray(dp.truncData, dtype=object), allow_pickle=True)
+        print('DONE')
+    elif MODE == 'load_data':
+        print('Loading data from files...', end='')
+        with open('../../data/makespan_data/X_train_sampled.npy', 'rb') as f:
+            X_train_sampled = np.load(f, allow_pickle=True)
+
+        with open('../../data/makespan_data/trunc_data.npy', 'rb') as f:
+            trunc_data = np.load(f, allow_pickle=True)
+        print('DONE')
 
     makespan_models = {}
 
     # If True it will run pipeline: load models, predict (if True) and generate metrics, if False it will generate metrics from saved files
     compute = True
     # If True it will run prediction inside computation pipeline, if False it will load predictions from npy file
-    predict = True
+    predict = False
     # If True, it will save dicts upon metric generation
     save_dicts = True
     # If True it will save generated plots
@@ -103,12 +122,12 @@ if __name__ == '__main__':
             ff_dim = 256
             num_heads = 8
             head_size = 256
-            dropout_rate = 0.25
+            dropout_rate = 0.2
             mlp_dropout = 0.4
             mlp_units = [128, 256, 64]
 
             oop_transformer.build(
-                X_sample=dp.X_train_sampled[:32],
+                X_sample=X_train_sampled[:64],
                 num_layers=num_layers,
                 d_model=d_model,
                 ff_dim=ff_dim,
@@ -130,12 +149,12 @@ if __name__ == '__main__':
             ff_dim = 256
             num_heads = 4
             head_size = 128
-            dropout_rate = 0.25
+            dropout_rate = 0.2
             mlp_dropout = 0.4
             mlp_units = [128]
 
             oop_transformer_small.build(
-                X_sample=dp.X_train_sampled[:32],
+                X_sample=X_train_sampled[:64],
                 num_layers=num_layers,
                 d_model=d_model,
                 ff_dim=ff_dim,
@@ -155,8 +174,8 @@ if __name__ == '__main__':
                 res[model_name] = {'metrics': {}, 'conf_mat': {}, 'times': []}
             print(f'====> For model {model_name}:')
             if predict:
-                make_predictions(model_name=model_name, model=model, dp=dp, verbose=True)
-            makespan_metrics, conf_mat, times = run_makespan_prediction_for_model(model_name=model_name, model=model, dp=dp, verbose=True)
+                make_predictions(model_name=model_name, model=model, trunc_data=trunc_data, verbose=True)
+            makespan_metrics, conf_mat, times = run_makespan_prediction_for_model(model_name=model_name, verbose=True)
             res[model_name]['metrics'] = makespan_metrics
             res[model_name]['conf_mat'] = conf_mat
             res[model_name]['times'] = times
