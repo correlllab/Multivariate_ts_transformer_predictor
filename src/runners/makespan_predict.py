@@ -19,7 +19,7 @@ from utilities.makespan_utils import *
 
 MODELS_TO_RUN = [
     'FCN',
-    'RNN',
+    # 'RNN',
     # 'VanillaTransformer',
     # 'OOP_Transformer',
     # 'OOP_Transformer_small'
@@ -97,7 +97,7 @@ if __name__ == '__main__':
     # If True it will run pipeline: load models, predict (if True) and generate metrics, if False it will generate metrics from saved files
     compute = True
     # If True it will run prediction inside computation pipeline, if False it will load predictions from npy file
-    predict = False
+    predict = True
     # If True, it will save dicts upon metric generation
     save_dicts = True
     # If True it will save generated plots

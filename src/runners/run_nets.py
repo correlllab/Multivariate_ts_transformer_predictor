@@ -20,8 +20,8 @@ DATA_DIR = f'../../data/data_manager/{DATA}'
 SAVE_DATA = True
 LOAD_DATA_FROM_FILES = True
 MODELS_TO_RUN = [
-    # 'FCN',
-    # 'RNN',
+    'FCN',
+    'RNN',
     'VanillaTransformer',
     'OOP_Transformer',
     'OOP_Transformer_small'
@@ -195,7 +195,6 @@ if __name__ == '__main__':
             dropout_rate=dropout_rate,
             mlp_dropout=mlp_dropout,
             mlp_units=mlp_units,
-            save_model=True,
             verbose=True
         )
 
@@ -238,7 +237,6 @@ if __name__ == '__main__':
             dropout_rate=dropout_rate,
             mlp_dropout=mlp_dropout,
             mlp_units=mlp_units,
-            save_model=True,
             verbose=True
         )
 

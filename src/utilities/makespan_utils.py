@@ -1,4 +1,5 @@
 import sys, os, json
+import random
 sys.path.append(os.path.realpath('../'))
 # print(sys.path)
 
@@ -79,6 +80,63 @@ def make_predictions(model_name: str, model: tf.keras.Model, trunc_data, verbose
             episode_predictions.append([prediction, true_label])
 
     np.save(f'../saved_data/episode_predictions/{model_name}_episode_predictions.npy', episode_predictions, allow_pickle=True)
+
+
+
+def classify(model: tf.keras.Model, episode: np.ndarray, true_label: float, window_width: int):
+    with tf.device('/GPU:0'):
+        time_steps = episode.shape[0]
+        n_windows = time_steps - window_width + 1
+        episode_X_list = []
+        for i in range(n_windows):
+            episode_window = episode[i:i + window_width, :]
+            episode_X_list.append(episode_window[:, 1:7])
+        episode_X = tf.stack(episode_X_list)
+        prediction = model.predict(episode_X, use_multiprocessing=True)
+        ans, t_c, row = scan_output_for_decision(
+            np.array(prediction),
+            np.array([tf.keras.utils.to_categorical(true_label, num_classes=2)] * len(prediction)),
+            threshold=0.9
+        )
+
+    # Return the classification answer and the time (in seconds) at which the classification happened
+    return ans, t_c * (20 / 1000)
+
+
+def run_simulation(model: tf.keras.Model, episodes: list, n_simulations: int = 1000, verbose: bool = False):
+    rolling_window_width = int(7.0 * 50)
+    total_time = 0
+    mks = []
+    for i in range(n_simulations):
+        if verbose:    
+            print(f'Simulation {i+1}/{n_simulations}:')
+        win = False
+        makespan = 0
+        while not win:
+            ep = random.choice(episodes)
+            episode_time = ep.shape[0] * (20 / 1000)
+            true_label = 0.0
+            if ep[0, 7] == 0.0:
+                true_label = 1.0
+            ans, t_c = classify(model=model, episode=ep, true_label=true_label, window_width=rolling_window_width)
+            if ans == 'NC':
+                # If true_label == failure
+                if true_label == 1.0:
+                    makespan += episode_time
+                # If true_label == success
+                elif true_label == 0.0:
+                    makespan += episode_time
+                    win = True
+            else:
+                if ans == 'TN' or ans == 'FP':
+                    makespan += t_c
+                elif ans == 'TP' or ans == 'FN':
+                    makespan += episode_time
+                    win = True
+        total_time += makespan
+        mks.append(makespan)
+    return total_time / n_simulations, mks
+
 
 
 def run_makespan_prediction_for_model(model_name: str, verbose: bool = False):
@@ -365,3 +423,38 @@ def plot_runtimes(res: dict, save_plots: bool = True):
         plt.clf()
     else:
         plt.plot()
+
+
+def plot_simulation_makespans(res: dict, models: list, save_plots: bool = True):
+    textstr_dict = dict.fromkeys(models, None)
+    for model_name in models:
+        if model_name != 'FCN':
+            hits = np.sum([1 if vt < fcn else 0 for vt, fcn in zip(res[model_name]['makespan_sim_hist'], res['FCN']['makespan_sim_hist'])])
+            performance = (hits * 100) / len(res[model_name]['makespan_sim_hist'])
+            textstr_dict[model_name] = ''.join(f'Makespan is lower for {performance:.2f}% of the episodes with {model_name} ({res[model_name]["makespan_sim_avg"]:.2f} \u00B1 {res[model_name]["makespan_sim_std"]:.2f})')
+
+    props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+
+    fig, axes = plt.subplots(1, 1, figsize=(20, 8))
+    axes.title.set_text(f'Simulated makespans for each model (N = {len(res[list(res.keys())[0]]["makespan_sim_hist"])})')
+    runtimes = []
+    for model_name in models:
+        runtimes.append(res[model_name]['makespan_sim_hist'])
+
+    axes.hist(runtimes, alpha=0.5, label=models, bins=10)
+    axes.legend()
+    axes.set_xlabel('Makespan [s]')
+    axes.set_ylabel('Count')
+    x = 0.15
+    y = 0.85
+    for model_name, textstr in textstr_dict.items():
+        if textstr is not None:
+            axes.text(x, y, textstr, transform=axes.transAxes, bbox=props, fontsize=20)
+            y -= 0.08
+
+    if save_plots:
+        plt.savefig('../saved_data/imgs/makespan_prediction/makespan_simulation_histogram.png')
+        plt.clf()
+    else:
+        plt.plot()
+

@@ -107,7 +107,6 @@ if __name__ == '__main__':
                     dropout_rate=dropout_rate,
                     mlp_dropout=mlp_dropout,
                     mlp_units=mlp_units,
-                    save_model=True,
                     verbose=False
                 )
                 transformer.compile()
@@ -133,7 +132,6 @@ if __name__ == '__main__':
                     dropout_rate=dropout_rate,
                     mlp_dropout=mlp_dropout,
                     mlp_units=mlp_units,
-                    save_model=True,
                     verbose=False
                 )
 
