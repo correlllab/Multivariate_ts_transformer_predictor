@@ -31,7 +31,7 @@ class RNN:
 
         self.model = model
 
-    def fit(self, X_train, Y_train, X_test, Y_test, batch_size=256, epochs=200, save_model=True):
+    def fit(self, X_train, Y_train, X_test, Y_test, batch_size=256, epochs=200, save_model=True, verbose=False):
         self.build_model(
             input_shape=X_train.shape[1:],
             lstm_dim=128,
@@ -47,7 +47,8 @@ class RNN:
             optimizer=opt,
             metrics=[tf.keras.metrics.CategoricalAccuracy()]
         )
-        self.model.summary()
+        if verbose:
+            self.model.summary()
 
         callbacks = [
             tf.keras.callbacks.EarlyStopping(

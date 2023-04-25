@@ -22,7 +22,7 @@ class FCN:
         self.rollWinWidth = rolling_window_width
 
 
-    def build(self):
+    def build(self, verbose=False):
         self.model = Sequential()
 
         # https://machinelearningmastery.com/how-to-develop-convolutional-neural-network-models-for-time-series-forecasting/
@@ -54,7 +54,8 @@ class FCN:
 
         self.model.add( Dense( 2 ) ) # "The softmax layer computes the probability values for the predicted class."
         self.model.add( Activation( "softmax" ) )
-        self.model.summary()
+        if verbose:
+            self.model.summary()
 
         self.model.compile(
             # optimizer=Adam(
