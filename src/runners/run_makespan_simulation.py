@@ -18,9 +18,9 @@ from utilities.makespan_utils import *
 
 
 MODELS_TO_RUN = [
-    'FCN',
-    'RNN',
-    'VanillaTransformer',
+    # 'FCN',
+    # 'RNN',
+    # 'VanillaTransformer',
     # 'OOP_Transformer',
     'OOP_Transformer_small'
     ]
@@ -54,7 +54,7 @@ if __name__ == '__main__':
     for i in range( len( gpus ) ):
         try:
             tf.config.experimental.set_memory_growth(device=gpus[i], enable=True)
-            tf.config.experimental.VirtualDeviceConfiguration( memory_limit = 1024*3 )
+            tf.config.experimental.VirtualDeviceConfiguration( memory_limit = 1024*6 )
             print( f"\t{tf.config.experimental.get_device_details( device=gpus[i] )}" )
         except RuntimeError as e:
             print( '\n', e, '\n' )
@@ -73,6 +73,9 @@ if __name__ == '__main__':
 
         X_train_sampled = dp.X_train_sampled
         trunc_data = dp.truncData
+
+        if not os.path.exists('../../data/makespan_data/'):
+            os.makedirs('../../data/makespan_data/')
 
         print('Creating X_train_sampled...', end='')
         with open('../../data/makespan_data/X_train_sampled.npy', 'wb') as f:
@@ -95,11 +98,11 @@ if __name__ == '__main__':
     makespan_models = {}
 
     # If True it will run pipeline: load models, predict (if True) and generate metrics, if False it will generate metrics from saved files
-    compute = False
+    compute = True
     # If True, it will save dicts upon metric generation
-    save_dicts = True
+    save_dicts = False
     # If True it will save generated plots
-    save_plots = True
+    save_plots = False
     with open('../saved_data/makespan/makespan_results.txt', 'r') as f:
         res = json.loads(f.read())
     if compute:
