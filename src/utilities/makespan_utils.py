@@ -1,4 +1,5 @@
 import sys, os, json
+import random
 sys.path.append(os.path.realpath('../'))
 # print(sys.path)
 
@@ -47,11 +48,16 @@ def expected_makespan( MTF, MTN, MTS, P_TP, P_FN, P_TN, P_FP ):
     return -( MTF*P_FP + MTN*P_FN + MTN*P_TN + MTS*P_TP + 1) / (P_FN + P_FP + P_TN - 1)
 
 
-def make_predictions(model_name: str, model: tf.keras.Model, dp: DataPreprocessing, verbose: bool = False):
+def monitored_makespan( MTS, MTF, MTN, P_TP, P_FN, P_TN, P_FP, P_NCS, P_NCF ):
+    """ Closed form makespan for monitored case, symbolic simplification from Mathematica """
+    return (1 + MTF*(P_FP + P_NCF) + MTS*(P_NCS + P_TP) + MTN*(P_FN + P_TN) ) / (1 - P_FN - P_FP - P_TN)
+
+
+def make_predictions(model_name: str, model: tf.keras.Model, trunc_data, verbose: bool = False):
     episode_predictions = []
     rolling_window_width = int(7.0 * 50)
     print( f"Each window is {rolling_window_width} timesteps long!" )
-    for ep_index, episode in enumerate(dp.truncData):
+    for ep_index, episode in enumerate(trunc_data):
         with tf.device('/GPU:0'):
             print(f'Episode {ep_index}')
             time_steps = episode.shape[0]
@@ -76,7 +82,64 @@ def make_predictions(model_name: str, model: tf.keras.Model, dp: DataPreprocessi
     np.save(f'../saved_data/episode_predictions/{model_name}_episode_predictions.npy', episode_predictions, allow_pickle=True)
 
 
-def run_makespan_prediction_for_model(model_name: str, model: tf.keras.Model, dp: DataPreprocessing, verbose: bool = False):
+
+def classify(model: tf.keras.Model, episode: np.ndarray, true_label: float, window_width: int):
+    with tf.device('/GPU:0'):
+        time_steps = episode.shape[0]
+        n_windows = time_steps - window_width + 1
+        episode_X_list = []
+        for i in range(n_windows):
+            episode_window = episode[i:i + window_width, :]
+            episode_X_list.append(episode_window[:, 1:7])
+        episode_X = tf.stack(episode_X_list)
+        prediction = model.predict(episode_X, use_multiprocessing=True)
+        ans, t_c, row = scan_output_for_decision(
+            np.array(prediction),
+            np.array([tf.keras.utils.to_categorical(true_label, num_classes=2)] * len(prediction)),
+            threshold=0.9
+        )
+
+    # Return the classification answer and the time (in seconds) at which the classification happened
+    return ans, t_c * (20 / 1000)
+
+
+def run_simulation(model: tf.keras.Model, episodes: list, n_simulations: int = 1000, verbose: bool = False):
+    rolling_window_width = int(7.0 * 50)
+    total_time = 0
+    mks = []
+    for i in range(n_simulations):
+        if verbose:    
+            print(f'Simulation {i+1}/{n_simulations}:')
+        win = False
+        makespan = 0
+        while not win:
+            ep = random.choice(episodes)
+            episode_time = ep.shape[0] * (20 / 1000)
+            true_label = 0.0
+            if ep[0, 7] == 0.0:
+                true_label = 1.0
+            ans, t_c = classify(model=model, episode=ep, true_label=true_label, window_width=rolling_window_width)
+            if ans == 'NC':
+                # If true_label == failure
+                if true_label == 1.0:
+                    makespan += episode_time
+                # If true_label == success
+                elif true_label == 0.0:
+                    makespan += episode_time
+                    win = True
+            else:
+                if ans == 'TN' or ans == 'FP':
+                    makespan += t_c
+                elif ans == 'TP' or ans == 'FN':
+                    makespan += episode_time
+                    win = True
+        total_time += makespan
+        mks.append(makespan)
+    return total_time / n_simulations, mks
+
+
+
+def run_makespan_prediction_for_model(model_name: str, verbose: bool = False):
     perf = CounterDict()
 
     N_posCls  = 0 # --------- Number of positive classifications
@@ -117,7 +180,16 @@ def run_makespan_prediction_for_model(model_name: str, model: tf.keras.Model, dp
 
         print(f'Window {n_steps}/{n_windows}: Prediction = [{row[0]:.2f}, {row[1]:.2f}] | True label = {true_label} | Answer = {ans}')
 
-        perf.count(ans)
+        # perf.count(ans)
+        if ans == 'NC':
+            if true_label == 0.0:
+                perf.count('NCS')
+            elif true_label == 1.0:
+                perf.count('NCF')
+        else:
+            perf.count(ans)
+
+
 
         # Measure time performance
         # episode_len_s = n_steps * ts_s
@@ -129,11 +201,11 @@ def run_makespan_prediction_for_model(model_name: str, model: tf.keras.Model, dp
         episode_obj.answer = ans
         episode_obj.runTime = episode_len_s
 
-        if true_label == 1.0:
+        if true_label == 0.0:
             MTS += episode_len_s
             N_success += 1
             episode_obj.TTS = episode_len_s
-        elif true_label == 0.0:
+        elif true_label == 1.0:
             MTF += episode_len_s
             N_failure += 1
             episode_obj.TTF = episode_len_s
@@ -161,7 +233,7 @@ def run_makespan_prediction_for_model(model_name: str, model: tf.keras.Model, dp
         # Actual Negatives
         'TN' : (perf['TN'] if ('TN' in perf) else 0) / ((perf['TN'] if ('TN' in perf) else 0) + (perf['FP'] if ('FP' in perf) else 0)),
         'FP' : (perf['FP'] if ('FP' in perf) else 0) / ((perf['TN'] if ('TN' in perf) else 0) + (perf['FP'] if ('FP' in perf) else 0)),
-        'NC' : (perf['NC'] if ('NC' in perf) else 0) / len(dp.truncData),
+        'NC' : (perf['NCS'] + perf['NCF'] if ('NCS' in perf and 'NCF' in perf) else 0) / len(episode_predictions),
     }
 
     print()
@@ -209,14 +281,27 @@ def run_makespan_prediction_for_model(model_name: str, model: tf.keras.Model, dp
 
 
     print('    Expected makespan:', end=' ')
-    EMS = expected_makespan( 
+    # EMS = expected_makespan( 
+    #     MTF = MTF, 
+    #     MTN = MTN, 
+    #     MTS = MTS, 
+    #     P_TP = confMatx['TP'] * (N_success/(N_success + N_failure)) , 
+    #     P_FN = confMatx['FN'] * (N_success/(N_success + N_failure)) , 
+    #     P_TN = confMatx['TN'] * (N_failure/(N_success + N_failure)) , 
+    #     P_FP = confMatx['FP'] * (N_failure/(N_success + N_failure))  
+    # )
+    EMS = monitored_makespan(
         MTF = MTF, 
         MTN = MTN, 
         MTS = MTS, 
-        P_TP = confMatx['TP'] * (N_success/(N_success + N_failure)) , 
-        P_FN = confMatx['FN'] * (N_success/(N_success + N_failure)) , 
-        P_TN = confMatx['TN'] * (N_failure/(N_success + N_failure)) , 
-        P_FP = confMatx['FP'] * (N_failure/(N_success + N_failure))  
+        P_TP = confMatx['TP'] * (N_success/(N_success + N_failure)), 
+        P_FN = confMatx['FN'] * (N_success/(N_success + N_failure)), 
+        P_TN = confMatx['TN'] * (N_failure/(N_success + N_failure)), 
+        P_FP = confMatx['FP'] * (N_failure/(N_success + N_failure)),
+        # P_NCS = perf['NCS'] / (confMatx['NC']),
+        # P_NCF = perf['NCF'] / (confMatx['NC'])
+        P_NCS = perf['NCS'] / len(episode_predictions),
+        P_NCF = perf['NCF'] / len(episode_predictions)
     )
     print( EMS, end=' [s]' )
     metrics = {
@@ -228,7 +313,9 @@ def run_makespan_prediction_for_model(model_name: str, model: tf.keras.Model, dp
         'P_TP': confMatx['TP'] * (N_success/(N_success + N_failure)),
         'P_FN': confMatx['FN'] * (N_success/(N_success + N_failure)),
         'P_TN': confMatx['TN'] * (N_failure/(N_success + N_failure)),
-        'P_FP': confMatx['FP'] * (N_failure/(N_success + N_failure))
+        'P_FP': confMatx['FP'] * (N_failure/(N_success + N_failure)),
+        'P_NCS': perf['NCS'] / len(episode_predictions),
+        'P_NCF': perf['NCF'] / len(episode_predictions)
     }
     return metrics, confMatx, times
 
@@ -336,3 +423,38 @@ def plot_runtimes(res: dict, save_plots: bool = True):
         plt.clf()
     else:
         plt.plot()
+
+
+def plot_simulation_makespans(res: dict, models: list, save_plots: bool = True):
+    textstr_dict = dict.fromkeys(models, None)
+    for model_name in models:
+        if model_name != 'FCN':
+            hits = np.sum([1 if vt < fcn else 0 for vt, fcn in zip(res[model_name]['makespan_sim_hist'], res['FCN']['makespan_sim_hist'])])
+            performance = (hits * 100) / len(res[model_name]['makespan_sim_hist'])
+            textstr_dict[model_name] = ''.join(f'Makespan is lower for {performance:.2f}% of the episodes with {model_name} ({res[model_name]["makespan_sim_avg"]:.2f} \u00B1 {res[model_name]["makespan_sim_std"]:.2f})')
+
+    props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+
+    fig, axes = plt.subplots(1, 1, figsize=(20, 8))
+    axes.title.set_text(f'Simulated makespans for each model (N = {len(res[list(res.keys())[0]]["makespan_sim_hist"])})')
+    runtimes = []
+    for model_name in models:
+        runtimes.append(res[model_name]['makespan_sim_hist'])
+
+    axes.hist(runtimes, alpha=0.5, label=models, bins=10)
+    axes.legend()
+    axes.set_xlabel('Makespan [s]')
+    axes.set_ylabel('Count')
+    x = 0.15
+    y = 0.85
+    for model_name, textstr in textstr_dict.items():
+        if textstr is not None:
+            axes.text(x, y, textstr, transform=axes.transAxes, bbox=props, fontsize=20)
+            y -= 0.08
+
+    if save_plots:
+        plt.savefig('../saved_data/imgs/makespan_prediction/makespan_simulation_histogram.png')
+        plt.clf()
+    else:
+        plt.plot()
+

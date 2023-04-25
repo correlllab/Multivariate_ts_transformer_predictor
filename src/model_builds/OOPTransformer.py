@@ -35,7 +35,6 @@ class OOPTransformer:
             dropout_rate: float,
             mlp_dropout: float,
             mlp_units: List[int],
-            save_model: bool = True,
             verbose: bool = False
     ):
         self.model = Transformer(
@@ -45,12 +44,10 @@ class OOPTransformer:
             head_size=head_size,
             ff_dim=ff_dim,
             mlp_units=mlp_units,
-            input_space_size=6,
             target_space_size=2,
             training=True,
             dropout_rate=dropout_rate,
-            mlp_dropout=mlp_dropout,
-            pos_encoding=True
+            mlp_dropout=mlp_dropout
         )
 
         output = self.model(X_sample)
@@ -90,7 +87,7 @@ class OOPTransformer:
                 monitor='val_loss',
                 patience=10,
                 restore_best_weights=True,
-                start_from_epoch=epochs*0.2
+                start_from_epoch=epochs*0.1
             )
         ]
         self.history = self.model.fit(

@@ -23,25 +23,29 @@ class RNN:
         self.imgs_path = f'../saved_data/imgs/{self.model_name}/'
         self.histories_path = f'../saved_data/histories/{self.model_name}_history'
 
-    def build_model(self, input_shape, lstm_dim=128, dense_dim=2):
+    def build_model(self, input_shape, lstm_dim=128, lstm_dropout=0.2, dense_dim=2):
         model = tf.keras.Sequential()
         model.add(tf.keras.Input(shape=input_shape))
-        model.add(tf.keras.layers.LSTM(lstm_dim))
+        model.add(tf.keras.layers.LSTM(units=lstm_dim, dropout=lstm_dropout))
         model.add(tf.keras.layers.Dense(dense_dim, activation='softmax'))
 
         self.model = model
 
-    def fit(self, X_train, Y_train, X_test, Y_test, batch_size=64, epochs=200, save_model=True):
+    def fit(self, X_train, Y_train, X_test, Y_test, batch_size=256, epochs=200, save_model=True):
         self.build_model(
             input_shape=X_train.shape[1:],
             lstm_dim=128,
             dense_dim=2
         )
 
+        learning_rate = 1e-4
+        opt = tf.keras.optimizers.legacy.Adam(learning_rate)
+        opt = tf.keras.mixed_precision.LossScaleOptimizer(opt)
+        loss_object = tf.keras.losses.CategoricalCrossentropy()
         self.model.compile(
-            loss="binary_focal_crossentropy",
-            optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4),
-            metrics=["categorical_accuracy"]
+            loss=loss_object,
+            optimizer=opt,
+            metrics=[tf.keras.metrics.CategoricalAccuracy()]
         )
         self.model.summary()
 
@@ -50,7 +54,7 @@ class RNN:
                 monitor='val_loss',
                 patience=10,
                 restore_best_weights=True,
-                start_from_epoch=epochs*0.2
+                start_from_epoch=epochs*0.1
             )
         ]
 

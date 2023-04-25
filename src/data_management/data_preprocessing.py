@@ -1,4 +1,5 @@
 import sys, os, glob
+import random
 sys.path.append(os.path.realpath('../'))
 # print(sys.path)
 
@@ -133,7 +134,7 @@ class DataPreprocessing:
 
 
     def balance_window_data(self, verbose=False):
-        window_limit = 75000
+        window_limit = 100000
         positive_windows = []
         negative_windows = []
         positive_sum = 0.
@@ -400,5 +401,7 @@ class DataPreprocessing:
 
 if __name__ == '__main__':
     dp = DataPreprocessing(sampling='none', data='reactive')
-    dp.run(save_data=True, verbose=True)
+    dp.run(save_data=False, verbose=True)
+    print(type(dp.truncData))
+    print(type(random.choice(dp.truncData)))
     print('ALL OK')

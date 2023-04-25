@@ -9,7 +9,7 @@ from tensorflow.keras import regularizers
 # from MultiHeadAttention import MultiHeadAttention
 from Transformer.AttentionLayers import CrossAttention, CausalSelfAttention
 from Transformer.FeedForwardLayer import FeedForward
-from Transformer.PositionalEncoding import PositionalEmbedding
+from Transformer.PositionalEncoding import PositionalEncoding
 
 # from https://www.tensorflow.org/text/tutorials/transformer#define_the_components
 # Decoder layer
@@ -54,7 +54,7 @@ class Decoder(tf.keras.layers.Layer):
         self.d_model = d_model
         self.num_layers = num_layers
 
-        self.pos_embedding = PositionalEmbedding(space_size=space_size,
+        self.pos_embedding = PositionalEncoding(space_size=space_size,
                                                     d_model=d_model)
         self.dropout = tf.keras.layers.Dropout(dropout_rate)
         self.dec_layers = [
