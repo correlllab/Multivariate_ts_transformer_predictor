@@ -46,15 +46,39 @@ def plot_histories(histories: dict, num_folds: int, save:bool = True):
     else:
         plt.show()
 
-def plot_histories_average(histories: dict, save: bool = True):
+
+def find_min_max_len(values: list, num_folds: int):
+    base_min = 200
+    base_max = 0
+    for i in range(num_folds):
+        if len(values[i]) <= base_min:
+            base_min = len(values[i])
+
+        if len(values[i]) >= base_max:
+            base_max = len(values[i])
+
+    return base_min, base_max
+
+
+def plot_histories_average(histories: dict, num_folds: int, save: bool = True):
     for model, hist in histories.items():
         fig, axes = plt.subplots(2, 2, figsize=(15, 9))
         fig.tight_layout(pad=3.0)
 
-        acc_mean = np.mean([item['categorical_accuracy'] for item in histories[model]], axis=0)
-        val_acc_mean = np.mean([item['val_categorical_accuracy'] for item in histories[model]], axis=0)
-        loss_mean = np.mean([item['loss'] for item in histories[model]], axis=0)
-        val_loss_mean = np.mean([item['val_loss'] for item in histories[model]], axis=0)
+        accs = [item['categorical_accuracy'] for item in histories[model]]
+        val_accs = [item['val_categorical_accuracy'] for item in histories[model]]
+        losses = [item['loss'] for item in histories[model]]
+        val_losses = [item['val_loss'] for item in histories[model]]
+
+        acc_min_len, acc_max_len = find_min_max_len(values=accs, num_folds=num_folds)
+        val_acc_min_len, val_acc_max_len = find_min_max_len(values=val_accs, num_folds=num_folds)
+        loss_min_len, loss_max_len = find_min_max_len(values=losses, num_folds=num_folds)
+        val_loss_min_len, val_loss_max_len = find_min_max_len(values=val_losses, num_folds=num_folds)
+
+        acc_mean = np.mean([el[:acc_min_len] for el in accs], axis=0)
+        val_acc_mean = np.mean([el[:val_acc_min_len] for el in val_accs], axis=0)
+        loss_mean = np.mean([el[:loss_min_len] for el in losses], axis=0)
+        val_loss_mean = np.mean([el[:val_loss_min_len] for el in val_losses], axis=0)
 
         axes[0, 0].plot(acc_mean)
         for l in [item['categorical_accuracy'] for item in histories[model]]:
@@ -62,8 +86,8 @@ def plot_histories_average(histories: dict, save: bool = True):
         axes[0, 0].title.set_text(f'{model} mean training accuracy')
         axes[0, 0].legend(['Mean training accuracy', 'Training accuracy for each fold'])
         for fold_num, fold in enumerate([item['categorical_accuracy'] for item in histories[model]]):
-            axes[0, 0].text(len(fold) - 1, fold[-1], f'Fold {fold_num}', ha='left', va='center', size='small', color='grey')
-        axes[0, 0].set_xlim((-0.1, len(fold) - 0.9))
+            axes[0, 0].text(len(fold) - 1, fold[-1], f'  Fold {fold_num}', ha='left', va='center', size='small', color='grey')
+        axes[0, 0].set_xlim((-acc_max_len * 0.1, acc_max_len + acc_max_len * 0.1))
 
         axes[0, 1].plot(loss_mean, color='orange')
         for l in [item['loss'] for item in histories[model]]:
@@ -71,8 +95,8 @@ def plot_histories_average(histories: dict, save: bool = True):
         axes[0, 1].title.set_text(f'{model} mean training loss')
         axes[0, 1].legend(['Mean training loss', 'Training loss for each fold'])
         for fold_num, fold in enumerate([item['loss'] for item in histories[model]]):
-            axes[0, 1].text(len(fold) - 1, fold[-1], f'Fold {fold_num}', ha='left', va='center', size='small', color='grey')
-        axes[0, 1].set_xlim((-0.1, len(fold) - 0.9))
+            axes[0, 1].text(len(fold) - 1, fold[-1], f'  Fold {fold_num}', ha='left', va='center', size='small', color='grey')
+        axes[0, 1].set_xlim((-val_acc_max_len * 0.1, val_acc_max_len + val_acc_max_len * 0.1))
 
         axes[1, 0].plot(val_acc_mean)
         for l in [item['val_categorical_accuracy'] for item in histories[model]]:
@@ -80,8 +104,8 @@ def plot_histories_average(histories: dict, save: bool = True):
         axes[1, 0].title.set_text(f'{model} mean validation accuracy')
         axes[1, 0].legend(['Mean validation accuracy', 'Validation accuracy for each fold'])
         for fold_num, fold in enumerate([item['val_categorical_accuracy'] for item in histories[model]]):
-            axes[1, 0].text(len(fold) - 1, fold[-1], f'Fold {fold_num}', ha='left', va='center', size='small', color='grey')
-        axes[1, 0].set_xlim((-0.1, len(fold) - 0.9))
+            axes[1, 0].text(len(fold) - 1, fold[-1], f'  Fold {fold_num}', ha='left', va='center', size='small', color='grey')
+        axes[1, 0].set_xlim((-loss_max_len * 0.1, loss_max_len + loss_max_len * 0.1))
 
         axes[1, 1].plot(val_loss_mean, color='orange')
         for l in [item['val_loss'] for item in histories[model]]:
@@ -89,8 +113,8 @@ def plot_histories_average(histories: dict, save: bool = True):
         axes[1, 1].title.set_text(f'{model} mean validation loss')
         axes[1, 1].legend(['Mean validation loss', 'Validation loss for each fold'])
         for fold_num, fold in enumerate([item['val_loss'] for item in histories[model]]):
-            axes[1, 1].text(len(fold) - 1, fold[-1], f'Fold {fold_num}', ha='left', va='center', size='small', color='grey')
-        axes[1, 1].set_xlim((-0.1, len(fold) - 0.9))
+            axes[1, 1].text(len(fold) - 1, fold[-1], f'  Fold {fold_num}', ha='left', va='center', size='small', color='grey')
+        axes[1, 1].set_xlim((-val_loss_max_len * 0.1, val_loss_max_len + val_loss_max_len * 0.1))
 
         if save:
             plt.savefig(f'../saved_data/imgs/kfold_crossvalidation/{model}_mean_metrics.png')
@@ -201,7 +225,7 @@ if __name__ == "__main__":
     for dev in devices:
         print( f"\t{dev}" )
 
-    num_folds = 2
+    num_folds = 10
 
     if COMPUTE:
         dp = DataPreprocessing(sampling='under', data='reactive')
@@ -256,5 +280,5 @@ if __name__ == "__main__":
         with open('../saved_data/kfold_crossvalidation/histories.json', 'r') as f:
             histories = json.load(f)
 
-    plot_histories_average(histories=histories, save=True)
-    plot_histories(histories=histories, num_folds=num_folds, save=True)
+    plot_histories_average(histories=histories, num_folds=num_folds, save=True)
+    # plot_histories(histories=histories, num_folds=num_folds, save=True)
