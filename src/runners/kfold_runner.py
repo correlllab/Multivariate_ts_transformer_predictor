@@ -12,7 +12,7 @@ from sklearn.model_selection import KFold
 
 from data_management.data_preprocessing import DataPreprocessing
 from model_builds.FCN import FCN
-from model_builds.RNN import RNN
+from model_builds.RNN import RNN, GRU, LSTM
 from model_builds.VanillaTransformer import VanillaTransformer
 from model_builds.OOPTransformer import OOPTransformer
 
@@ -136,6 +136,16 @@ def build_rnn():
     return RNN()
 
 
+def build_gru():
+    # GRU
+    return GRU()
+
+
+def build_lstm():
+    # LSTM
+    return LSTM()
+
+
 def build_vanilla_transformer():
     # VanillaTransformer
     return VanillaTransformer()
@@ -189,6 +199,10 @@ def get_model(name: str, roll_win_width: int = 0, X_sample = None):
         return build_fcn(roll_win_width=roll_win_width)
     elif name == 'RNN':
         return build_rnn()
+    elif name == 'GRU':
+        return build_gru()
+    elif name == 'LSTM':
+        return build_lstm()
     elif name == 'VanillaTransformer':
         return build_vanilla_transformer()
     elif name == 'OOP_Transformer':
@@ -202,12 +216,15 @@ def get_model(name: str, roll_win_width: int = 0, X_sample = None):
 MODELS_TO_RUN = [
     'FCN',
     'RNN',
+    'GRU',
+    'LSTM',
     'VanillaTransformer',
     'OOP_Transformer',
     'OOP_Transformer_small'
     ]
 COMPUTE = True
 SAVE_HISTORIES = True
+SAVE_MODEL_SIZE = True
 
 if __name__ == "__main__":
     gpus = tf.config.experimental.list_physical_devices(device_type='GPU')
@@ -228,7 +245,7 @@ if __name__ == "__main__":
     num_folds = 10
 
     if COMPUTE:
-        dp = DataPreprocessing(sampling='under', data='reactive')
+        dp = DataPreprocessing(sampling='none', data='reactive')
         print(dp.datadir)
         dp.run(verbose=True)
 
@@ -243,6 +260,7 @@ if __name__ == "__main__":
         print(inputs.shape, targets.shape)
 
         histories = {key: [] for key in MODELS_TO_RUN}
+        model_n_params = {key: [] for key in MODELS_TO_RUN}
         fold_no = 1
         for train, test in kfold.split(inputs, targets):
             print(f'\nFold {fold_no}/{num_folds}:')
@@ -261,21 +279,30 @@ if __name__ == "__main__":
                 )
                 histories[model_name].append(model.history.history)
 
+                if fold_no == 1 and SAVE_MODEL_SIZE:
+                    model_n_params[model.model_name] = int(np.sum([np.prod(v.get_shape().as_list()) for v in model.model.trainable_variables]))
+
                 tf.keras.backend.clear_session()
+
+            if fold_no == 1 and SAVE_MODEL_SIZE:
+                with open('../saved_data/model_sizes_kfold.json', 'w') as f:
+                    json.dump(model_n_params, f)
 
             fold_no += 1
 
 
-        if not os.path.exists('../saved_data/imgs/kfold_crossvalidation/'):
-            os.makedirs('../saved_data/imgs/kfold_crossvalidation/')
+            if not os.path.exists('../saved_data/imgs/kfold_crossvalidation/'):
+                os.makedirs('../saved_data/imgs/kfold_crossvalidation/')
+
+            if SAVE_HISTORIES:
+                if not os.path.exists('../saved_data/kfold_crossvalidation/'):
+                    os.makedirs('../saved_data/kfold_crossvalidation/') 
+                with open('../saved_data/kfold_crossvalidation/histories.json', 'w') as f:
+                    json.dump(histories, f)
+
 
         print()
         print(histories)
-        if SAVE_HISTORIES:
-            if not os.path.exists('../saved_data/kfold_crossvalidation/'):
-                os.makedirs('../saved_data/kfold_crossvalidation/') 
-            with open('../saved_data/kfold_crossvalidation/histories.json', 'w') as f:
-                json.dump(histories, f)
     else:
         with open('../saved_data/kfold_crossvalidation/histories.json', 'r') as f:
             histories = json.load(f)

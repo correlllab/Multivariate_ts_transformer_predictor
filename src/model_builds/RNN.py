@@ -1,21 +1,16 @@
 import os, sys, pickle
+sys.path.append(os.path.realpath('../'))
 print(sys.version)
 print(sys.path)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # INFO and WARNING messages are not printed
-from random import choice
 import tensorflow as tf
-import matplotlib.pyplot as plt
-import numpy as np
-import seaborn as sns
 
 from data_management.data_preprocessing import DataPreprocessing
-from utilities.utils import CounterDict
-from utilities.helper_functions import scan_output_for_decision, graph_episode_output
 
 
-class RNN:
-    def __init__(self):
-        self.model_name = 'RNN'
+class BaseRNN:
+    def __init__(self, name: str = 'RNN'):
+        self.model_name = name
         self.model = None
         self.history = None
         self.evaluation = None
@@ -23,18 +18,11 @@ class RNN:
         self.imgs_path = f'../saved_data/imgs/{self.model_name}/'
         self.histories_path = f'../saved_data/histories/{self.model_name}_history'
 
-    def build_model(self, input_shape, lstm_dim=128, lstm_dropout=0.2, dense_dim=2):
-        model = tf.keras.Sequential()
-        model.add(tf.keras.Input(shape=input_shape))
-        model.add(tf.keras.layers.LSTM(units=lstm_dim, dropout=lstm_dropout))
-        model.add(tf.keras.layers.Dense(dense_dim, activation='softmax'))
-
-        self.model = model
-
-    def fit(self, X_train, Y_train, X_test, Y_test, batch_size=256, epochs=200, save_model=True, verbose=False):
+    def fit(self, X_train, Y_train, X_test, Y_test, batch_size=512, epochs=200, save_model=True, verbose=False):
         self.build_model(
             input_shape=X_train.shape[1:],
-            lstm_dim=128,
+            dim=128,
+            dropout=0.2,
             dense_dim=2
         )
 
@@ -78,6 +66,48 @@ class RNN:
                 pickle.dump(self.history.history, file_pi)
 
 
+class RNN(BaseRNN):
+    def __init__(self, name: str = 'RNN'):
+        super().__init__(name)
+
+
+    def build_model(self, input_shape, dim=128, dropout=0.2, dense_dim=2):
+        model = tf.keras.Sequential()
+        model.add(tf.keras.Input(shape=input_shape))
+        model.add(tf.keras.layers.SimpleRNN(units=dim, dropout=dropout))
+        model.add(tf.keras.layers.Dense(dense_dim, activation='softmax'))
+
+        self.model = model
+
+
+class GRU(BaseRNN):
+    def __init__(self, name: str = 'GRU'):
+        super().__init__(name)
+
+
+    def build_model(self, input_shape, dim=128, dropout=0.2, dense_dim=2):
+        model = tf.keras.Sequential()
+        model.add(tf.keras.Input(shape=input_shape))
+        model.add(tf.keras.layers.GRU(units=dim, dropout=dropout))
+        model.add(tf.keras.layers.Dense(dense_dim, activation='softmax'))
+
+        self.model = model
+
+
+class LSTM(BaseRNN):
+    def __init__(self, name: str = 'LSTM'):
+        super().__init__(name)
+
+
+    def build_model(self, input_shape, dim=128, dropout=0.2, dense_dim=2):
+        model = tf.keras.Sequential()
+        model.add(tf.keras.Input(shape=input_shape))
+        model.add(tf.keras.layers.LSTM(units=dim, dropout=dropout))
+        model.add(tf.keras.layers.Dense(dense_dim, activation='softmax'))
+
+        self.model = model
+
+
 if __name__ == '__main__':
     gpus = tf.config.experimental.list_physical_devices(device_type='GPU')
     print( f"Found {len(gpus)} GPUs!" )
@@ -95,14 +125,14 @@ if __name__ == '__main__':
         print( f"\t{dev}" )
         print()
 
-    dp = DataPreprocessing(sampling='none')
+    dp = DataPreprocessing(sampling='none', data='reactive')
     dp.run(save_data=False, verbose=True)
 
     X_train = dp.X_train_sampled
     Y_train = dp.Y_train_sampled
     X_test = dp.X_test
     Y_test = dp.Y_test
-    batch_size = 64
+    batch_size = 512
     epochs = 200
 
     rnn = RNN()
@@ -112,7 +142,8 @@ if __name__ == '__main__':
         X_test=X_test,
         Y_test=Y_test,
         batch_size=batch_size,
-        epochs=epochs
+        epochs=epochs,
+        verbose=True
     )
 
     # with open(f'./RNN_history', 'wb') as file_pi:
