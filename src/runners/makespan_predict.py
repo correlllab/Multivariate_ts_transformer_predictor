@@ -20,6 +20,8 @@ from utilities.makespan_utils import *
 MODELS_TO_RUN = [
     'FCN',
     # 'RNN',
+    # 'GRU',
+    # 'LSTM',
     # 'VanillaTransformer',
     # 'OOP_Transformer',
     # 'OOP_Transformer_small'

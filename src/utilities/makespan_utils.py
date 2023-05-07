@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 
 from random import choice
 from data_management.data_preprocessing import DataPreprocessing
-from utilities.utils import CounterDict
+from utilities.utils import CounterDict, set_size
 
 # Classes --------------------------------------------------------------------------
 class EpisodePerf:
@@ -138,7 +138,7 @@ def run_simulation(model: tf.keras.Model, episodes: list, n_simulations: int = 1
     return total_time / n_simulations, mks
 
 
-
+# TODO: fix this function, something wrong with MTP, MTN, MTS, MTF
 def run_makespan_prediction_for_model(model_name: str, verbose: bool = False):
     perf = CounterDict()
 
@@ -166,7 +166,8 @@ def run_makespan_prediction_for_model(model_name: str, verbose: bool = False):
     for episode in episode_predictions:
         predictions = episode[0]
         true_label = episode[1]
-        n_windows = len(predictions) - rolling_window_width + 1
+        n_windows = len(predictions)
+        episode_len_s = (n_windows + rolling_window_width - 1) * ts_s
         n_steps = 0
         for prediction in predictions:
             ans, ad_x, row = scan_output_for_decision(
@@ -189,11 +190,9 @@ def run_makespan_prediction_for_model(model_name: str, verbose: bool = False):
         else:
             perf.count(ans)
 
-
-
-        # Measure time performance
-        # episode_len_s = n_steps * ts_s
-        episode_len_s = (rolling_window_width + n_steps - 1) * ts_s
+        # episode len = number of rows of episode:
+        # episode_len_s = N_rows * ts_s
+        # episode_len_s = (rolling_window_width + n_steps - 1) * ts_s
         # episode_len_s = (rolling_window_width + X_episodes.shape[0] - 1) * ts_s
 
         episode_obj = EpisodePerf()
@@ -201,16 +200,7 @@ def run_makespan_prediction_for_model(model_name: str, verbose: bool = False):
         episode_obj.answer = ans
         episode_obj.runTime = episode_len_s
 
-        if true_label == 0.0:
-            MTS += episode_len_s
-            N_success += 1
-            episode_obj.TTS = episode_len_s
-        elif true_label == 1.0:
-            MTF += episode_len_s
-            N_failure += 1
-            episode_obj.TTF = episode_len_s
-
-        tAns_s = (ad_x + rolling_window_width - 1) * ts_s
+        tAns_s = (rolling_window_width + n_steps - 1) * ts_s
         if ans in ( 'TP', 'FP' ):
             MTP += tAns_s
             episode_obj.TTP = tAns_s
@@ -219,6 +209,18 @@ def run_makespan_prediction_for_model(model_name: str, verbose: bool = False):
             MTN += tAns_s
             episode_obj.TTN = tAns_s
             N_negCls += 1
+
+        # TODO: in James' code this is nested in else statement, but since Transformer
+        # has a NC rate of 0, MTS and MTF would never be updated resulting in division
+        # by zero further down the code (when computing the actual mean)
+        if true_label == 0.0:
+            MTS += episode_len_s
+            N_success += 1
+            episode_obj.TTS = episode_len_s
+        elif true_label == 1.0:
+            MTF += episode_len_s
+            N_failure += 1
+            episode_obj.TTF = episode_len_s
 
         timed_episodes.append(episode_obj)
 
@@ -254,30 +256,39 @@ def run_makespan_prediction_for_model(model_name: str, verbose: bool = False):
     print( f"Failure: {N_failure}" )
 
     if verbose:
-        print('MC BASELINE...')
+        print('MC MONITORED BASELINE...')
+
+
     N   = 200000 # Number of trials
     MTS = 0.0 # Mean time to success
+
+    print( f"Sampling {N} episodes from {len(timed_episodes)} trials" )
 
     for i in range(N):
         failing = 1
         TS_i    = 0.0
         while( failing ):
-            
+
             # Draw episode
-            ep = choice( timed_episodes )
-            
+            ep = choice(timed_episodes)
+
             # If classifier decides Negative, then we only take TTN hit but commit to another attempt
-            if ep.answer[1] == 'N':
+            if ep.answer[-1] == 'N':
                 failing = True
                 TS_i += ep.TTN
+                # if i%int(N/10) == 0:
+                #     print( ep.TTN )
             # Else we always let the episode play out and task makes decision for us
+            elif ep.answer[-1] == 'P':
+                failing = not int(ep.trueLabel)
+                TS_i += ep.runTime
             else:
-                failing = not int( ep.trueLabel )
+                failing = not int(ep.trueLabel)
                 TS_i += ep.runTime
         MTS += TS_i
         
     MTS /= N
-    print( f"\n    Task Mean Time to Success: {MTS} [s]" )
+    print( f"    Task Mean Time to Success: {MTS} [s]" )
 
 
     print('    Expected makespan:', end=' ')
@@ -303,7 +314,7 @@ def run_makespan_prediction_for_model(model_name: str, verbose: bool = False):
         P_NCS = perf['NCS'] / len(episode_predictions),
         P_NCF = perf['NCF'] / len(episode_predictions)
     )
-    print( EMS, end=' [s]' )
+    print( EMS, end=' [s]\n' )
     metrics = {
         'EMS': [EMS],
         'MTP': [MTP],
@@ -319,8 +330,27 @@ def run_makespan_prediction_for_model(model_name: str, verbose: bool = False):
     }
     return metrics, confMatx, times
 
+
 # Plotting ----------------------------------------------------------------------------
 def plot_mts_ems(res: dict, save_plots: bool = True):
+    # Setup
+    plt.style.use('seaborn')
+    # From Latex \textwidth
+    fig_width = 345
+    tex_fonts = {
+        # Use LaTeX to write all text
+        "text.usetex": True,
+        "font.family": "serif",
+        # Use 10pt font in plots, to match 10pt font in document
+        "axes.labelsize": 14,
+        "font.size": 14,
+        # Make the legend/label fonts a little smaller
+        "legend.fontsize": 12,
+        "xtick.labelsize": 12,
+        "ytick.labelsize": 12
+    }
+    plt.rcParams.update(tex_fonts)
+
     mts_time_reduction = 1 - (res['VanillaTransformer']['metrics']['MTS'][0] / res['FCN']['metrics']['MTS'][0])
     mts_textstr = ''.join(f'Mean Time to Success is decreased by {mts_time_reduction*100:.2f}%\nwith VanillaTransformer')
 
@@ -330,7 +360,8 @@ def plot_mts_ems(res: dict, save_plots: bool = True):
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
 
 
-    fig, axes = plt.subplots(1, 1, figsize=(20, 8))
+    fig, axes = plt.subplots(1, 1, figsize=set_size(fig_width))
+    fig.tight_layout()
     for model_name in res.keys():
         axes.bar([model_name], res[model_name]['metrics']['MTS'], label=model_name)
 
@@ -344,7 +375,8 @@ def plot_mts_ems(res: dict, save_plots: bool = True):
     else:
         plt.plot()
 
-    fig, axes = plt.subplots(1, 1, figsize=(20, 8))
+    fig, axes = plt.subplots(1, 1, figsize=set_size(fig_width))
+    fig.tight_layout()
     for model_name in res.keys():
         axes.bar([model_name], res[model_name]['metrics']['EMS'], alpha=0.5, label=model_name)
 
@@ -362,6 +394,24 @@ def plot_mts_ems(res: dict, save_plots: bool = True):
 
 
 def plot_model_confusion_matrix(model_name: str, conf_mat: dict, save_plot: bool = True):
+    # Setup
+    plt.style.use('seaborn')
+    # From Latex \textwidth
+    fig_width = 345
+    tex_fonts = {
+        # Use LaTeX to write all text
+        "text.usetex": True,
+        "font.family": "serif",
+        # Use 10pt font in plots, to match 10pt font in document
+        "axes.labelsize": 14,
+        "font.size": 14,
+        # Make the legend/label fonts a little smaller
+        "legend.fontsize": 12,
+        "xtick.labelsize": 12,
+        "ytick.labelsize": 12
+    }
+    plt.rcParams.update(tex_fonts)
+
     arr = [
         [conf_mat['TP'], conf_mat['FP']],
         [conf_mat['FN'], conf_mat['TN']]
@@ -380,7 +430,8 @@ def plot_model_confusion_matrix(model_name: str, conf_mat: dict, save_plot: bool
 
     # NC percentage visualization through stacked plots
     x = ['No classification', 'Actual Positives', 'Actual negatives']
-    fig, axes = plt.subplots(1, 1, figsize=(20, 8))
+    fig, axes = plt.subplots(1, 1, figsize=set_size(fig_width))
+    fig.tight_layout()
     if save_plot:
         nc = [conf_mat['NC'], 0, 0]
         tp = np.array([0, conf_mat['TP'], 0])
@@ -400,18 +451,37 @@ def plot_model_confusion_matrix(model_name: str, conf_mat: dict, save_plot: bool
 
 
 def plot_runtimes(res: dict, save_plots: bool = True):
+    # Setup
+    plt.style.use('seaborn')
+    # From Latex \textwidth
+    fig_width = 345
+    tex_fonts = {
+        # Use LaTeX to write all text
+        "text.usetex": True,
+        "font.family": "serif",
+        # Use 10pt font in plots, to match 10pt font in document
+        "axes.labelsize": 14,
+        "font.size": 14,
+        # Make the legend/label fonts a little smaller
+        "legend.fontsize": 12,
+        "xtick.labelsize": 12,
+        "ytick.labelsize": 12
+    }
+    plt.rcParams.update(tex_fonts)
+
     ems_hits = np.sum([1 if vt < fcn else 0 for vt, fcn in zip(res['VanillaTransformer']['times'], res['FCN']['times'])])
     ems_performance = (ems_hits * 100) / len(res['VanillaTransformer']['times'])
     ems_textstr = ''.join(f'Runtime is lower for {ems_performance:.2f}% of the episodes with VanillaTransformer')
 
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
 
-    fig, axes = plt.subplots(1, 1, figsize=(20, 8))
+    fig, axes = plt.subplots(1, 1, figsize=set_size(fig_width))
+    fig.tight_layout()
     axes.title.set_text('Runtimes for each model')
     runtimes = []
     for model_name in res.keys():
         runtimes.append(res[model_name]['times'])
-    
+
     axes.hist(runtimes, alpha=0.5, label=list(res.keys()), bins=10)
     axes.legend()
     axes.set_xlabel('Runtime [s]')
@@ -426,6 +496,24 @@ def plot_runtimes(res: dict, save_plots: bool = True):
 
 
 def plot_simulation_makespans(res: dict, models: list, save_plots: bool = True):
+    # Setup
+    plt.style.use('seaborn')
+    # From Latex \textwidth
+    fig_width = 345
+    tex_fonts = {
+        # Use LaTeX to write all text
+        "text.usetex": True,
+        "font.family": "serif",
+        # Use 10pt font in plots, to match 10pt font in document
+        "axes.labelsize": 14,
+        "font.size": 14,
+        # Make the legend/label fonts a little smaller
+        "legend.fontsize": 12,
+        "xtick.labelsize": 12,
+        "ytick.labelsize": 12
+    }
+    plt.rcParams.update(tex_fonts)
+
     textstr_dict = dict.fromkeys(models, None)
     for model_name in models:
         if model_name != 'FCN':
@@ -435,7 +523,8 @@ def plot_simulation_makespans(res: dict, models: list, save_plots: bool = True):
 
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
 
-    fig, axes = plt.subplots(1, 1, figsize=(20, 8))
+    fig, axes = plt.subplots(1, 1, figsize=set_size(fig_width))
+    fig.tight_layout()
     axes.title.set_text(f'Simulated makespans for each model (N = {len(res[list(res.keys())[0]]["makespan_sim_hist"])})')
     runtimes = []
     for model_name in models:

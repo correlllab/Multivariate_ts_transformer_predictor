@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 
 from sklearn.model_selection import KFold
 
+from utilities.utils import set_size
 from data_management.data_preprocessing import DataPreprocessing
 from model_builds.FCN import FCN
 from model_builds.RNN import RNN, GRU, LSTM
@@ -19,7 +20,25 @@ from model_builds.OOPTransformer import OOPTransformer
 
 
 def plot_histories(histories: dict, num_folds: int, save:bool = True):
-    fig, axes = plt.subplots(2*num_folds, len(histories.keys()), figsize=(25, 12))
+    # Setup
+    plt.style.use('seaborn')
+    # From Latex \textwidth
+    fig_width = 345
+    tex_fonts = {
+        # Use LaTeX to write all text
+        "text.usetex": True,
+        "font.family": "serif",
+        # Use 10pt font in plots, to match 10pt font in document
+        "axes.labelsize": 14,
+        "font.size": 14,
+        # Make the legend/label fonts a little smaller
+        "legend.fontsize": 12,
+        "xtick.labelsize": 12,
+        "ytick.labelsize": 12
+    }
+    plt.rcParams.update(tex_fonts)
+
+    fig, axes = plt.subplots(2*num_folds, len(histories.keys()), figsize=set_size(fig_width, subplots=(2*num_folds, len(histories.keys()))))
     fig.tight_layout(pad=3.0)
     model_ind = 0
     for model, hist in histories.items():
@@ -62,7 +81,25 @@ def find_min_max_len(values: list, num_folds: int):
 
 def plot_histories_average(histories: dict, num_folds: int, save: bool = True):
     for model, hist in histories.items():
-        fig, axes = plt.subplots(2, 2, figsize=(15, 9))
+        # Setup
+        plt.style.use('seaborn')
+        # From Latex \textwidth
+        fig_width = 345
+        tex_fonts = {
+            # Use LaTeX to write all text
+            "text.usetex": True,
+            "font.family": "serif",
+            # Use 10pt font in plots, to match 10pt font in document
+            "axes.labelsize": 14,
+            "font.size": 14,
+            # Make the legend/label fonts a little smaller
+            "legend.fontsize": 12,
+            "xtick.labelsize": 12,
+            "ytick.labelsize": 12
+        }
+        plt.rcParams.update(tex_fonts)
+
+        fig, axes = plt.subplots(2, 2, figsize=set_size(fig_width, subplots=(2, 2)))
         fig.tight_layout(pad=3.0)
 
         accs = [item['categorical_accuracy'] for item in histories[model]]
@@ -117,6 +154,8 @@ def plot_histories_average(histories: dict, num_folds: int, save: bool = True):
         axes[1, 1].set_xlim((-val_loss_max_len * 0.1, val_loss_max_len + val_loss_max_len * 0.1))
 
         if save:
+            if not os.path.exists('../saved_data/imgs/kfold_crossvalidation/'):
+                os.makedirs('../saved_data/imgs/kfold_crossvalidation/')
             plt.savefig(f'../saved_data/imgs/kfold_crossvalidation/{model}_mean_metrics.png')
             plt.clf()
             plt.close('all')
@@ -223,6 +262,8 @@ MODELS_TO_RUN = [
     'OOP_Transformer_small'
     ]
 COMPUTE = True
+DATA_MODE = 'create'
+# DATA_MODE = 'load'
 SAVE_HISTORIES = True
 SAVE_MODEL_SIZE = True
 
@@ -244,22 +285,40 @@ if __name__ == "__main__":
 
     num_folds = 10
 
+    if SAVE_HISTORIES:
+        if not os.path.exists('../saved_data/kfold_crossvalidation/'):
+            os.makedirs('../saved_data/kfold_crossvalidation/')
+
     if COMPUTE:
-        dp = DataPreprocessing(sampling='none', data='reactive')
-        print(dp.datadir)
-        dp.run(verbose=True)
+        if DATA_MODE == 'create':
+            dp = DataPreprocessing(sampling='under', data='reactive')
+            print(dp.datadir)
+            dp.run(verbose=True)
 
-        # Define the K-fold Cross Validator
-        kfold = KFold(n_splits=num_folds, shuffle=True)
+            # Define the K-fold Cross Validator
+            kfold = KFold(n_splits=num_folds, shuffle=True)
 
-        print('ALL OK')
+            print('ALL OK')
 
-        # Merge inputs and targets
-        inputs = np.concatenate((dp.X_train_sampled, dp.X_test), axis=0)
-        targets = np.concatenate((dp.Y_train_sampled, dp.Y_test), axis=0)
-        print(inputs.shape, targets.shape)
+            # Merge inputs and targets
+            # inputs = np.concatenate((dp.X_train_sampled, dp.X_test), axis=0)
+            # targets = np.concatenate((dp.Y_train_sampled, dp.Y_test), axis=0)
+            inputs = dp.X_train_sampled
+            targets = dp.Y_train_sampled
+            print(inputs.shape, targets.shape)
+        elif DATA_MODE == 'load':
+            pass
 
-        histories = {key: [] for key in MODELS_TO_RUN}
+        if os.path.exists('../saved_data/kfold_crossvalidation/histories.json'):
+            with open('../saved_data/kfold_crossvalidation/histories.json') as f:
+                histories = json.load(f)
+            print('\nLoaded histories from file\n')
+            for model_name in MODELS_TO_RUN:
+                histories[model_name] = []
+        else:
+            histories = {key: [] for key in MODELS_TO_RUN}
+        histories['num_folds'] = 0
+
         model_n_params = {key: [] for key in MODELS_TO_RUN}
         fold_no = 1
         for train, test in kfold.split(inputs, targets):
@@ -289,14 +348,10 @@ if __name__ == "__main__":
                     json.dump(model_n_params, f)
 
             fold_no += 1
+            histories['num_folds'] += 1
 
-
-            if not os.path.exists('../saved_data/imgs/kfold_crossvalidation/'):
-                os.makedirs('../saved_data/imgs/kfold_crossvalidation/')
 
             if SAVE_HISTORIES:
-                if not os.path.exists('../saved_data/kfold_crossvalidation/'):
-                    os.makedirs('../saved_data/kfold_crossvalidation/') 
                 with open('../saved_data/kfold_crossvalidation/histories.json', 'w') as f:
                     json.dump(histories, f)
 
@@ -307,5 +362,6 @@ if __name__ == "__main__":
         with open('../saved_data/kfold_crossvalidation/histories.json', 'r') as f:
             histories = json.load(f)
 
-    plot_histories_average(histories=histories, num_folds=num_folds, save=True)
+
+    plot_histories_average(histories=histories, num_folds=histories['num_folds'], save=True)
     # plot_histories(histories=histories, num_folds=num_folds, save=True)

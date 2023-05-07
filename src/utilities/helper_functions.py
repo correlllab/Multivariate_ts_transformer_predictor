@@ -1,15 +1,42 @@
+import sys, os
+sys.path.append(os.path.realpath('../'))
+# print(sys.path)
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # INFO and WARNING messages are not printed
+
 import math
 import numpy as np
 import matplotlib.pyplot as plt
 import tensorflow as tf
 
+from utilities.utils import set_size
+
 # Some helper functions
 def graph_episode_output( res, index, ground_truth, out_decision, net, imgs_path, ts_ms = 20, save_fig=False ):
     """ Graph the result of `simulate_episode_input` """
+    # Setup
+    plt.style.use('seaborn')
+    # From Latex \textwidth
+    fig_width = 345
+    tex_fonts = {
+        # Use LaTeX to write all text
+        "text.usetex": True,
+        "font.family": "serif",
+        # Use 10pt font in plots, to match 10pt font in document
+        "axes.labelsize": 14,
+        "font.size": 14,
+        # Make the legend/label fonts a little smaller
+        "legend.fontsize": 12,
+        "xtick.labelsize": 12,
+        "ytick.labelsize": 12
+    }
+    plt.rcParams.update(tex_fonts)
+
     N = res.shape[0]
     L = res.transpose()
     X = np.arange(0, N*ts_ms, ts_ms) 
-    plt.figure()
+    plt.figure(figsize=set_size(fig_width))
+    plt.tight_layout()
     # print( X.shape, L.shape )
     plt.stackplot(X, *L, labels=("Pr(Pass)", "Pr(Fail)"), baseline='zero')
     plt.axhline(y = 0.9, color = 'black', linestyle = '--')

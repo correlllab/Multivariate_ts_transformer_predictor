@@ -12,6 +12,8 @@ sys.path.append(os.path.realpath('../'))
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # INFO and WARNING messages are not printed
 
+from utilities.utils import set_size
+
 
 model_name_table = {
     'FCN': 'FCN', 
@@ -23,7 +25,26 @@ model_name_table = {
 
 
 def plot_model_sizes(sizes: dict):
-    fig, ax = plt.subplots(figsize=(15, 10))
+    # Setup
+    plt.style.use('seaborn')
+    # From Latex \textwidth
+    fig_width = 345
+    tex_fonts = {
+        # Use LaTeX to write all text
+        "text.usetex": True,
+        "font.family": "serif",
+        # Use 10pt font in plots, to match 10pt font in document
+        "axes.labelsize": 14,
+        "font.size": 14,
+        # Make the legend/label fonts a little smaller
+        "legend.fontsize": 12,
+        "xtick.labelsize": 12,
+        "ytick.labelsize": 12
+    }
+    plt.rcParams.update(tex_fonts)
+
+    fig, ax = plt.subplots(figsize=set_size(fig_width))
+    fig.tight_layout()
     # sort dict (greater to lower)
     sizes = sorted(sizes.items(), key=lambda item: item[1], reverse=False)
     # colors = ['r', 'g', 'b', 'y']

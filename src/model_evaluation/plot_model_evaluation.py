@@ -9,6 +9,8 @@ sys.path.append(os.path.realpath('../'))
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # INFO and WARNING messages are not printed
 
+from utilities.utils import set_size
+
 
 # function to add value labels
 def add_labels(x, y):
@@ -18,7 +20,26 @@ def add_labels(x, y):
 
 
 def nc_bar_plot(labels, vals, save_plot=True):
-    plt.figure(figsize=(10, 5))
+    # Setup
+    plt.style.use('seaborn')
+    # From Latex \textwidth
+    fig_width = 345
+    tex_fonts = {
+        # Use LaTeX to write all text
+        "text.usetex": True,
+        "font.family": "serif",
+        # Use 10pt font in plots, to match 10pt font in document
+        "axes.labelsize": 14,
+        "font.size": 14,
+        # Make the legend/label fonts a little smaller
+        "legend.fontsize": 12,
+        "xtick.labelsize": 12,
+        "ytick.labelsize": 12
+    }
+    plt.rcParams.update(tex_fonts)
+
+    plt.figure(figsize=set_size(fig_width))
+    plt.tight_layout()
     plt.bar(x=labels, height=vals)
     add_labels(names, values)
 
@@ -36,8 +57,27 @@ def nc_bar_plot(labels, vals, save_plot=True):
 
 
 def stacked_conf_mat_bar_plot(conf_mat: dict, model_name: str, save_plot: bool = True):
+    # Setup
+    plt.style.use('seaborn')
+    # From Latex \textwidth
+    fig_width = 345
+    tex_fonts = {
+        # Use LaTeX to write all text
+        "text.usetex": True,
+        "font.family": "serif",
+        # Use 10pt font in plots, to match 10pt font in document
+        "axes.labelsize": 14,
+        "font.size": 14,
+        # Make the legend/label fonts a little smaller
+        "legend.fontsize": 12,
+        "xtick.labelsize": 12,
+        "ytick.labelsize": 12
+    }
+    plt.rcParams.update(tex_fonts)
+
     x = ['No classification', 'Actual Positives', 'Actual negatives']
-    fig, axes = plt.subplots(figsize=(20, 8))
+    fig, axes = plt.subplots(figsize=set_size(fig_width))
+    fig.tight_layout()
     nc = [conf_mat['NC'], 0, 0]
     tp = np.array([0, conf_mat['TP'], 0])
     fn = np.array([0, conf_mat['FN'], 0])

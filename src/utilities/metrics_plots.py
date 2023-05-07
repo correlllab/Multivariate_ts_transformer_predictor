@@ -9,17 +9,36 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 import seaborn as sns
 
-from utilities.utils import CounterDict
+from utilities.utils import CounterDict, set_size
 from helper_functions import scan_output_for_decision, graph_episode_output
 
 
 def plot_acc_loss(history, imgs_path):
+    # Setup
+    plt.style.use('seaborn')
+    # From Latex \textwidth
+    fig_width = 345
+    tex_fonts = {
+        # Use LaTeX to write all text
+        "text.usetex": True,
+        "font.family": "serif",
+        # Use 10pt font in plots, to match 10pt font in document
+        "axes.labelsize": 14,
+        "font.size": 14,
+        # Make the legend/label fonts a little smaller
+        "legend.fontsize": 12,
+        "xtick.labelsize": 12,
+        "ytick.labelsize": 12
+    }
+    plt.rcParams.update(tex_fonts)
+
     loss = history.history['loss']
     val_loss = history.history['val_loss']
     accuracy = history.history['categorical_accuracy']
     val_accuracy = history.history['val_categorical_accuracy']
 
-    fig, axes = plt.subplots(2, 2, figsize=(20, 8))
+    fig, axes = plt.subplots(2, 2, figsize=set_size(fig_width, subplots=(2, 2)))
+    fig.tight_layout()
     axes[0, 0].plot(accuracy, label='Training accuracy')
     axes[0, 0].title.set_text('Training accuracy over epochs')
     axes[0, 1].plot(np.array(loss), label='Training loss', color='orange')
@@ -71,6 +90,7 @@ def compute_confusion_matrix(model, file_name, imgs_path, X_winTest, Y_winTest, 
             [confMatx['TP'], confMatx['FP']],
             [confMatx['FN'], confMatx['TP']]
             ]
+        sns.set(font_scale=1.5)
         conf_mat = sns.heatmap(arr, annot=True).get_figure()
         conf_mat.savefig(imgs_path + 'confusion_matrix.png')
 

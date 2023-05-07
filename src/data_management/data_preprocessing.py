@@ -16,6 +16,8 @@ from random import shuffle
 from copy import deepcopy
 from utilities.helper_functions import position_encode
 
+# SHUFFLING ONLY ON EPISODES!!!! NOT ON WINDOWS
+
 class DataPreprocessing:
     def __init__(self, sampling: str = 'over' or 'under', data: str = 'preemptive' or 'reactive' or 'training') -> None:
         self.sampling = sampling
@@ -133,40 +135,40 @@ class DataPreprocessing:
         self.window_data = windowData
 
 
-    def balance_window_data(self, verbose=False):
-        window_limit = 100000
-        positive_windows = []
-        negative_windows = []
-        positive_sum = 0.
-        negative_sum = 0.
-        positive_flag = False
-        negative_flag = False
-        stop_flag = False
-        i = 0
-        while not stop_flag:
-            episode = self.window_data[i]
-            if episode[0,0,6] == 1.0:
-                if positive_sum <= window_limit:
-                    positive_sum += episode.shape[0]
-                    positive_windows.append(episode)
-                else:
-                    positive_flag = True
-            elif episode[0,0,6] == 0.0:
-                if negative_sum <= window_limit:
-                    negative_sum += episode.shape[0]
-                    negative_windows.append(episode)
-                else:
-                    negative_flag = True
+    # def balance_window_data(self, verbose=False):
+    #     window_limit = 100000
+    #     positive_windows = []
+    #     negative_windows = []
+    #     positive_sum = 0.
+    #     negative_sum = 0.
+    #     positive_flag = False
+    #     negative_flag = False
+    #     stop_flag = False
+    #     i = 0
+    #     while not stop_flag:
+    #         episode = self.window_data[i]
+    #         if episode[0,0,6] == 1.0:
+    #             if positive_sum <= window_limit:
+    #                 positive_sum += episode.shape[0]
+    #                 positive_windows.append(episode)
+    #             else:
+    #                 positive_flag = True
+    #         elif episode[0,0,6] == 0.0:
+    #             if negative_sum <= window_limit:
+    #                 negative_sum += episode.shape[0]
+    #                 negative_windows.append(episode)
+    #             else:
+    #                 negative_flag = True
 
-            stop_flag = (positive_flag and negative_flag)
-            i += 1
+    #         stop_flag = (positive_flag and negative_flag)
+    #         i += 1
 
-        if verbose:
-            print(f'Truncated to {positive_sum} positive windows and {negative_sum} negative windows')
+    #     if verbose:
+    #         print(f'Truncated to {positive_sum} positive windows and {negative_sum} negative windows')
 
-        # Concat the two lists and shuffle
-        self.window_data = [*positive_windows, *negative_windows]
-        shuffle(self.window_data)
+    #     # Concat the two lists and shuffle
+    #     self.window_data = [*positive_windows, *negative_windows]
+    #     shuffle(self.window_data)
 
 
     def stack_windows(self, verbose=False):
@@ -280,7 +282,7 @@ class DataPreprocessing:
         self.Y_test  = tf.keras.utils.to_categorical(self.Y_test, num_classes=2)
         if verbose:
             print( self.Y_train.shape, self.Y_test.shape )
-            print( f"\nThere are {pos} passing windows and {neg} failing windows!, Total: {pos+neg}" )
+            print( f"\nThere are {pos} ({(pos * 100) / (pos + neg):.2f}%) passing windows and {neg} ({(neg * 100) / (pos + neg):.2f}%) failing windows!, Total: {pos+neg}" )
 
 
     def capture_test_episodes(self, verbose=False):
@@ -332,7 +334,7 @@ class DataPreprocessing:
         if verbose:
             print('    ====> CLASSES DISTRIBUTION AFTER:')
             print(f'        Passes = {int(sum(self.Y_train_sampled[:,0]))}; Fails = {int(sum(self.Y_train_sampled[:,1]))}\n')
-            print(self.X_train_sampled.shape, self.Y_train_sampled.shape)
+    #         print(self.X_train_sampled.shape, self.Y_train_sampled.shape)
 
 
     def scale_data(self, verbose=False):
@@ -354,9 +356,9 @@ class DataPreprocessing:
         if verbose:
             print('\n====> Getting complete twist windows...\n')
         self.get_complete_twist_windows(verbose=verbose)
-        if verbose:
-            print('\n====> Balancing windows...\n')
-        self.balance_window_data(verbose=verbose)
+        # if verbose:
+        #     print('\n====> Balancing windows...\n')
+        # self.balance_window_data(verbose=verbose)
         if verbose:
             print('\n====> Stacking windows...\n')
         self.stack_windows(verbose=verbose)
@@ -376,6 +378,12 @@ class DataPreprocessing:
             save_dir = f'../../data/data_manager/{self.data_name}'
             if not os.path.exists(save_dir):
                 os.makedirs(save_dir)
+
+            with open(f'{save_dir}/{self.data_name}_X_train.npy', 'wb') as f:
+                np.save(f, self.X_train, allow_pickle=True)
+
+            with open(f'{save_dir}/{self.data_name}_Y_train.npy', 'wb') as f:
+                np.save(f, self.Y_train, allow_pickle=True)
 
             with open(f'{save_dir}/{self.data_name}_X_train_sampled.npy', 'wb') as f:
                 np.save(f, self.X_train_sampled, allow_pickle=True)
