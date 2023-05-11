@@ -408,7 +408,7 @@ class DataPreprocessing:
 
 
 if __name__ == '__main__':
-    dp = DataPreprocessing(sampling='none', data='reactive')
+    dp = DataPreprocessing(sampling='under', data='training')
     dp.run(save_data=False, verbose=True)
     print(type(dp.truncData))
     print(type(random.choice(dp.truncData)))

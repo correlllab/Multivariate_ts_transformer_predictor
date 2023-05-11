@@ -18,20 +18,23 @@ from utilities.utils import set_size
 model_name_table = {
     'FCN': 'FCN', 
     'RNN': 'RNN',
+    'GRU': 'GRU',
+    'LSTM': 'LSTM',
+    'Transformer': 'Transformer',
     'VanillaTransformer': 'Vanilla\nTransformer',
     'OOP_Transformer_small': 'OOP Transformer\n(small)',
     'OOP_Transformer': 'OOP Transformer (big)'
     }
 
 
-def plot_model_sizes(sizes: dict):
+def plot_model_sizes(sizes: dict, out_name: str = ''):
     # Setup
-    plt.style.use('seaborn')
+    # plt.style.use('seaborn')
     # From Latex \textwidth
-    fig_width = 345
+    fig_width = 600
     tex_fonts = {
         # Use LaTeX to write all text
-        "text.usetex": True,
+        # "text.usetex": True,
         "font.family": "serif",
         # Use 10pt font in plots, to match 10pt font in document
         "axes.labelsize": 14,
@@ -79,7 +82,11 @@ def plot_model_sizes(sizes: dict):
     plt.ylim((-sizes[-1][-1] * 1.15, sizes[-1][-1] * 1.15))
     # plt.legend()
     plt.title('Number of parameters')
-    plt.savefig('../saved_data/imgs/evaluation/model_sizes.png')
+    plt.tight_layout()
+    if out_name == '':
+        plt.savefig('../saved_data/imgs/evaluation/model_sizes.png')
+    else:
+        plt.savefig(f'../saved_data/imgs/evaluation/{out_name}.png')
 
 
 if __name__ == '__main__':

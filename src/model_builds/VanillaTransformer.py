@@ -101,7 +101,7 @@ class VanillaTransformer:
         self.model = tf.keras.Model(inputs, outputs)
 
 
-    def fit(self, X_train, Y_train, X_test, Y_test, batch_size=64, epochs=200, save_model=True, verbose=False):
+    def fit(self, X_train, Y_train, X_test, Y_test, batch_size=128, epochs=200, save_model=True, verbose=False):
         input_shape = X_train.shape[1:]
         self.build_model(
             input_shape,

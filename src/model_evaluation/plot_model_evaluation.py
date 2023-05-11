@@ -21,12 +21,12 @@ def add_labels(x, y):
 
 def nc_bar_plot(labels, vals, save_plot=True):
     # Setup
-    plt.style.use('seaborn')
+    # plt.style.use('seaborn')
     # From Latex \textwidth
-    fig_width = 345
+    fig_width = 600
     tex_fonts = {
         # Use LaTeX to write all text
-        "text.usetex": True,
+        # "text.usetex": True,
         "font.family": "serif",
         # Use 10pt font in plots, to match 10pt font in document
         "axes.labelsize": 14,
@@ -58,12 +58,12 @@ def nc_bar_plot(labels, vals, save_plot=True):
 
 def stacked_conf_mat_bar_plot(conf_mat: dict, model_name: str, save_plot: bool = True):
     # Setup
-    plt.style.use('seaborn')
+    # plt.style.use('seaborn')
     # From Latex \textwidth
-    fig_width = 345
+    fig_width = 550
     tex_fonts = {
         # Use LaTeX to write all text
-        "text.usetex": True,
+        # "text.usetex": True,
         "font.family": "serif",
         # Use 10pt font in plots, to match 10pt font in document
         "axes.labelsize": 14,
@@ -102,7 +102,10 @@ def stacked_conf_mat_bar_plot(conf_mat: dict, model_name: str, save_plot: bool =
 
     axes.legend()
     plt.ylim(top=1.1)
-    plt.title(f'{model_name} confusion matrix (preemptive dataset)')
+    if model_name == 'VanillaTransformer':
+        plt.title(f'Transformer confusion matrix (preemptive dataset)')
+    else:
+        plt.title(f'{model_name} confusion matrix (preemptive dataset)')
 
     if save_plot:
         plt.savefig(f'../saved_data/imgs/evaluation/{model_name}_stacked_conf_mat_preemptive.png')
@@ -112,7 +115,15 @@ def stacked_conf_mat_bar_plot(conf_mat: dict, model_name: str, save_plot: bool =
 
 
 if __name__ == '__main__':
-    model_names = ['FCN', 'RNN', 'VanillaTransformer', 'OOP_Transformer_small', 'OOP_Transformer']
+    model_names = [
+        'FCN',
+        # 'RNN',
+        # 'GRU',
+        # 'LSTM',
+        'VanillaTransformer',
+        # 'OOP_Transformer_small',
+        # 'OOP_Transformer'
+        ]
     confusion_matrices = dict.fromkeys(model_names)
 
     counter = 0

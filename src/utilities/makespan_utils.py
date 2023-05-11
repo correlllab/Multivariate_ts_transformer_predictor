@@ -53,6 +53,34 @@ def monitored_makespan( MTS, MTF, MTN, P_TP, P_FN, P_TN, P_FP, P_NCS, P_NCF ):
     return (1 + MTF*(P_FP + P_NCF) + MTS*(P_NCS + P_TP) + MTN*(P_FN + P_TN) ) / (1 - P_FN - P_FP - P_TN)
 
 
+def get_mts_mtf(trunc_data):
+    MTS = 0
+    MTF = 0
+    N_success = 0
+    N_failure = 0
+    ts_s      = 20.0/1000.0
+    rolling_window_width = int(7.0 * 50)
+    for ep_index, episode in enumerate(trunc_data):
+        episode_len_s = episode.shape[0] * ts_s
+        label = episode[0:rolling_window_width, :][0, 7]
+        if label == 0.0:
+            true_label = 1.0
+        elif label == 1.0:
+            true_label = 0.0
+
+        if true_label == 0.0:
+            MTS += episode_len_s
+            N_success += 1
+        elif true_label == 1.0:
+            MTF += episode_len_s
+            N_failure += 1
+
+    MTS /= N_success # Mean Time to Success
+    MTF /= N_failure # Mean Time to Failure
+
+    return MTS, MTF
+
+
 def make_predictions(model_name: str, model: tf.keras.Model, trunc_data, verbose: bool = False):
     episode_predictions = []
     rolling_window_width = int(7.0 * 50)
@@ -210,9 +238,7 @@ def run_makespan_prediction_for_model(model_name: str, verbose: bool = False):
             episode_obj.TTN = tAns_s
             N_negCls += 1
 
-        # TODO: in James' code this is nested in else statement, but since Transformer
-        # has a NC rate of 0, MTS and MTF would never be updated resulting in division
-        # by zero further down the code (when computing the actual mean)
+
         if true_label == 0.0:
             MTS += episode_len_s
             N_success += 1
@@ -332,14 +358,14 @@ def run_makespan_prediction_for_model(model_name: str, verbose: bool = False):
 
 
 # Plotting ----------------------------------------------------------------------------
-def plot_mts_ems(res: dict, save_plots: bool = True):
+def plot_mts_ems(res: dict, models_to_use: list, save_plots: bool = True):
     # Setup
-    plt.style.use('seaborn')
+    # plt.style.use('seaborn')
     # From Latex \textwidth
-    fig_width = 345
+    fig_width = 800
     tex_fonts = {
         # Use LaTeX to write all text
-        "text.usetex": True,
+        # "text.usetex": True,
         "font.family": "serif",
         # Use 10pt font in plots, to match 10pt font in document
         "axes.labelsize": 14,
@@ -352,18 +378,19 @@ def plot_mts_ems(res: dict, save_plots: bool = True):
     plt.rcParams.update(tex_fonts)
 
     mts_time_reduction = 1 - (res['VanillaTransformer']['metrics']['MTS'][0] / res['FCN']['metrics']['MTS'][0])
-    mts_textstr = ''.join(f'Mean Time to Success is decreased by {mts_time_reduction*100:.2f}%\nwith VanillaTransformer')
+    mts_textstr = ''.join(f'Mean Time to Success is decreased by {mts_time_reduction*100:.2f}%\nwith Transformer')
 
     ems_time_reduction = 1 - (res['VanillaTransformer']['metrics']['EMS'][0] / res['FCN']['metrics']['EMS'][0])
-    ems_textstr = ''.join(f'Makespan is decreased by {ems_time_reduction*100:.2f}%\nwith VanillaTransformer')
+    ems_textstr = ''.join(f'Makespan is decreased by {ems_time_reduction*100:.2f}%\nwith Transformer')
 
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
 
 
     fig, axes = plt.subplots(1, 1, figsize=set_size(fig_width))
-    fig.tight_layout()
+    # fig.tight_layout()
     for model_name in res.keys():
-        axes.bar([model_name], res[model_name]['metrics']['MTS'], label=model_name)
+        if model_name in models_to_use:
+            axes.bar([model_name], res[model_name]['metrics']['MTS'], label=model_name)
 
     axes.set_xlabel('Model')
     axes.set_ylabel('Mean time to Success [s]')
@@ -376,9 +403,10 @@ def plot_mts_ems(res: dict, save_plots: bool = True):
         plt.plot()
 
     fig, axes = plt.subplots(1, 1, figsize=set_size(fig_width))
-    fig.tight_layout()
+    # fig.tight_layout()
     for model_name in res.keys():
-        axes.bar([model_name], res[model_name]['metrics']['EMS'], alpha=0.5, label=model_name)
+        if model_name in models_to_use:
+            axes.bar([model_name], res[model_name]['metrics']['EMS'], alpha=0.5, label=model_name)
 
     # axes[1].legend()
     axes.set_xlabel('Model')
@@ -395,12 +423,12 @@ def plot_mts_ems(res: dict, save_plots: bool = True):
 
 def plot_model_confusion_matrix(model_name: str, conf_mat: dict, save_plot: bool = True):
     # Setup
-    plt.style.use('seaborn')
+    # plt.style.use('seaborn')
     # From Latex \textwidth
-    fig_width = 345
+    fig_width = 600
     tex_fonts = {
         # Use LaTeX to write all text
-        "text.usetex": True,
+        # "text.usetex": True,
         "font.family": "serif",
         # Use 10pt font in plots, to match 10pt font in document
         "axes.labelsize": 14,
@@ -419,7 +447,10 @@ def plot_model_confusion_matrix(model_name: str, conf_mat: dict, save_plot: bool
 
     sns.set(font_scale=2)
     if save_plot:
-        nc_textstr = ''.join(f'{model_name} has a {conf_mat["NC"]*100:.2f}% NC rate')
+        if model_name == 'VanillaTransformer':
+            nc_textstr = ''.join(f'Transformer has a {conf_mat["NC"]*100:.2f}% NC rate')
+        else:
+            nc_textstr = ''.join(f'{model_name} has a {conf_mat["NC"]*100:.2f}% NC rate')
         props = dict(boxstyle='round', facecolor='green', alpha=0.75)
         conf_mat_plot = sns.heatmap(arr, annot=True).get_figure()
         conf_mat_plot.text(0.43, 0.95, nc_textstr, bbox=props, fontsize=20, horizontalalignment='center', verticalalignment='top')
@@ -450,14 +481,14 @@ def plot_model_confusion_matrix(model_name: str, conf_mat: dict, save_plot: bool
         plt.show()
 
 
-def plot_runtimes(res: dict, save_plots: bool = True):
+def plot_runtimes(res: dict, models_to_use: list, save_plots: bool = True):
     # Setup
-    plt.style.use('seaborn')
+    # plt.style.use('seaborn')
     # From Latex \textwidth
-    fig_width = 345
+    fig_width = 600
     tex_fonts = {
         # Use LaTeX to write all text
-        "text.usetex": True,
+        # "text.usetex": True,
         "font.family": "serif",
         # Use 10pt font in plots, to match 10pt font in document
         "axes.labelsize": 14,
@@ -471,7 +502,7 @@ def plot_runtimes(res: dict, save_plots: bool = True):
 
     ems_hits = np.sum([1 if vt < fcn else 0 for vt, fcn in zip(res['VanillaTransformer']['times'], res['FCN']['times'])])
     ems_performance = (ems_hits * 100) / len(res['VanillaTransformer']['times'])
-    ems_textstr = ''.join(f'Runtime is lower for {ems_performance:.2f}% of the episodes with VanillaTransformer')
+    ems_textstr = ''.join(f'Runtime is lower for {ems_performance:.2f}% of the episodes with Transformer')
 
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
 
@@ -480,7 +511,8 @@ def plot_runtimes(res: dict, save_plots: bool = True):
     axes.title.set_text('Runtimes for each model')
     runtimes = []
     for model_name in res.keys():
-        runtimes.append(res[model_name]['times'])
+        if model_name in models_to_use:
+            runtimes.append(res[model_name]['times'])
 
     axes.hist(runtimes, alpha=0.5, label=list(res.keys()), bins=10)
     axes.legend()
@@ -497,12 +529,12 @@ def plot_runtimes(res: dict, save_plots: bool = True):
 
 def plot_simulation_makespans(res: dict, models: list, save_plots: bool = True):
     # Setup
-    plt.style.use('seaborn')
+    # plt.style.use('seaborn')
     # From Latex \textwidth
-    fig_width = 345
+    fig_width = 600
     tex_fonts = {
         # Use LaTeX to write all text
-        "text.usetex": True,
+        # "text.usetex": True,
         "font.family": "serif",
         # Use 10pt font in plots, to match 10pt font in document
         "axes.labelsize": 14,
@@ -519,7 +551,11 @@ def plot_simulation_makespans(res: dict, models: list, save_plots: bool = True):
         if model_name != 'FCN':
             hits = np.sum([1 if vt < fcn else 0 for vt, fcn in zip(res[model_name]['makespan_sim_hist'], res['FCN']['makespan_sim_hist'])])
             performance = (hits * 100) / len(res[model_name]['makespan_sim_hist'])
-            textstr_dict[model_name] = ''.join(f'Makespan is lower for {performance:.2f}% of the episodes with {model_name} ({res[model_name]["makespan_sim_avg"]:.2f} \u00B1 {res[model_name]["makespan_sim_std"]:.2f})')
+            if model_name == 'VanillaTransformer':
+                textstr_dict[model_name] = ''.join(f'Makespan is lower for {performance:.2f}% of the episodes\nwith Transformer ({res[model_name]["makespan_sim_avg"]:.2f} \u00B1 {res[model_name]["makespan_sim_std"]:.2f})')
+            else:
+                textstr_dict[model_name] = ''.join(f'Makespan is lower for {performance:.2f}% of the episodes\nwith {model_name} ({res[model_name]["makespan_sim_avg"]:.2f} \u00B1 {res[model_name]["makespan_sim_std"]:.2f})')
+
 
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
 
@@ -530,12 +566,15 @@ def plot_simulation_makespans(res: dict, models: list, save_plots: bool = True):
     for model_name in models:
         runtimes.append(res[model_name]['makespan_sim_hist'])
 
+    if 'VanillaTransformer' in models:
+        models = [m for m in models if m != 'VanillaTransformer']
+    models.append('Transformer')
     axes.hist(runtimes, alpha=0.5, label=models, bins=10)
     axes.legend()
     axes.set_xlabel('Makespan [s]')
     axes.set_ylabel('Count')
     x = 0.15
-    y = 0.85
+    y = 0.7
     for model_name, textstr in textstr_dict.items():
         if textstr is not None:
             axes.text(x, y, textstr, transform=axes.transAxes, bbox=props, fontsize=20)

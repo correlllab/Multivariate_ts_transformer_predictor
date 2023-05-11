@@ -41,7 +41,7 @@ if __name__ == '__main__':
         if not os.path.exists('../../data/eval_data/'):
             os.makedirs('../../data/eval_data/')
 
-        dp = DataPreprocessing(sampling='none', data='training')
+        dp = DataPreprocessing(sampling='under', data='training')
         dp.run(verbose=True)
 
         X_data = np.concatenate((dp.X_train_sampled, dp.X_test), axis=0)
@@ -76,9 +76,9 @@ if __name__ == '__main__':
         # model_names = ['RNN']
         # model_names = ['GRU']
         # model_names = ['LSTM']
-        # model_names = ['VanillaTransformer']
+        model_names = ['VanillaTransformer']
         # model_names = ['OOP_Transformer_small']
-        model_names = ['OOP_Transformer']
+        # model_names = ['OOP_Transformer']
 
         results = dict.fromkeys(
             model_names,

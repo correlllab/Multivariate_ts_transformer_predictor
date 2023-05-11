@@ -18,13 +18,13 @@ from utilities.makespan_utils import *
 
 
 MODELS_TO_RUN = [
-    # 'FCN',
+    'FCN',
     # 'RNN',
     # 'GRU',
     # 'LSTM',
-    # 'VanillaTransformer',
+    'VanillaTransformer',
     # 'OOP_Transformer',
-    'OOP_Transformer_small'
+    # 'OOP_Transformer_small'
     ]
 # MODE = 'create_data'
 MODE = 'load_data'
@@ -38,7 +38,7 @@ def load_keras_model(model_name: str, makespan_models: dict, verbose: bool = Tru
             print(f'--> Loaded {model_name}')
     except OSError as e:
         print(f'{e}: model {model_name}.keras does not exist!\n')
-    
+
 
 def load_keras_weights(model_build: OOPTransformer, model_name: str, makespan_models: dict, verbose: bool = True):
     try:
@@ -69,7 +69,7 @@ if __name__ == '__main__':
 
     if MODE == 'create_data':
         print('FETCHING DATA...')
-        dp = DataPreprocessing(sampling='none', data='reactive')
+        dp = DataPreprocessing(sampling='under', data='reactive')
         dp.shuffle = False
         dp.run(save_data=False, verbose=True)
 
@@ -100,11 +100,11 @@ if __name__ == '__main__':
     makespan_models = {}
 
     # If True it will run pipeline: load models, predict (if True) and generate metrics, if False it will generate metrics from saved files
-    compute = True
+    compute = False
     # If True, it will save dicts upon metric generation
-    save_dicts = False
+    save_dicts = True
     # If True it will save generated plots
-    save_plots = False
+    save_plots = True
     with open('../saved_data/makespan/makespan_results.txt', 'r') as f:
         res = json.loads(f.read())
     if compute:

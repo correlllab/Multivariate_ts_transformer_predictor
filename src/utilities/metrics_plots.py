@@ -15,12 +15,12 @@ from helper_functions import scan_output_for_decision, graph_episode_output
 
 def plot_acc_loss(history, imgs_path):
     # Setup
-    plt.style.use('seaborn')
+    # plt.style.use('seaborn')
     # From Latex \textwidth
-    fig_width = 345
+    fig_width = 800
     tex_fonts = {
         # Use LaTeX to write all text
-        "text.usetex": True,
+        # "text.usetex": True,
         "font.family": "serif",
         # Use 10pt font in plots, to match 10pt font in document
         "axes.labelsize": 14,
@@ -93,6 +93,7 @@ def compute_confusion_matrix(model, file_name, imgs_path, X_winTest, Y_winTest, 
         sns.set(font_scale=1.5)
         conf_mat = sns.heatmap(arr, annot=True).get_figure()
         conf_mat.savefig(imgs_path + 'confusion_matrix.png')
+        plt.close()
 
 
 def make_probabilities_plots(model, model_name, imgs_path, X_winTest, Y_winTest):

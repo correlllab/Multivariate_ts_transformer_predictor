@@ -283,7 +283,7 @@ if __name__ == "__main__":
     for dev in devices:
         print( f"\t{dev}" )
 
-    num_folds = 10
+    num_folds = 5
 
     if SAVE_HISTORIES:
         if not os.path.exists('../saved_data/kfold_crossvalidation/'):

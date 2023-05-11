@@ -22,7 +22,7 @@ MODELS_TO_RUN = [
     # 'RNN',
     # 'GRU',
     # 'LSTM',
-    # 'VanillaTransformer',
+    'VanillaTransformer',
     # 'OOP_Transformer',
     # 'OOP_Transformer_small'
     ]
@@ -99,7 +99,7 @@ if __name__ == '__main__':
     # If True it will run pipeline: load models, predict (if True) and generate metrics, if False it will generate metrics from saved files
     compute = True
     # If True it will run prediction inside computation pipeline, if False it will load predictions from npy file
-    predict = True
+    predict = False
     # If True, it will save dicts upon metric generation
     save_dicts = True
     # If True it will save generated plots
@@ -171,6 +171,8 @@ if __name__ == '__main__':
             oop_transformer_small.compile()
             load_keras_weights(model_build=oop_transformer_small, model_name='OOP_Transformer_small', makespan_models=makespan_models)
 
+        MTS, MTF = get_mts_mtf(trunc_data=trunc_data)
+
         for model_name, model in makespan_models.items():
             if model_name not in res.keys():
                 res[model_name] = {'metrics': {}, 'conf_mat': {}, 'times': []}
@@ -181,6 +183,8 @@ if __name__ == '__main__':
             res[model_name]['metrics'] = makespan_metrics
             res[model_name]['conf_mat'] = conf_mat
             res[model_name]['times'] = times
+            res[model_name]['metrics']['MTS'] = [MTS]
+            res[model_name]['metrics']['MTF'] = [MTF]
             print()
 
     print(f'res = {res}\n')
@@ -199,7 +203,7 @@ if __name__ == '__main__':
 
     print(f'metrics = {metrics}\n')
 
-    plot_mts_ems(res=res, save_plots=save_plots)
-    plot_runtimes(res=res, save_plots=save_plots)
+    plot_mts_ems(res=res, models_to_use=MODELS_TO_RUN, save_plots=save_plots)
+    # plot_runtimes(res=res, models_to_use=MODELS_TO_RUN, save_plots=save_plots)
     for model_name in res.keys():
         plot_model_confusion_matrix(model_name=model_name, conf_mat=res[model_name]['conf_mat'], save_plot=save_plots)

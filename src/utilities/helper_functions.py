@@ -15,12 +15,12 @@ from utilities.utils import set_size
 def graph_episode_output( res, index, ground_truth, out_decision, net, imgs_path, ts_ms = 20, save_fig=False ):
     """ Graph the result of `simulate_episode_input` """
     # Setup
-    plt.style.use('seaborn')
+    # plt.style.use('seaborn')
     # From Latex \textwidth
-    fig_width = 345
+    fig_width = 600
     tex_fonts = {
         # Use LaTeX to write all text
-        "text.usetex": True,
+        # "text.usetex": True,
         "font.family": "serif",
         # Use 10pt font in plots, to match 10pt font in document
         "axes.labelsize": 14,

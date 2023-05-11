@@ -112,22 +112,30 @@ MODELS_TO_RUN = [
     # 'FCN',
     # 'RNN',
     # 'GRU',
-    'LSTM',
-    # 'VanillaTransformer',
+    # 'LSTM',
+    'VanillaTransformer',
     # 'OOP_Transformer',
     # 'OOP_Transformer_small'
     ]
 
 
-def run_model(model, X_train, Y_train, X_test, Y_test, X_window_test, Y_window_test, model_n_params):
-    model.fit(
-        X_train=X_train,
-        Y_train=Y_train,
-        X_test=X_test,
-        Y_test=Y_test,
-        epochs=200,
-        save_model=True
-    )
+class hist_obj:
+    def __init__(self, h: dict) -> None:
+        self.history = h
+
+
+def run_model(model, X_train, Y_train, X_test, Y_test, X_window_test, Y_window_test, model_n_params, compute: bool = True):
+    if compute:
+        model.fit(
+            X_train=X_train,
+            Y_train=Y_train,
+            X_test=X_test,
+            Y_test=Y_test,
+            epochs=200,
+            save_model=True
+        )
+    else:
+        model.history = hist_obj(np.load(model.histories_path, allow_pickle=True))
     model_n_params[model.model_name] = int(np.sum([np.prod(v.get_shape().as_list()) for v in model.model.trainable_variables]))
     plot_acc_loss(history=model.history, imgs_path=model.imgs_path)
     compute_confusion_matrix(
@@ -165,7 +173,7 @@ if __name__ == '__main__':
     for dev in devices:
         print( f"\t{dev}" )
 
-    dp = DataPreprocessing(sampling='none', data=DATA)
+    dp = DataPreprocessing(sampling='under', data=DATA)
     if LOAD_DATA_FROM_FILES:
         print('\nLoading data from files...', end='')
         with open(f'{DATA_DIR}/{DATA}_X_train.npy', 'rb') as f:
@@ -222,7 +230,8 @@ if __name__ == '__main__':
             Y_test=Y_test,
             X_window_test=X_winTest,
             Y_window_test=Y_winTest,
-            model_n_params=model_n_params
+            model_n_params=model_n_params,
+            compute=True
         )
 
         with open('../saved_data/model_sizes.json', 'w') as f:
