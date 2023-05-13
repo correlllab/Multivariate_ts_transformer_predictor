@@ -59,7 +59,7 @@ def plot_acc_loss(history, imgs_path):
 def compute_confusion_matrix(model, file_name, imgs_path, X_winTest, Y_winTest, plot=False):
     perf = CounterDict()
 
-    for epNo in range( len( X_winTest ) ):    
+    for epNo in range( len( X_winTest ) ):
         print( '>', end=' ' )
         with tf.device('/GPU:0'):
             res = model.predict( X_winTest[epNo] )
@@ -88,12 +88,14 @@ def compute_confusion_matrix(model, file_name, imgs_path, X_winTest, Y_winTest, 
     if plot:
         arr = [
             [confMatx['TP'], confMatx['FP']],
-            [confMatx['FN'], confMatx['TP']]
+            [confMatx['FN'], confMatx['TN']]
             ]
         sns.set(font_scale=1.5)
         conf_mat = sns.heatmap(arr, annot=True).get_figure()
         conf_mat.savefig(imgs_path + 'confusion_matrix.png')
         plt.close()
+
+    return confMatx
 
 
 def make_probabilities_plots(model, model_name, imgs_path, X_winTest, Y_winTest):

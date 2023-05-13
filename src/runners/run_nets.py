@@ -109,7 +109,7 @@ DATA_DIR = f'../../data/data_manager/{DATA}'
 SAVE_DATA = True
 LOAD_DATA_FROM_FILES = True
 MODELS_TO_RUN = [
-    # 'FCN',
+    'FCN',
     # 'RNN',
     # 'GRU',
     # 'LSTM',
@@ -231,7 +231,7 @@ if __name__ == '__main__':
             X_window_test=X_winTest,
             Y_window_test=Y_winTest,
             model_n_params=model_n_params,
-            compute=True
+            compute=False
         )
 
         with open('../saved_data/model_sizes.json', 'w') as f:

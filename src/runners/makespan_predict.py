@@ -171,7 +171,7 @@ if __name__ == '__main__':
             oop_transformer_small.compile()
             load_keras_weights(model_build=oop_transformer_small, model_name='OOP_Transformer_small', makespan_models=makespan_models)
 
-        MTS, MTF = get_mts_mtf(trunc_data=trunc_data)
+        MTS, MTF, ps, pf = get_mts_mtf(trunc_data=trunc_data)
 
         for model_name, model in makespan_models.items():
             if model_name not in res.keys():

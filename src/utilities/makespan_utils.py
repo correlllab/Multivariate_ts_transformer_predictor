@@ -52,6 +52,9 @@ def monitored_makespan( MTS, MTF, MTN, P_TP, P_FN, P_TN, P_FP, P_NCS, P_NCF ):
     """ Closed form makespan for monitored case, symbolic simplification from Mathematica """
     return (1 + MTF*(P_FP + P_NCF) + MTS*(P_NCS + P_TP) + MTN*(P_FN + P_TN) ) / (1 - P_FN - P_FP - P_TN)
 
+def reactive_makespan(MTS, MTF, ps, pf):
+    return -(MTF * pf + MTS * ps + 1) / (pf - 1)
+
 
 def get_mts_mtf(trunc_data):
     MTS = 0
@@ -62,23 +65,18 @@ def get_mts_mtf(trunc_data):
     rolling_window_width = int(7.0 * 50)
     for ep_index, episode in enumerate(trunc_data):
         episode_len_s = episode.shape[0] * ts_s
-        label = episode[0:rolling_window_width, :][0, 7]
-        if label == 0.0:
-            true_label = 1.0
-        elif label == 1.0:
-            true_label = 0.0
-
-        if true_label == 0.0:
-            MTS += episode_len_s
-            N_success += 1
-        elif true_label == 1.0:
+        raw_label = episode[0:rolling_window_width, :][0, 7]
+        if raw_label == 0.0:
             MTF += episode_len_s
             N_failure += 1
+        elif raw_label == 1.0:
+            MTS += episode_len_s
+            N_success += 1
 
     MTS /= N_success # Mean Time to Success
     MTF /= N_failure # Mean Time to Failure
 
-    return MTS, MTF
+    return MTS, MTF, N_success/len(trunc_data), N_failure/len(trunc_data)
 
 
 def make_predictions(model_name: str, model: tf.keras.Model, trunc_data, verbose: bool = False):
@@ -128,16 +126,17 @@ def classify(model: tf.keras.Model, episode: np.ndarray, true_label: float, wind
         )
 
     # Return the classification answer and the time (in seconds) at which the classification happened
-    return ans, t_c * (20 / 1000)
+    return ans, t_c * (20.0 / 1000.0)
 
 
-def run_simulation(model: tf.keras.Model, episodes: list, n_simulations: int = 1000, verbose: bool = False):
-    rolling_window_width = int(7.0 * 50)
+def run_reactive_simulation(episodes: list, n_simulations: int = 100, verbose: bool = False):
     total_time = 0
     mks = []
     for i in range(n_simulations):
-        if verbose:    
-            print(f'Simulation {i+1}/{n_simulations}:')
+        if verbose:
+            # print(f'Simulation {i+1}/{n_simulations}:')
+            sys.stdout.write("\rSimulation %d/%d" % (i+1, n_simulations))
+            sys.stdout.flush()
         win = False
         makespan = 0
         while not win:
@@ -146,24 +145,133 @@ def run_simulation(model: tf.keras.Model, episodes: list, n_simulations: int = 1
             true_label = 0.0
             if ep[0, 7] == 0.0:
                 true_label = 1.0
+            # If true_label == failure
+            if true_label == 1.0:
+                makespan += episode_time
+            # If true_label == success
+            elif true_label == 0.0:
+                makespan += episode_time
+                win = True
+        total_time += makespan
+        mks.append(makespan)
+    return total_time / n_simulations, mks
+
+
+def run_simulation(model: tf.keras.Model, episodes: list, n_simulations: int = 1000, verbose: bool = False):
+    perf = CounterDict()
+    N_posCls  = 0 # --------- Number of positive classifications
+    N_negCls  = 0 # --------- Number of negative classifications
+    # N_success = 0 # --------- Number of true task successes
+    # N_failure = 0 # --------- Number of true task failures
+    ts_s      = 20.0/1000.0 # Seconds per timestep
+    MTP       = 0.0 # ------- Mean Time to Positive Classification
+    MTN       = 0.0 # ------- Mean Time to Negative Classification
+    # MTS       = 0.0 # ------- Mean Time to Success
+    # MTF       = 0.0 # ------- Mean Time to Failure
+    timed_episodes = []
+    rolling_window_width = int(7.0 * 50)
+    total_time = 0
+    mks = []
+    for i in range(n_simulations):
+        if verbose:
+            print(f'Simulation {i+1}/{n_simulations}:')
+        win = False
+        makespan = 0
+        while not win:
+            ep = random.choice(episodes)
+            episode_time = ep.shape[0] * ts_s
+            true_label = 0.0
+            if ep[0, 7] == 0.0:
+                true_label = 1.0
             ans, t_c = classify(model=model, episode=ep, true_label=true_label, window_width=rolling_window_width)
+
+            episode_obj = EpisodePerf()
+            episode_obj.trueLabel = true_label
+            episode_obj.answer = ans
+            episode_obj.runTime = episode_time
+
             if ans == 'NC':
                 # If true_label == failure
                 if true_label == 1.0:
                     makespan += episode_time
+
+                    perf.count('NCF')
                 # If true_label == success
                 elif true_label == 0.0:
                     makespan += episode_time
                     win = True
+
+                    perf.count('NCS')
             else:
+                perf.count(ans)
                 if ans == 'TN' or ans == 'FP':
                     makespan += t_c
                 elif ans == 'TP' or ans == 'FN':
                     makespan += episode_time
                     win = True
+
+                if ans in ( 'TP', 'FP' ):
+                    MTP += episode_time
+                    episode_obj.TTP = episode_time
+                    N_posCls += 1
+                elif ans in ( 'TN', 'FN' ):
+                    MTN += t_c
+                    episode_obj.TTN = t_c
+                    N_negCls += 1
+            timed_episodes.append(episode_obj)
         total_time += makespan
         mks.append(makespan)
-    return total_time / n_simulations, mks
+
+    times = []
+    for ep in timed_episodes:
+        times.append(ep.runTime)
+
+    confMatx = {
+        # Actual Positives
+        'TP' : (perf['TP'] if ('TP' in perf) else 0) / ((perf['TP'] if ('TP' in perf) else 0) + (perf['FN'] if ('FN' in perf) else 0)),
+        'FN' : (perf['FN'] if ('FN' in perf) else 0) / ((perf['TP'] if ('TP' in perf) else 0) + (perf['FN'] if ('FN' in perf) else 0)),
+        # Actual Negatives
+        'TN' : (perf['TN'] if ('TN' in perf) else 0) / ((perf['TN'] if ('TN' in perf) else 0) + (perf['FP'] if ('FP' in perf) else 0)),
+        'FP' : (perf['FP'] if ('FP' in perf) else 0) / ((perf['TN'] if ('TN' in perf) else 0) + (perf['FP'] if ('FP' in perf) else 0)),
+        'NC' : (perf['NCS'] + perf['NCF'] if ('NCS' in perf and 'NCF' in perf) else 0) / len(timed_episodes),
+    }
+
+    MTP /= N_posCls #- Mean Time to Positive Classification
+    MTN /= N_negCls #- Mean Time to Negative Classification
+    MTS, MTF, _, _ = get_mts_mtf(trunc_data=episodes)
+
+    print( f"MTP: {MTP} [s]" )
+    print( f"MTN: {MTN} [s]" )
+    print( f"MTP: {MTS} [s]" )
+    print( f"MTN: {MTF} [s]" )
+
+    EMS = monitored_makespan(
+        MTF = MTF, 
+        MTN = MTN, 
+        MTS = MTS,
+        P_TP = perf['TP'] / len(timed_episodes), 
+        P_FN = perf['FN'] / len(timed_episodes), 
+        P_TN = perf['TN'] / len(timed_episodes), 
+        P_FP = perf['FP'] / len(timed_episodes),
+        P_NCS = perf['NCS'] / len(timed_episodes),
+        P_NCF = perf['NCF'] / len(timed_episodes)
+    )
+    print( EMS, end=' [s]\n' )
+    metrics = {
+        'EMS': [EMS],
+        'MTP': [MTP],
+        'MTN': [MTN],
+        'MTS': [MTS],
+        'MTF': [MTF],
+        'P_TP': perf['TP'] / len(timed_episodes), 
+        'P_FN': perf['FN'] / len(timed_episodes), 
+        'P_TN': perf['TN'] / len(timed_episodes), 
+        'P_FP': perf['FP'] / len(timed_episodes),
+        'P_NCS': perf['NCS'] / len(timed_episodes),
+        'P_NCF': perf['NCF'] / len(timed_episodes)
+    }
+
+    return total_time / n_simulations, mks, metrics, confMatx
 
 
 # TODO: fix this function, something wrong with MTP, MTN, MTS, MTF
@@ -330,13 +438,11 @@ def run_makespan_prediction_for_model(model_name: str, verbose: bool = False):
     EMS = monitored_makespan(
         MTF = MTF, 
         MTN = MTN, 
-        MTS = MTS, 
-        P_TP = confMatx['TP'] * (N_success/(N_success + N_failure)), 
-        P_FN = confMatx['FN'] * (N_success/(N_success + N_failure)), 
-        P_TN = confMatx['TN'] * (N_failure/(N_success + N_failure)), 
-        P_FP = confMatx['FP'] * (N_failure/(N_success + N_failure)),
-        # P_NCS = perf['NCS'] / (confMatx['NC']),
-        # P_NCF = perf['NCF'] / (confMatx['NC'])
+        MTS = MTS,
+        P_TP = confMatx['TP'] / len(episode_predictions), 
+        P_FN = confMatx['FN'] / len(episode_predictions), 
+        P_TN = confMatx['TN'] / len(episode_predictions), 
+        P_FP = confMatx['FP'] / len(episode_predictions),
         P_NCS = perf['NCS'] / len(episode_predictions),
         P_NCF = perf['NCF'] / len(episode_predictions)
     )
@@ -347,10 +453,10 @@ def run_makespan_prediction_for_model(model_name: str, verbose: bool = False):
         'MTN': [MTN],
         'MTS': [MTS],
         'MTF': [MTF],
-        'P_TP': confMatx['TP'] * (N_success/(N_success + N_failure)),
-        'P_FN': confMatx['FN'] * (N_success/(N_success + N_failure)),
-        'P_TN': confMatx['TN'] * (N_failure/(N_success + N_failure)),
-        'P_FP': confMatx['FP'] * (N_failure/(N_success + N_failure)),
+        'P_TP': confMatx['TP'] / len(episode_predictions), 
+        'P_FN': confMatx['FN'] / len(episode_predictions), 
+        'P_TN': confMatx['TN'] / len(episode_predictions), 
+        'P_FP': confMatx['FP'] / len(episode_predictions),
         'P_NCS': perf['NCS'] / len(episode_predictions),
         'P_NCF': perf['NCF'] / len(episode_predictions)
     }
@@ -546,16 +652,20 @@ def plot_simulation_makespans(res: dict, models: list, save_plots: bool = True):
     }
     plt.rcParams.update(tex_fonts)
 
-    textstr_dict = dict.fromkeys(models, None)
+    # textstr_dict = dict.fromkeys(models, None)
+    means_textstr_dict = dict.fromkeys(models, None)
     for model_name in models:
-        if model_name != 'FCN':
-            hits = np.sum([1 if vt < fcn else 0 for vt, fcn in zip(res[model_name]['makespan_sim_hist'], res['FCN']['makespan_sim_hist'])])
-            performance = (hits * 100) / len(res[model_name]['makespan_sim_hist'])
-            if model_name == 'VanillaTransformer':
-                textstr_dict[model_name] = ''.join(f'Makespan is lower for {performance:.2f}% of the episodes\nwith Transformer ({res[model_name]["makespan_sim_avg"]:.2f} \u00B1 {res[model_name]["makespan_sim_std"]:.2f})')
-            else:
-                textstr_dict[model_name] = ''.join(f'Makespan is lower for {performance:.2f}% of the episodes\nwith {model_name} ({res[model_name]["makespan_sim_avg"]:.2f} \u00B1 {res[model_name]["makespan_sim_std"]:.2f})')
-
+        # if model_name != 'FCN':
+        #     hits = np.sum([1 if vt < fcn else 0 for vt, fcn in zip(res[model_name]['makespan_sim_hist'], res['FCN']['makespan_sim_hist'])])
+        #     performance = (hits * 100) / len(res[model_name]['makespan_sim_hist'])
+            # if model_name == 'VanillaTransformer':
+            #     textstr_dict[model_name] = ''.join(f'Makespan is lower for {performance:.2f}% of the trials\nwith Transformer')
+            # else:
+            #     textstr_dict[model_name] = ''.join(f'Makespan is lower for {performance:.2f}% of the trials\nwith {model_name}')
+        if model_name == 'VanillaTransformer':
+            means_textstr_dict[model_name] = ''.join(f'Transformer: {res[model_name]["makespan_sim_avg"]:.2f} \u00B1 {res[model_name]["makespan_sim_std"]:.2f}')
+        else:
+            means_textstr_dict[model_name] = ''.join(f'{model_name}: {res[model_name]["makespan_sim_avg"]:.2f} \u00B1 {res[model_name]["makespan_sim_std"]:.2f}')
 
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
 
@@ -571,14 +681,19 @@ def plot_simulation_makespans(res: dict, models: list, save_plots: bool = True):
     models.append('Transformer')
     axes.hist(runtimes, alpha=0.5, label=models, bins=10)
     axes.legend()
-    axes.set_xlabel('Makespan [s]')
-    axes.set_ylabel('Count')
+    axes.set_xlabel('Episode Makespan [s]')
+    axes.set_ylabel('Count [Episode]')
     x = 0.15
     y = 0.7
-    for model_name, textstr in textstr_dict.items():
+    # for model_name, textstr in textstr_dict.items():
+    #     if textstr is not None:
+    #         axes.text(x, y, textstr, transform=axes.transAxes, bbox=props, fontsize=20)
+    #         y -= 0.11
+
+    for model_name, textstr in means_textstr_dict.items():
         if textstr is not None:
             axes.text(x, y, textstr, transform=axes.transAxes, bbox=props, fontsize=20)
-            y -= 0.08
+            y -= 0.11
 
     if save_plots:
         plt.savefig('../saved_data/imgs/makespan_prediction/makespan_simulation_histogram.png')
