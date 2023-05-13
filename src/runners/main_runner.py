@@ -19,7 +19,7 @@ from model_builds.RNN import RNN, GRU, LSTM
 from model_builds.VanillaTransformer import VanillaTransformer
 from model_builds.OOPTransformer import OOPTransformer
 from utilities.metrics_plots import compute_confusion_matrix
-from utilities.makespan_utils import get_mts_mtf, monitored_makespan, reactive_makespan
+from utilities.makespan_utils import get_mts_mtf, expected_makespan, monitored_makespan, reactive_makespan
 
 SRC_PATH = os.path.dirname(os.path.realpath(__file__))
 MAIN_PATH = os.path.dirname(os.path.dirname(__file__))
@@ -139,6 +139,7 @@ def get_model(name: str, roll_win_width: int = 0, X_sample = None):
         return build_oop_transformer(X_sample=X_sample, model_type='small')
 
 
+CREATE_DATA = False
 
 if __name__ == '__main__':
     gpus = tensorflow.config.experimental.list_physical_devices(device_type='GPU')
@@ -155,6 +156,10 @@ if __name__ == '__main__':
     print( "Tensorflow sees the following devices:" )
     for dev in devices:
         print( f"\t{dev}" )
+
+    if CREATE_DATA:
+        dp = DataPreprocessing(sampling='under', data='reactive')
+        dp.run(save_data=True, verbose=True)
 
     # Load training data
     print('\nLoading data from files...', end='')
@@ -246,7 +251,7 @@ if __name__ == '__main__':
         models_to_run={'FCN': fcn_model.model, 'VanillaTransformer': transformer_model.model},
         n_simulations = 150,
         data_mode='load_data',
-        compute=True
+        compute=False
     )
 
     data[0][2] = sim_res['FCN']['makespan_sim_avg']
@@ -261,4 +266,52 @@ if __name__ == '__main__':
 
     print(tabulate(data, headers=headers))
 
+    # Time saving plots
+    actual_react = react_avg_mks
+    actual_fcn = sim_res['FCN']['makespan_sim_avg']
+    actual_transformer = sim_res['VanillaTransformer']['makespan_sim_avg']
+
+    metrics_fcn = sim_res['FCN']['metrics']
+    metrics_transformer = sim_res['VanillaTransformer']['metrics']
+
+    # P_TP var independent
+    n_vals = 100
+    p_tn = np.linspace(0.0, 0.5, num=n_vals)
+    result_react = [r_mks] * n_vals
+    result_fcn = monitored_makespan(
+        MTS=metrics_fcn['MTS'][0],
+        MTF=metrics_fcn['MTF'][0],
+        MTN=metrics_fcn['MTN'][0],
+        P_TP=metrics_fcn['P_TP'],
+        P_FN=metrics_fcn['P_FN'],
+        P_TN=p_tn,
+        P_FP=metrics_fcn['P_FP'],
+        P_NCF=metrics_fcn['P_NCF'],
+        P_NCS=metrics_fcn['P_NCS']
+    )
+    result_tr = monitored_makespan(
+        MTS=metrics_transformer['MTS'][0],
+        MTF=metrics_transformer['MTF'][0],
+        MTN=metrics_transformer['MTN'][0],
+        P_TP=metrics_transformer['P_TP'],
+        P_FN=metrics_transformer['P_FN'],
+        P_TN=p_tn,
+        P_FP=metrics_transformer['P_FP'],
+        P_NCF=metrics_transformer['P_NCF'],
+        P_NCS=metrics_transformer['P_NCS']
+    )
+
+    plt.plot(p_tn, result_react, label='Reactive')
+    plt.plot(metrics_fcn['P_TN'], actual_react, marker='x', color='black')
+
+    plt.plot(p_tn, result_fcn, label='FCN')
+    plt.plot(metrics_fcn['P_TN'], actual_fcn, marker='o', color='black')
+    plt.plot(p_tn, result_react - result_fcn, label='Time saved FCN')
+
+    plt.plot(p_tn, result_tr, label='Transformer')
+    plt.plot(metrics_transformer['P_TN'], actual_transformer, marker='o', color='gray')
+    plt.plot(p_tn, result_react - result_tr, label='Time saved Transformer')
+
+    plt.legend()
+    plt.show()
 

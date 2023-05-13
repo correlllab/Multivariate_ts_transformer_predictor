@@ -256,6 +256,7 @@ def run_simulation(model: tf.keras.Model, episodes: list, n_simulations: int = 1
         P_NCS = perf['NCS'] / len(timed_episodes),
         P_NCF = perf['NCF'] / len(timed_episodes)
     )
+    print('Expected makespan [s] = ', end='')
     print( EMS, end=' [s]\n' )
     metrics = {
         'EMS': [EMS],
@@ -670,7 +671,7 @@ def plot_simulation_makespans(res: dict, models: list, save_plots: bool = True):
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
 
     fig, axes = plt.subplots(1, 1, figsize=set_size(fig_width))
-    fig.tight_layout()
+    # plt.tight_layout()
     axes.title.set_text(f'Simulated makespans for each model (N = {len(res[list(res.keys())[0]]["makespan_sim_hist"])})')
     runtimes = []
     for model_name in models:
