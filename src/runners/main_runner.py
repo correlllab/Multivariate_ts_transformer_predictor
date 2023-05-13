@@ -251,7 +251,7 @@ if __name__ == '__main__':
         models_to_run={'FCN': fcn_model.model, 'VanillaTransformer': transformer_model.model},
         n_simulations = 150,
         data_mode='load_data',
-        compute=False
+        compute=True
     )
 
     data[0][2] = sim_res['FCN']['makespan_sim_avg']

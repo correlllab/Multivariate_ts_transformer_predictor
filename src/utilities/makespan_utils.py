@@ -172,6 +172,11 @@ def run_simulation(model: tf.keras.Model, episodes: list, n_simulations: int = 1
     rolling_window_width = int(7.0 * 50)
     total_time = 0
     mks = []
+
+    # Params for selecting first F_z hit
+    winWidth    = 10
+    FzCol       =  3
+    spikeThresh = 0.05
     for i in range(n_simulations):
         if verbose:
             print(f'Simulation {i+1}/{n_simulations}:')
@@ -179,11 +184,26 @@ def run_simulation(model: tf.keras.Model, episodes: list, n_simulations: int = 1
         makespan = 0
         while not win:
             ep = random.choice(episodes)
-            episode_time = ep.shape[0] * ts_s
+            N = ep.shape[0]
+            chopDex = 0
+            for bgn in range( int(1.5*50), N-winWidth+1 ):
+                end     = bgn+winWidth
+                FzSlice = ep[ bgn:end, FzCol ].flatten()
+                # print( FzSlice.shape )
+                # print( np.amax( FzSlice ), np.amin( FzSlice ), type( np.amax( FzSlice ) - np.amin( FzSlice ) ) )
+                if np.abs( np.amax( FzSlice ) - np.amin( FzSlice ) ) >= spikeThresh:
+                    # print( np.amax( FzSlice ), np.amin( FzSlice ) )
+                    # print( FzSlice )
+                    chopDex = bgn
+                    # if verbose:
+                    #     print( f"Relevant data at {chopDex*20/1000.0} seconds!" )
+                    break
+            ep_matrix = ep[chopDex:, :]
+            episode_time = ep_matrix.shape[0] * ts_s
             true_label = 0.0
             if ep[0, 7] == 0.0:
                 true_label = 1.0
-            ans, t_c = classify(model=model, episode=ep, true_label=true_label, window_width=rolling_window_width)
+            ans, t_c = classify(model=model, episode=ep_matrix, true_label=true_label, window_width=rolling_window_width)
 
             episode_obj = EpisodePerf()
             episode_obj.trueLabel = true_label
@@ -215,7 +235,7 @@ def run_simulation(model: tf.keras.Model, episodes: list, n_simulations: int = 1
                     episode_obj.TTP = episode_time
                     N_posCls += 1
                 elif ans in ( 'TN', 'FN' ):
-                    MTN += t_c
+                    MTN += (t_c + (chopDex * ts_s))
                     episode_obj.TTN = t_c
                     N_negCls += 1
             timed_episodes.append(episode_obj)

@@ -58,6 +58,7 @@ def run_makespan_simulation(models_to_run: dict, n_simulations: int = 100, data_
         dp.run(save_data=False, verbose=True)
 
         X_train_sampled = dp.X_train_sampled
+        data = dp.data
         trunc_data = dp.truncData
 
         if not os.path.exists('../../data/makespan_data/'):
@@ -68,6 +69,11 @@ def run_makespan_simulation(models_to_run: dict, n_simulations: int = 100, data_
             np.save(f, dp.X_train_sampled, allow_pickle=True)
         print('DONE')
 
+        print('Creating data...', end='')
+        with open('../../data/makespan_data/data.npy', 'wb') as f:
+            np.save(f, np.asarray(dp.data, dtype=object), allow_pickle=True)
+        print('DONE')
+
         print('Creating trunc_data...', end='')
         with open('../../data/makespan_data/trunc_data.npy', 'wb') as f:
             np.save(f, np.asarray(dp.truncData, dtype=object), allow_pickle=True)
@@ -76,6 +82,10 @@ def run_makespan_simulation(models_to_run: dict, n_simulations: int = 100, data_
         print('Loading data from files...', end='')
         with open('../../data/makespan_data/X_train_sampled.npy', 'rb') as f:
             X_train_sampled = np.load(f, allow_pickle=True)
+
+        with open('../../data/makespan_data/data.npy', 'rb') as f:
+            data = np.load(f, allow_pickle=True)
+        print('DONE')
 
         with open('../../data/makespan_data/trunc_data.npy', 'rb') as f:
             trunc_data = np.load(f, allow_pickle=True)
@@ -96,7 +106,7 @@ def run_makespan_simulation(models_to_run: dict, n_simulations: int = 100, data_
             print(f'====> For model {model_name}:')
             avg_mks, mks, metrics, conf_mat = run_simulation(
                 model=model,
-                episodes=trunc_data,
+                episodes=data,
                 n_simulations=n_simulations,
                 verbose=True
             )
