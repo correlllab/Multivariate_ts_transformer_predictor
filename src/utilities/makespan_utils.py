@@ -109,14 +109,15 @@ def make_predictions(model_name: str, model: tf.keras.Model, trunc_data, verbose
 
 
 
-def classify(model: tf.keras.Model, episode: np.ndarray, true_label: float, window_width: int):
+def classify(model: tf.keras.Model, episode: np.ndarray, true_label: float, window_width: int, ts_s: float = 20.0/1000.0):
     with tf.device('/GPU:0'):
         time_steps = episode.shape[0]
         n_windows = time_steps - window_width + 1
         episode_X_list = []
         for i in range(n_windows):
-            episode_window = episode[i:i + window_width, :]
-            episode_X_list.append(episode_window[:, 1:7])
+            if i >= 350:
+                episode_window = episode[i:i + window_width, :]
+                episode_X_list.append(episode_window[:, 1:7])
         episode_X = tf.stack(episode_X_list)
         prediction = model.predict(episode_X, use_multiprocessing=True)
         ans, t_c, row = scan_output_for_decision(
@@ -126,7 +127,7 @@ def classify(model: tf.keras.Model, episode: np.ndarray, true_label: float, wind
         )
 
     # Return the classification answer and the time (in seconds) at which the classification happened
-    return ans, t_c * (20.0 / 1000.0)
+    return ans, (350 * ts_s) + (t_c * ts_s)
 
 
 def run_reactive_simulation(episodes: list, n_simulations: int = 100, verbose: bool = False):
@@ -141,7 +142,7 @@ def run_reactive_simulation(episodes: list, n_simulations: int = 100, verbose: b
         makespan = 0
         while not win:
             ep = random.choice(episodes)
-            episode_time = ep.shape[0] * (20 / 1000)
+            episode_time = ep.shape[0] * (20.0 / 1000.0)
             true_label = 0.0
             if ep[0, 7] == 0.0:
                 true_label = 1.0
@@ -157,6 +158,49 @@ def run_reactive_simulation(episodes: list, n_simulations: int = 100, verbose: b
     return total_time / n_simulations, mks
 
 
+def run_vanilla_simulation(model: tf.keras.Model, episodes: list, n_simulations: int = 1000, verbose: bool = False):
+    rolling_window_width = int(7.0 * 50)
+    ts_s = 20.0 / 1000.0
+    total_time = 0
+    mks = []
+
+    for i in range(n_simulations):
+        if verbose:
+            print(f'Simulation {i+1}/{n_simulations}:')
+        win = False
+        makespan = 0
+        while not win:
+            ep = random.choice(episodes)
+            episode_time = ep.shape[0] * ts_s
+            true_label = 0.0
+            if ep[0, 7] == 0.0:
+                true_label = 1.0
+            ans, t_c = classify(
+                model=model,
+                episode=ep,
+                true_label=true_label,
+                window_width=rolling_window_width,
+                ts_s=ts_s
+            )
+
+            if ans == 'NC':
+                if true_label == 1.0:
+                    makespan += episode_time
+                elif true_label == 0.0:
+                    makespan += episode_time
+                    win = True
+            else:
+                if ans in ('TN', 'FP'):
+                    makespan += t_c
+                elif ans in ('TP', 'FN'):
+                    makespan += episode_time
+                    win = True
+        total_time += makespan
+        mks.append(makespan)
+
+    return total_time / n_simulations, mks
+
+
 def run_simulation(model: tf.keras.Model, episodes: list, n_simulations: int = 1000, verbose: bool = False):
     perf = CounterDict()
     N_posCls  = 0 # --------- Number of positive classifications
@@ -168,6 +212,7 @@ def run_simulation(model: tf.keras.Model, episodes: list, n_simulations: int = 1
     MTN       = 0.0 # ------- Mean Time to Negative Classification
     # MTS       = 0.0 # ------- Mean Time to Success
     # MTF       = 0.0 # ------- Mean Time to Failure
+
     timed_episodes = []
     rolling_window_width = int(7.0 * 50)
     total_time = 0
@@ -194,51 +239,57 @@ def run_simulation(model: tf.keras.Model, episodes: list, n_simulations: int = 1
                 if np.abs( np.amax( FzSlice ) - np.amin( FzSlice ) ) >= spikeThresh:
                     # print( np.amax( FzSlice ), np.amin( FzSlice ) )
                     # print( FzSlice )
-                    chopDex = bgn
+                    chopDex = end
                     # if verbose:
                     #     print( f"Relevant data at {chopDex*20/1000.0} seconds!" )
                     break
-            ep_matrix = ep[chopDex:, :]
-            episode_time = ep_matrix.shape[0] * ts_s
-            true_label = 0.0
-            if ep[0, 7] == 0.0:
-                true_label = 1.0
-            ans, t_c = classify(model=model, episode=ep_matrix, true_label=true_label, window_width=rolling_window_width)
+            if (chopDex * ts_s) < 15.0:
+                ep_matrix = ep[chopDex:, :]
+                episode_time = ep_matrix.shape[0] * ts_s
+                true_label = 0.0
+                if ep_matrix[0, 7] == 0.0:
+                    true_label = 1.0
+                ans, t_c = classify(
+                    model=model,
+                    episode=ep_matrix,
+                    true_label=true_label,
+                    window_width=rolling_window_width,
+                    ts_s=ts_s
+                )
 
-            episode_obj = EpisodePerf()
-            episode_obj.trueLabel = true_label
-            episode_obj.answer = ans
-            episode_obj.runTime = episode_time
+                episode_obj = EpisodePerf()
+                episode_obj.trueLabel = true_label
+                episode_obj.answer = ans
+                episode_obj.runTime = episode_time
 
-            if ans == 'NC':
-                # If true_label == failure
-                if true_label == 1.0:
-                    makespan += episode_time
+                t_ans_s = ((t_c / ts_s) + chopDex + ep_matrix.shape[1] - 1) * ts_s
+                if ans == 'NC':
+                    # If true_label == failure
+                    if true_label == 1.0:
+                        makespan += episode_time
+                        perf.count('NCF')
+                    # If true_label == success
+                    elif true_label == 0.0:
+                        makespan += episode_time
+                        win = True
+                        perf.count('NCS')
+                else:
+                    perf.count(ans)
+                    if ans == 'TN' or ans == 'FP':
+                        makespan += t_ans_s
+                    elif ans == 'TP' or ans == 'FN':
+                        makespan += episode_time
+                        win = True
 
-                    perf.count('NCF')
-                # If true_label == success
-                elif true_label == 0.0:
-                    makespan += episode_time
-                    win = True
-
-                    perf.count('NCS')
-            else:
-                perf.count(ans)
-                if ans == 'TN' or ans == 'FP':
-                    makespan += t_c
-                elif ans == 'TP' or ans == 'FN':
-                    makespan += episode_time
-                    win = True
-
-                if ans in ( 'TP', 'FP' ):
-                    MTP += episode_time
-                    episode_obj.TTP = episode_time
-                    N_posCls += 1
-                elif ans in ( 'TN', 'FN' ):
-                    MTN += (t_c + (chopDex * ts_s))
-                    episode_obj.TTN = t_c
-                    N_negCls += 1
-            timed_episodes.append(episode_obj)
+                    if ans in ( 'TP', 'FP' ):
+                        MTP += episode_time
+                        episode_obj.TTP = episode_time
+                        N_posCls += 1
+                    elif ans in ( 'TN', 'FN' ):
+                        MTN += t_ans_s
+                        episode_obj.TTN = t_ans_s
+                        N_negCls += 1
+                timed_episodes.append(episode_obj)
         total_time += makespan
         mks.append(makespan)
 
@@ -279,11 +330,11 @@ def run_simulation(model: tf.keras.Model, episodes: list, n_simulations: int = 1
     print('Expected makespan [s] = ', end='')
     print( EMS, end=' [s]\n' )
     metrics = {
-        'EMS': [EMS],
-        'MTP': [MTP],
-        'MTN': [MTN],
-        'MTS': [MTS],
-        'MTF': [MTF],
+        'EMS': EMS,
+        'MTP': MTP,
+        'MTN': MTN,
+        'MTS': MTS,
+        'MTF': MTF,
         'P_TP': perf['TP'] / len(timed_episodes), 
         'P_FN': perf['FN'] / len(timed_episodes), 
         'P_TN': perf['TN'] / len(timed_episodes), 
@@ -654,7 +705,7 @@ def plot_runtimes(res: dict, models_to_use: list, save_plots: bool = True):
         plt.plot()
 
 
-def plot_simulation_makespans(res: dict, models: list, save_plots: bool = True):
+def plot_simulation_makespans(res: dict, models: list, reactive_mks: list = [], plot_reactive: bool =False, save_plots: bool = True):
     # Setup
     # plt.style.use('seaborn')
     # From Latex \textwidth
@@ -675,6 +726,8 @@ def plot_simulation_makespans(res: dict, models: list, save_plots: bool = True):
 
     # textstr_dict = dict.fromkeys(models, None)
     means_textstr_dict = dict.fromkeys(models, None)
+    if plot_reactive and reactive_mks != []:
+        means_textstr_dict = {**{'Reactive': ''.join(f'Reactive: {np.mean(reactive_mks):.2f} \u00B1 {np.std(reactive_mks):.2f}')}, **means_textstr_dict}
     for model_name in models:
         # if model_name != 'FCN':
         #     hits = np.sum([1 if vt < fcn else 0 for vt, fcn in zip(res[model_name]['makespan_sim_hist'], res['FCN']['makespan_sim_hist'])])
@@ -694,18 +747,24 @@ def plot_simulation_makespans(res: dict, models: list, save_plots: bool = True):
     # plt.tight_layout()
     axes.title.set_text(f'Simulated makespans for each model (N = {len(res[list(res.keys())[0]]["makespan_sim_hist"])})')
     runtimes = []
+    if plot_reactive and reactive_mks != []:
+        runtimes.append(reactive_mks)
     for model_name in models:
         runtimes.append(res[model_name]['makespan_sim_hist'])
 
     if 'VanillaTransformer' in models:
         models = [m for m in models if m != 'VanillaTransformer']
     models.append('Transformer')
+    if plot_reactive and reactive_mks != []:
+        models.insert(0, 'Reactive')
     axes.hist(runtimes, alpha=0.5, label=models, bins=10)
     axes.legend()
     axes.set_xlabel('Episode Makespan [s]')
     axes.set_ylabel('Count [Episode]')
+
+
     x = 0.15
-    y = 0.7
+    y = 0.6
     # for model_name, textstr in textstr_dict.items():
     #     if textstr is not None:
     #         axes.text(x, y, textstr, transform=axes.transAxes, bbox=props, fontsize=20)

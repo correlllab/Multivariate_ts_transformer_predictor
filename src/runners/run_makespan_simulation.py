@@ -104,17 +104,39 @@ def run_makespan_simulation(models_to_run: dict, n_simulations: int = 100, data_
             if model_name not in res.keys():
                 res[model_name] = {'metrics': {}, 'conf_mat': {}, 'times': {}, 'makespan_sim_hist': [], 'makespan_sim_avg': -1, 'makespan_sim_std': -1}
             print(f'====> For model {model_name}:')
-            avg_mks, mks, metrics, conf_mat = run_simulation(
+            # avg_mks, mks, metrics, conf_mat = run_simulation(
+            #     model=model,
+            #     episodes=data,
+            #     n_simulations=n_simulations,
+            #     verbose=True
+            # )
+            avg_mks, mks = run_vanilla_simulation(
                 model=model,
                 episodes=data,
                 n_simulations=n_simulations,
                 verbose=True
             )
-            res[model_name]['metrics'] = metrics
-            res[model_name]['conf_mat'] = conf_mat
+            # res[model_name]['metrics'] = metrics
+            # res[model_name]['conf_mat'] = conf_mat
             res[model_name]['makespan_sim_hist'] = mks
             res[model_name]['makespan_sim_avg'] = avg_mks
             res[model_name]['makespan_sim_std'] = np.std(res[model_name]['makespan_sim_hist'])
+    else:
+        for model_name, model in models_to_run.items():
+            if model_name not in res.keys():
+                res[model_name] = {'metrics': {}, 'conf_mat': {}, 'times': {}, 'makespan_sim_hist': [], 'makespan_sim_avg': -1, 'makespan_sim_std': -1}
+            print(f'====> Updating expected makespan from equation for {model_name}:')
+            res[model_name]['metrics']['EMS'] = monitored_makespan(
+                MTS=res[model_name]['metrics']['MTS'],
+                MTF=res[model_name]['metrics']['MTF'],
+                MTN=res[model_name]['metrics']['MTN'],
+                P_TP=res[model_name]['metrics']['P_TP'],
+                P_FN=res[model_name]['metrics']['P_FN'],
+                P_TN=res[model_name]['metrics']['P_TN'],
+                P_FP=res[model_name]['metrics']['P_FP'],
+                P_NCF=res[model_name]['metrics']['P_NCF'],
+                P_NCS=res[model_name]['metrics']['P_NCS']
+            )
 
     print(f'res = {res}\n')
 
@@ -122,7 +144,7 @@ def run_makespan_simulation(models_to_run: dict, n_simulations: int = 100, data_
         with open('../saved_data/makespan/makespan_results.txt', 'w') as f:
             f.write(json.dumps(res))
 
-    plot_simulation_makespans(res=res, models=models_to_run, save_plots=save_plots)
+    # plot_simulation_makespans(res=res, models=models_to_run, save_plots=save_plots)
 
     return res
 

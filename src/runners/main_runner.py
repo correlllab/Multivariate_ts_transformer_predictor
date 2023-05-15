@@ -7,7 +7,6 @@ import pandas as pd
 import numpy as np
 import tensorflow
 import matplotlib.pyplot as plt
-import yaml
 import tensorflow as tf
 
 from tabulate import tabulate
@@ -19,7 +18,7 @@ from model_builds.RNN import RNN, GRU, LSTM
 from model_builds.VanillaTransformer import VanillaTransformer
 from model_builds.OOPTransformer import OOPTransformer
 from utilities.metrics_plots import compute_confusion_matrix
-from utilities.makespan_utils import get_mts_mtf, expected_makespan, monitored_makespan, reactive_makespan
+from utilities.makespan_utils import get_mts_mtf, expected_makespan, monitored_makespan, reactive_makespan, plot_simulation_makespans
 
 SRC_PATH = os.path.dirname(os.path.realpath(__file__))
 MAIN_PATH = os.path.dirname(os.path.dirname(__file__))
@@ -185,7 +184,7 @@ if __name__ == '__main__':
 
     # Create table to be printed
     headers = ['Measure', 'Reactive', 'FCN Simulation', 'Transformer Simulation']
-    data = [
+    data_table = [
         ['Makespan [s]', None, None, None],
         ['Predicted [s]', None, None, None],
         ['MTS', None, None, None],
@@ -229,42 +228,52 @@ if __name__ == '__main__':
     # dp.load_data(verbose=True)
     # dp.scale_data(verbose=True)
     # dp.set_episode_beginning(verbose=True)
+    with open('../../data/makespan_data/data.npy', 'rb') as f:
+        data = np.load(f, allow_pickle=True)
     with open('../../data/makespan_data/trunc_data.npy', 'rb') as f:
         trunc_data = np.load(f, allow_pickle=True)
-    MTS, MTF, p_success, p_failure = get_mts_mtf(trunc_data=trunc_data)
+    MTS, MTF, p_success, p_failure = get_mts_mtf(trunc_data=data)
     r_mks = reactive_makespan(MTF=MTF, MTS=MTS, pf=p_failure, ps=p_success)
-    data[0][1] = None
-    data[1][1] = r_mks
-    data[2][1] = MTS
-    data[3][1] = MTF
+    data_table[0][1] = None
+    data_table[1][1] = r_mks
+    data_table[2][1] = MTS
+    data_table[3][1] = MTF
 
     # Run simulations
     react_avg_mks, react_mks = run_reactive_simulation(
-        episodes=trunc_data,
+        episodes=data,
         n_simulations=1000,
         verbose=True
     )
-    data[0][1] = react_avg_mks
+    data_table[0][1] = react_avg_mks
     print()
 
     sim_res = run_makespan_simulation(
         models_to_run={'FCN': fcn_model.model, 'VanillaTransformer': transformer_model.model},
         n_simulations = 150,
         data_mode='load_data',
-        compute=True
+        compute=False
     )
 
-    data[0][2] = sim_res['FCN']['makespan_sim_avg']
-    data[1][2] = sim_res['FCN']['metrics']['EMS'][0]
-    data[2][2] = sim_res['FCN']['metrics']['MTS'][0]
-    data[3][2] = sim_res['FCN']['metrics']['MTF'][0]
+    plot_simulation_makespans(
+        res=sim_res,
+        models={'FCN': fcn_model.model, 'VanillaTransformer': transformer_model.model},
+        reactive_mks=react_mks[:150],
+        plot_reactive=True,
+        save_plots=True
+    )
 
-    data[0][3] = sim_res['VanillaTransformer']['makespan_sim_avg']
-    data[1][3] = sim_res['VanillaTransformer']['metrics']['EMS'][0]
-    data[2][3] = sim_res['VanillaTransformer']['metrics']['MTS'][0]
-    data[3][3] = sim_res['VanillaTransformer']['metrics']['MTF'][0]
+    data_table[0][2] = sim_res['FCN']['makespan_sim_avg']
+    data_table[1][2] = sim_res['FCN']['metrics']['EMS']
+    data_table[2][2] = sim_res['FCN']['metrics']['MTS']
+    data_table[3][2] = sim_res['FCN']['metrics']['MTF']
 
-    print(tabulate(data, headers=headers))
+    data_table[0][3] = sim_res['VanillaTransformer']['makespan_sim_avg']
+    data_table[1][3] = sim_res['VanillaTransformer']['metrics']['EMS']
+    data_table[2][3] = sim_res['VanillaTransformer']['metrics']['MTS']
+    data_table[3][3] = sim_res['VanillaTransformer']['metrics']['MTF']
+
+    print(tabulate(data_table, headers=headers))
 
     # Time saving plots
     actual_react = react_avg_mks
@@ -276,42 +285,43 @@ if __name__ == '__main__':
 
     # P_TP var independent
     n_vals = 100
-    p_tn = np.linspace(0.0, 0.5, num=n_vals)
+    prob = np.linspace(0.0, 0.5, num=n_vals)
     result_react = [r_mks] * n_vals
     result_fcn = monitored_makespan(
-        MTS=metrics_fcn['MTS'][0],
-        MTF=metrics_fcn['MTF'][0],
-        MTN=metrics_fcn['MTN'][0],
-        P_TP=metrics_fcn['P_TP'],
+        MTS=metrics_fcn['MTS'],
+        MTF=metrics_fcn['MTF'],
+        MTN=metrics_fcn['MTN'],
+        P_TP=prob,
         P_FN=metrics_fcn['P_FN'],
-        P_TN=p_tn,
+        P_TN=metrics_fcn['P_TN'],
         P_FP=metrics_fcn['P_FP'],
         P_NCF=metrics_fcn['P_NCF'],
         P_NCS=metrics_fcn['P_NCS']
     )
     result_tr = monitored_makespan(
-        MTS=metrics_transformer['MTS'][0],
-        MTF=metrics_transformer['MTF'][0],
-        MTN=metrics_transformer['MTN'][0],
-        P_TP=metrics_transformer['P_TP'],
+        MTS=metrics_transformer['MTS'],
+        MTF=metrics_transformer['MTF'],
+        MTN=metrics_transformer['MTN'],
+        P_TP=prob,
         P_FN=metrics_transformer['P_FN'],
-        P_TN=p_tn,
+        P_TN=metrics_transformer['P_TN'],
         P_FP=metrics_transformer['P_FP'],
         P_NCF=metrics_transformer['P_NCF'],
         P_NCS=metrics_transformer['P_NCS']
     )
 
-    plt.plot(p_tn, result_react, label='Reactive')
-    plt.plot(metrics_fcn['P_TN'], actual_react, marker='x', color='black')
+    plt.plot(prob, result_react, label='Reactive')
+    plt.plot(metrics_fcn['P_TP'], actual_react, marker='x', color='black')
 
-    plt.plot(p_tn, result_fcn, label='FCN')
-    plt.plot(metrics_fcn['P_TN'], actual_fcn, marker='o', color='black')
-    plt.plot(p_tn, result_react - result_fcn, label='Time saved FCN')
+    plt.plot(prob, result_fcn, label='FCN')
+    plt.plot(metrics_fcn['P_TP'], actual_fcn, marker='o', color='black')
 
-    plt.plot(p_tn, result_tr, label='Transformer')
-    plt.plot(metrics_transformer['P_TN'], actual_transformer, marker='o', color='gray')
-    plt.plot(p_tn, result_react - result_tr, label='Time saved Transformer')
+    plt.plot(prob, result_tr, label='Transformer')
+    plt.plot(metrics_transformer['P_TP'], actual_transformer, marker='o', color='gray')
+
+    plt.plot(prob, result_react - result_fcn, label='Time saved FCN')
+    plt.plot(prob, result_react - result_tr, label='Time saved Transformer')
 
     plt.legend()
-    plt.show()
+    plt.savefig('../saved_data/imgs/simulation/sim_img.png')
 
