@@ -104,20 +104,14 @@ def run_makespan_simulation(models_to_run: dict, n_simulations: int = 100, data_
             if model_name not in res.keys():
                 res[model_name] = {'metrics': {}, 'conf_mat': {}, 'times': {}, 'makespan_sim_hist': [], 'makespan_sim_avg': -1, 'makespan_sim_std': -1}
             print(f'====> For model {model_name}:')
-            # avg_mks, mks, metrics, conf_mat = run_simulation(
-            #     model=model,
-            #     episodes=data,
-            #     n_simulations=n_simulations,
-            #     verbose=True
-            # )
-            avg_mks, mks = run_vanilla_simulation(
+            avg_mks, mks, metrics, conf_mat = run_simulation(
                 model=model,
                 episodes=data,
                 n_simulations=n_simulations,
                 verbose=True
             )
-            # res[model_name]['metrics'] = metrics
-            # res[model_name]['conf_mat'] = conf_mat
+            res[model_name]['metrics'] = metrics
+            res[model_name]['conf_mat'] = conf_mat
             res[model_name]['makespan_sim_hist'] = mks
             res[model_name]['makespan_sim_avg'] = avg_mks
             res[model_name]['makespan_sim_std'] = np.std(res[model_name]['makespan_sim_hist'])

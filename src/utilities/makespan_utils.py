@@ -115,8 +115,9 @@ def classify(model: tf.keras.Model, episode: np.ndarray, true_label: float, wind
         n_windows = time_steps - window_width + 1
         episode_X_list = []
         for i in range(n_windows):
-            if i >= 350:
-                episode_window = episode[i:i + window_width, :]
+            if i >= window_width:
+                # episode_window = episode[i:i + window_width, :]
+                episode_window = episode[i - window_width:i, :]
                 episode_X_list.append(episode_window[:, 1:7])
         episode_X = tf.stack(episode_X_list)
         prediction = model.predict(episode_X, use_multiprocessing=True)
@@ -127,7 +128,7 @@ def classify(model: tf.keras.Model, episode: np.ndarray, true_label: float, wind
         )
 
     # Return the classification answer and the time (in seconds) at which the classification happened
-    return ans, (350 * ts_s) + (t_c * ts_s)
+    return ans, (window_width * ts_s) + (t_c * ts_s)
 
 
 def run_reactive_simulation(episodes: list, n_simulations: int = 100, verbose: bool = False):
@@ -158,11 +159,27 @@ def run_reactive_simulation(episodes: list, n_simulations: int = 100, verbose: b
     return total_time / n_simulations, mks
 
 
-def run_vanilla_simulation(model: tf.keras.Model, episodes: list, n_simulations: int = 1000, verbose: bool = False):
+def run_simulation(model: tf.keras.Model, episodes: list, n_simulations: int = 1000, verbose: bool = False):
+    perf = CounterDict()
+    N_posCls  = 0 # --------- Number of positive classifications
+    N_negCls  = 0 # --------- Number of negative classifications
+    N_success = 0 # --------- Number of true task successes
+    N_failure = 0 # --------- Number of true task failures
+    MTP       = 0.0 # ------- Mean Time to Positive Classification
+    MTN       = 0.0 # ------- Mean Time to Negative Classification
+    MTS       = 0.0 # ------- Mean Time to Success
+    MTF       = 0.0 # ------- Mean Time to Failure
+
+    timed_episodes = []
     rolling_window_width = int(7.0 * 50)
     ts_s = 20.0 / 1000.0
     total_time = 0
     mks = []
+
+    # Params for selecting first F_z hit
+    winWidth    = 10
+    FzCol       =  3
+    spikeThresh = 0.05
 
     for i in range(n_simulations):
         if verbose:
@@ -172,63 +189,6 @@ def run_vanilla_simulation(model: tf.keras.Model, episodes: list, n_simulations:
         while not win:
             ep = random.choice(episodes)
             episode_time = ep.shape[0] * ts_s
-            true_label = 0.0
-            if ep[0, 7] == 0.0:
-                true_label = 1.0
-            ans, t_c = classify(
-                model=model,
-                episode=ep,
-                true_label=true_label,
-                window_width=rolling_window_width,
-                ts_s=ts_s
-            )
-
-            if ans == 'NC':
-                if true_label == 1.0:
-                    makespan += episode_time
-                elif true_label == 0.0:
-                    makespan += episode_time
-                    win = True
-            else:
-                if ans in ('TN', 'FP'):
-                    makespan += t_c
-                elif ans in ('TP', 'FN'):
-                    makespan += episode_time
-                    win = True
-        total_time += makespan
-        mks.append(makespan)
-
-    return total_time / n_simulations, mks
-
-
-def run_simulation(model: tf.keras.Model, episodes: list, n_simulations: int = 1000, verbose: bool = False):
-    perf = CounterDict()
-    N_posCls  = 0 # --------- Number of positive classifications
-    N_negCls  = 0 # --------- Number of negative classifications
-    # N_success = 0 # --------- Number of true task successes
-    # N_failure = 0 # --------- Number of true task failures
-    ts_s      = 20.0/1000.0 # Seconds per timestep
-    MTP       = 0.0 # ------- Mean Time to Positive Classification
-    MTN       = 0.0 # ------- Mean Time to Negative Classification
-    # MTS       = 0.0 # ------- Mean Time to Success
-    # MTF       = 0.0 # ------- Mean Time to Failure
-
-    timed_episodes = []
-    rolling_window_width = int(7.0 * 50)
-    total_time = 0
-    mks = []
-
-    # Params for selecting first F_z hit
-    winWidth    = 10
-    FzCol       =  3
-    spikeThresh = 0.05
-    for i in range(n_simulations):
-        if verbose:
-            print(f'Simulation {i+1}/{n_simulations}:')
-        win = False
-        makespan = 0
-        while not win:
-            ep = random.choice(episodes)
             N = ep.shape[0]
             chopDex = 0
             for bgn in range( int(1.5*50), N-winWidth+1 ):
@@ -245,7 +205,6 @@ def run_simulation(model: tf.keras.Model, episodes: list, n_simulations: int = 1
                     break
             if (chopDex * ts_s) < 15.0:
                 ep_matrix = ep[chopDex:, :]
-                episode_time = ep_matrix.shape[0] * ts_s
                 true_label = 0.0
                 if ep_matrix[0, 7] == 0.0:
                     true_label = 1.0
@@ -262,40 +221,38 @@ def run_simulation(model: tf.keras.Model, episodes: list, n_simulations: int = 1
                 episode_obj.answer = ans
                 episode_obj.runTime = episode_time
 
-                t_ans_s = ((t_c / ts_s) + chopDex + ep_matrix.shape[1] - 1) * ts_s
                 if ans == 'NC':
-                    # If true_label == failure
                     if true_label == 1.0:
                         makespan += episode_time
                         perf.count('NCF')
-                    # If true_label == success
                     elif true_label == 0.0:
                         makespan += episode_time
                         win = True
                         perf.count('NCS')
                 else:
                     perf.count(ans)
-                    if ans == 'TN' or ans == 'FP':
-                        makespan += t_ans_s
-                    elif ans == 'TP' or ans == 'FN':
+                    if ans in ('TN', 'FN'):
+                        makespan += t_c + (chopDex * ts_s)
+                        MTN += t_c + (chopDex * ts_s)
+                        episode_obj.TTN = t_c + (chopDex * ts_s)
+                        N_negCls += 1
+                    elif ans in ('TP', 'FP'):
                         makespan += episode_time
                         win = True
-
-                    if ans in ( 'TP', 'FP' ):
                         MTP += episode_time
                         episode_obj.TTP = episode_time
                         N_posCls += 1
-                    elif ans in ( 'TN', 'FN' ):
-                        MTN += t_ans_s
-                        episode_obj.TTN = t_ans_s
-                        N_negCls += 1
+
+                if true_label == 1.0:
+                    MTF += episode_time
+                    N_failure += 1
+                elif true_label == 0.0:
+                    MTS += episode_time
+                    N_success += 1
+
                 timed_episodes.append(episode_obj)
         total_time += makespan
         mks.append(makespan)
-
-    times = []
-    for ep in timed_episodes:
-        times.append(ep.runTime)
 
     confMatx = {
         # Actual Positives
@@ -309,12 +266,14 @@ def run_simulation(model: tf.keras.Model, episodes: list, n_simulations: int = 1
 
     MTP /= N_posCls #- Mean Time to Positive Classification
     MTN /= N_negCls #- Mean Time to Negative Classification
-    MTS, MTF, _, _ = get_mts_mtf(trunc_data=episodes)
+    MTS /= N_success
+    MTF /= N_failure
+    # MTS, MTF, _, _ = get_mts_mtf(trunc_data=episodes)
 
     print( f"MTP: {MTP} [s]" )
     print( f"MTN: {MTN} [s]" )
-    print( f"MTP: {MTS} [s]" )
-    print( f"MTN: {MTF} [s]" )
+    print( f"MTS: {MTS} [s]" )
+    print( f"MTF: {MTF} [s]" )
 
     EMS = monitored_makespan(
         MTF = MTF, 
@@ -344,6 +303,151 @@ def run_simulation(model: tf.keras.Model, episodes: list, n_simulations: int = 1
     }
 
     return total_time / n_simulations, mks, metrics, confMatx
+
+
+# def run_simulation(model: tf.keras.Model, episodes: list, n_simulations: int = 1000, verbose: bool = False):
+#     perf = CounterDict()
+#     N_posCls  = 0 # --------- Number of positive classifications
+#     N_negCls  = 0 # --------- Number of negative classifications
+#     # N_success = 0 # --------- Number of true task successes
+#     # N_failure = 0 # --------- Number of true task failures
+#     ts_s      = 20.0/1000.0 # Seconds per timestep
+#     MTP       = 0.0 # ------- Mean Time to Positive Classification
+#     MTN       = 0.0 # ------- Mean Time to Negative Classification
+#     # MTS       = 0.0 # ------- Mean Time to Success
+#     # MTF       = 0.0 # ------- Mean Time to Failure
+
+#     timed_episodes = []
+#     rolling_window_width = int(7.0 * 50)
+#     total_time = 0
+#     mks = []
+
+#     # Params for selecting first F_z hit
+#     winWidth    = 10
+#     FzCol       =  3
+#     spikeThresh = 0.05
+#     for i in range(n_simulations):
+#         if verbose:
+#             print(f'Simulation {i+1}/{n_simulations}:')
+#         win = False
+#         makespan = 0
+#         while not win:
+#             ep = random.choice(episodes)
+#             N = ep.shape[0]
+#             chopDex = 0
+#             for bgn in range( int(1.5*50), N-winWidth+1 ):
+#                 end     = bgn+winWidth
+#                 FzSlice = ep[ bgn:end, FzCol ].flatten()
+#                 # print( FzSlice.shape )
+#                 # print( np.amax( FzSlice ), np.amin( FzSlice ), type( np.amax( FzSlice ) - np.amin( FzSlice ) ) )
+#                 if np.abs( np.amax( FzSlice ) - np.amin( FzSlice ) ) >= spikeThresh:
+#                     # print( np.amax( FzSlice ), np.amin( FzSlice ) )
+#                     # print( FzSlice )
+#                     chopDex = end
+#                     # if verbose:
+#                     #     print( f"Relevant data at {chopDex*20/1000.0} seconds!" )
+#                     break
+#             if (chopDex * ts_s) < 15.0:
+#                 ep_matrix = ep[chopDex:, :]
+#                 episode_time = ep_matrix.shape[0] * ts_s
+#                 true_label = 0.0
+#                 if ep_matrix[0, 7] == 0.0:
+#                     true_label = 1.0
+#                 ans, t_c = classify(
+#                     model=model,
+#                     episode=ep_matrix,
+#                     true_label=true_label,
+#                     window_width=rolling_window_width,
+#                     ts_s=ts_s
+#                 )
+
+#                 episode_obj = EpisodePerf()
+#                 episode_obj.trueLabel = true_label
+#                 episode_obj.answer = ans
+#                 episode_obj.runTime = episode_time
+
+#                 t_ans_s = ((t_c / ts_s) + chopDex + ep_matrix.shape[1] - 1) * ts_s
+#                 if ans == 'NC':
+#                     # If true_label == failure
+#                     if true_label == 1.0:
+#                         makespan += episode_time
+#                         perf.count('NCF')
+#                     # If true_label == success
+#                     elif true_label == 0.0:
+#                         makespan += episode_time
+#                         win = True
+#                         perf.count('NCS')
+#                 else:
+#                     perf.count(ans)
+#                     if ans == 'TN' or ans == 'FP':
+#                         makespan += t_ans_s
+#                     elif ans == 'TP' or ans == 'FN':
+#                         makespan += episode_time
+#                         win = True
+
+#                     if ans in ( 'TP', 'FP' ):
+#                         MTP += episode_time
+#                         episode_obj.TTP = episode_time
+#                         N_posCls += 1
+#                     elif ans in ( 'TN', 'FN' ):
+#                         MTN += t_ans_s
+#                         episode_obj.TTN = t_ans_s
+#                         N_negCls += 1
+#                 timed_episodes.append(episode_obj)
+#         total_time += makespan
+#         mks.append(makespan)
+
+#     times = []
+#     for ep in timed_episodes:
+#         times.append(ep.runTime)
+
+#     confMatx = {
+#         # Actual Positives
+#         'TP' : (perf['TP'] if ('TP' in perf) else 0) / ((perf['TP'] if ('TP' in perf) else 0) + (perf['FN'] if ('FN' in perf) else 0)),
+#         'FN' : (perf['FN'] if ('FN' in perf) else 0) / ((perf['TP'] if ('TP' in perf) else 0) + (perf['FN'] if ('FN' in perf) else 0)),
+#         # Actual Negatives
+#         'TN' : (perf['TN'] if ('TN' in perf) else 0) / ((perf['TN'] if ('TN' in perf) else 0) + (perf['FP'] if ('FP' in perf) else 0)),
+#         'FP' : (perf['FP'] if ('FP' in perf) else 0) / ((perf['TN'] if ('TN' in perf) else 0) + (perf['FP'] if ('FP' in perf) else 0)),
+#         'NC' : (perf['NCS'] + perf['NCF'] if ('NCS' in perf and 'NCF' in perf) else 0) / len(timed_episodes),
+#     }
+
+#     MTP /= N_posCls #- Mean Time to Positive Classification
+#     MTN /= N_negCls #- Mean Time to Negative Classification
+#     MTS, MTF, _, _ = get_mts_mtf(trunc_data=episodes)
+
+#     print( f"MTP: {MTP} [s]" )
+#     print( f"MTN: {MTN} [s]" )
+#     print( f"MTP: {MTS} [s]" )
+#     print( f"MTN: {MTF} [s]" )
+
+#     EMS = monitored_makespan(
+#         MTF = MTF, 
+#         MTN = MTN, 
+#         MTS = MTS,
+#         P_TP = perf['TP'] / len(timed_episodes), 
+#         P_FN = perf['FN'] / len(timed_episodes), 
+#         P_TN = perf['TN'] / len(timed_episodes), 
+#         P_FP = perf['FP'] / len(timed_episodes),
+#         P_NCS = perf['NCS'] / len(timed_episodes),
+#         P_NCF = perf['NCF'] / len(timed_episodes)
+#     )
+#     print('Expected makespan [s] = ', end='')
+#     print( EMS, end=' [s]\n' )
+#     metrics = {
+#         'EMS': EMS,
+#         'MTP': MTP,
+#         'MTN': MTN,
+#         'MTS': MTS,
+#         'MTF': MTF,
+#         'P_TP': perf['TP'] / len(timed_episodes), 
+#         'P_FN': perf['FN'] / len(timed_episodes), 
+#         'P_TN': perf['TN'] / len(timed_episodes), 
+#         'P_FP': perf['FP'] / len(timed_episodes),
+#         'P_NCS': perf['NCS'] / len(timed_episodes),
+#         'P_NCF': perf['NCF'] / len(timed_episodes)
+#     }
+
+#     return total_time / n_simulations, mks, metrics, confMatx
 
 
 # TODO: fix this function, something wrong with MTP, MTN, MTS, MTF

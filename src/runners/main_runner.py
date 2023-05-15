@@ -34,7 +34,7 @@ MODELS_TO_RUN = [
 def load_keras_model(model_name: str, makespan_models: dict, verbose: bool = True):
     try:
         model = tf.keras.models.load_model(f'../saved_models/{model_name}.keras')
-        makespan_models[model_name] = model
+        makespan_models[model_name.split('-')[0]] = model
         if verbose:
             print(f'--> Loaded {model_name}')
     except OSError as e:
@@ -252,7 +252,7 @@ if __name__ == '__main__':
         models_to_run={'FCN': fcn_model.model, 'VanillaTransformer': transformer_model.model},
         n_simulations = 150,
         data_mode='load_data',
-        compute=False
+        compute=True
     )
 
     plot_simulation_makespans(
