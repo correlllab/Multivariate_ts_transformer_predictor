@@ -120,7 +120,7 @@ def run_makespan_simulation(models_to_run: dict, n_simulations: int = 100, data_
             if model_name not in res.keys():
                 res[model_name] = {'metrics': {}, 'conf_mat': {}, 'times': {}, 'makespan_sim_hist': [], 'makespan_sim_avg': -1, 'makespan_sim_std': -1}
             print(f'====> Updating expected makespan from equation for {model_name}:')
-            res[model_name]['metrics']['EMS'] = monitored_makespan(
+            res[model_name]['metrics']['EMS'] = abs(monitored_makespan(
                 MTS=res[model_name]['metrics']['MTS'],
                 MTF=res[model_name]['metrics']['MTF'],
                 MTN=res[model_name]['metrics']['MTN'],
@@ -130,7 +130,7 @@ def run_makespan_simulation(models_to_run: dict, n_simulations: int = 100, data_
                 P_FP=res[model_name]['metrics']['P_FP'],
                 P_NCF=res[model_name]['metrics']['P_NCF'],
                 P_NCS=res[model_name]['metrics']['P_NCS']
-            )
+            ))
 
     print(f'res = {res}\n')
 

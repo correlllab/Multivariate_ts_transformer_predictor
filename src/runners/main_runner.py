@@ -27,6 +27,9 @@ DATA = 'reactive'
 DATA_DIR = f'../../data/data_manager/{DATA}'
 MODELS_TO_RUN = [
     'FCN',
+    'RNN',
+    'GRU',
+    'LSTM',
     'VanillaTransformer'
 ]
 
@@ -183,12 +186,12 @@ if __name__ == '__main__':
     print('DONE\n')
 
     # Create table to be printed
-    headers = ['Measure', 'Reactive', 'FCN Simulation', 'Transformer Simulation']
+    headers = ['Measure', 'Reactive', 'FCN Simulation', 'RNN', 'GRU', 'LSTM', 'Transformer Simulation']
     data_table = [
-        ['Makespan [s]', None, None, None],
-        ['Predicted [s]', None, None, None],
-        ['MTS', None, None, None],
-        ['MTF', None, None, None]
+        ['Makespan [s]', None, None, None, None, None, None],
+        ['Predicted [s]', None, None, None, None, None, None],
+        ['MTS', None, None, None, None, None, None],
+        ['MTF', None, None, None, None, None, None]
     ]
 
     # Load models
@@ -197,31 +200,30 @@ if __name__ == '__main__':
     if 'FCN' in MODELS_TO_RUN:
         load_keras_model(model_name='FCN', makespan_models=makespan_models)
 
+    if 'RNN' in MODELS_TO_RUN:
+        load_keras_model(model_name='RNN', makespan_models=makespan_models)
+
+    if 'GRU' in MODELS_TO_RUN:
+        load_keras_model(model_name='GRU', makespan_models=makespan_models)
+
+    if 'LSTM' in MODELS_TO_RUN:
+        load_keras_model(model_name='LSTM', makespan_models=makespan_models)
+
     if 'VanillaTransformer' in MODELS_TO_RUN:
         load_keras_model(model_name='VanillaTransformer', makespan_models=makespan_models)
 
     # Call function to compute confusion matrices
-    fcn_model = get_model(name='FCN', roll_win_width=roll_win_width, X_sample=X_train[:64])
-    fcn_model.model = makespan_models['FCN']
-    fcn_conf_mat = compute_confusion_matrix(
-        model=fcn_model.model,
-        file_name=fcn_model.file_name,
-        imgs_path=fcn_model.imgs_path,
-        X_winTest=X_window_test,
-        Y_winTest=Y_window_test,
-        plot=True
-    )
-
-    transformer_model = get_model(name='VanillaTransformer', roll_win_width=roll_win_width, X_sample=X_train[:64])
-    transformer_model.model = makespan_models['VanillaTransformer']
-    transformer_conf_mat = compute_confusion_matrix(
-        model=transformer_model.model,
-        file_name=transformer_model.file_name,
-        imgs_path=transformer_model.imgs_path,
-        X_winTest=X_window_test,
-        Y_winTest=Y_window_test,
-        plot=True
-    )
+    for model_name in MODELS_TO_RUN:
+        model = get_model(name=model_name, roll_win_width=roll_win_width, X_sample=X_train[:64])
+        model.model = makespan_models[model_name]
+        fcn_conf_mat = compute_confusion_matrix(
+            model=model.model,
+            file_name=model.file_name,
+            imgs_path=model.imgs_path,
+            X_winTest=X_window_test,
+            Y_winTest=Y_window_test,
+            plot=True
+        )
 
     # Makespan prediction with formula
     # dp = DataPreprocessing(sampling='under', data=DATA)
@@ -248,30 +250,41 @@ if __name__ == '__main__':
     data_table[0][1] = react_avg_mks
     print()
 
+    sim_models = {
+        'FCN': makespan_models['FCN'],
+        'RNN': makespan_models['RNN'],
+        'GRU': makespan_models['GRU'],
+        'LSTM': makespan_models['LSTM'],
+        'VanillaTransformer': makespan_models['VanillaTransformer']
+    }
+    plot_models = {
+        'FCN': makespan_models['FCN'],
+        'RNN': makespan_models['RNN'],
+        'GRU': makespan_models['GRU'],
+        'LSTM': makespan_models['LSTM'],
+        'VanillaTransformer': makespan_models['VanillaTransformer']
+    }
+
     sim_res = run_makespan_simulation(
-        models_to_run={'FCN': fcn_model.model, 'VanillaTransformer': transformer_model.model},
+        models_to_run=sim_models,
         n_simulations = 150,
         data_mode='load_data',
-        compute=True
+        compute=False
     )
 
     plot_simulation_makespans(
         res=sim_res,
-        models={'FCN': fcn_model.model, 'VanillaTransformer': transformer_model.model},
+        models=plot_models,
         reactive_mks=react_mks[:150],
         plot_reactive=True,
         save_plots=True
     )
 
-    data_table[0][2] = sim_res['FCN']['makespan_sim_avg']
-    data_table[1][2] = sim_res['FCN']['metrics']['EMS']
-    data_table[2][2] = sim_res['FCN']['metrics']['MTS']
-    data_table[3][2] = sim_res['FCN']['metrics']['MTF']
-
-    data_table[0][3] = sim_res['VanillaTransformer']['makespan_sim_avg']
-    data_table[1][3] = sim_res['VanillaTransformer']['metrics']['EMS']
-    data_table[2][3] = sim_res['VanillaTransformer']['metrics']['MTS']
-    data_table[3][3] = sim_res['VanillaTransformer']['metrics']['MTF']
+    for i, model_name in enumerate(MODELS_TO_RUN):
+        data_table[0][i+2] = sim_res[model_name]['makespan_sim_avg']
+        data_table[1][i+2] = sim_res[model_name]['metrics']['EMS']
+        data_table[2][i+2] = sim_res[model_name]['metrics']['MTS']
+        data_table[3][i+2] = sim_res[model_name]['metrics']['MTF']
 
     print(tabulate(data_table, headers=headers))
 
@@ -280,6 +293,9 @@ if __name__ == '__main__':
     actual_fcn = sim_res['FCN']['makespan_sim_avg']
     actual_transformer = sim_res['VanillaTransformer']['makespan_sim_avg']
 
+    cm_fcn = sim_res['FCN']['conf_mat']
+    cm_transformer = sim_res['VanillaTransformer']['conf_mat']
+
     metrics_fcn = sim_res['FCN']['metrics']
     metrics_transformer = sim_res['VanillaTransformer']['metrics']
 
@@ -287,7 +303,8 @@ if __name__ == '__main__':
     n_vals = 100
     prob = np.linspace(0.0, 0.5, num=n_vals)
     result_react = [r_mks] * n_vals
-    result_fcn = monitored_makespan(
+
+    result_fcn = abs(monitored_makespan(
         MTS=metrics_fcn['MTS'],
         MTF=metrics_fcn['MTF'],
         MTN=metrics_fcn['MTN'],
@@ -297,8 +314,8 @@ if __name__ == '__main__':
         P_FP=metrics_fcn['P_FP'],
         P_NCF=metrics_fcn['P_NCF'],
         P_NCS=metrics_fcn['P_NCS']
-    )
-    result_tr = monitored_makespan(
+    ))
+    result_tr = abs(monitored_makespan(
         MTS=metrics_transformer['MTS'],
         MTF=metrics_transformer['MTF'],
         MTN=metrics_transformer['MTN'],
@@ -308,7 +325,7 @@ if __name__ == '__main__':
         P_FP=metrics_transformer['P_FP'],
         P_NCF=metrics_transformer['P_NCF'],
         P_NCS=metrics_transformer['P_NCS']
-    )
+    ))
 
     plt.plot(prob, result_react, label='Reactive')
     plt.plot(metrics_fcn['P_TP'], actual_react, marker='x', color='black')
