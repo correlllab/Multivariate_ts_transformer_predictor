@@ -7,6 +7,8 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # INFO and WARNING messages are not pri
 import numpy as np
 import tensorflow as tf
 
+from sklearn.model_selection import train_test_split
+
 from data_management.data_preprocessing import DataPreprocessing
 from model_builds.FCN import FCN
 from model_builds.RNN import RNN, GRU, LSTM
@@ -80,7 +82,7 @@ def build_oop_transformer(X_sample, model_type: str):
             verbose=False
         )
 
-    transformer_net.compile()
+    # transformer_net.compile()
 
     return transformer_net
 
@@ -104,18 +106,18 @@ def get_model(name: str, roll_win_width: int = 0, X_sample = None):
     return None
 
 
-DATA = 'reactive'
-DATA_DIR = f'../../data/data_manager/{DATA}'
+DATA = ['reactive', 'training']
+DATA_DIR = f'../../data/data_manager/{"_".join(DATA)}'
 SAVE_DATA = True
 LOAD_DATA_FROM_FILES = True
 MODELS_TO_RUN = [
     'FCN',
-    # 'RNN',
-    # 'GRU',
-    # 'LSTM',
+    'RNN',
+    'GRU',
+    'LSTM',
     'VanillaTransformer',
-    # 'OOP_Transformer',
-    # 'OOP_Transformer_small'
+    'OOP_Transformer',
+    'OOP_Transformer_small'
     ]
 
 
@@ -173,25 +175,25 @@ if __name__ == '__main__':
     for dev in devices:
         print( f"\t{dev}" )
 
-    dp = DataPreprocessing(sampling='under', data=DATA)
+    dp = DataPreprocessing(sampling='none', data=DATA)
     if LOAD_DATA_FROM_FILES:
         print('\nLoading data from files...', end='')
-        with open(f'{DATA_DIR}/{DATA}_X_train.npy', 'rb') as f:
+        with open(f'{DATA_DIR}/{"_".join(DATA)}_X_train.npy', 'rb') as f:
             X_train = np.load(f, allow_pickle=True)
 
-        with open(f'{DATA_DIR}/{DATA}_Y_train.npy', 'rb') as f:
+        with open(f'{DATA_DIR}/{"_".join(DATA)}_Y_train.npy', 'rb') as f:
             Y_train = np.load(f, allow_pickle=True)
 
-        with open(f'{DATA_DIR}/{DATA}_X_test.npy', 'rb') as f:
+        with open(f'{DATA_DIR}/{"_".join(DATA)}_X_test.npy', 'rb') as f:
             X_test = np.load(f, allow_pickle=True)
 
-        with open(f'{DATA_DIR}/{DATA}_Y_test.npy', 'rb') as f:
+        with open(f'{DATA_DIR}/{"_".join(DATA)}_Y_test.npy', 'rb') as f:
             Y_test = np.load(f, allow_pickle=True)
 
-        with open(f'{DATA_DIR}/{DATA}_X_winTest.npy', 'rb') as f:
+        with open(f'{DATA_DIR}/{"_".join(DATA)}_X_winTest.npy', 'rb') as f:
             X_winTest = np.load(f, allow_pickle=True)
 
-        with open(f'{DATA_DIR}/{DATA}_Y_winTest.npy', 'rb') as f:
+        with open(f'{DATA_DIR}/{"_".join(DATA)}_Y_winTest.npy', 'rb') as f:
             Y_winTest = np.load(f, allow_pickle=True)
         roll_win_width = int(7.0 * 50)
         print('DONE\n')
@@ -206,6 +208,12 @@ if __name__ == '__main__':
         Y_winTest = dp.Y_winTest
         roll_win_width = dp.rollWinWidth
         print('DONE\n')
+
+    # From the previous we have 0.8 train split and 0.2 test split, now we need to separate
+    # the train split into train-validation splits
+
+    # Generate train-validation split with 0.9 train and 0.1 validation
+    X_train, X_val, Y_train, Y_val = train_test_split(X_train, Y_train, train_size=0.9)
 
     if os.path.exists('../saved_data/model_sizes.json'):
         with open('../saved_data/model_sizes.json', 'r') as f:
@@ -226,12 +234,12 @@ if __name__ == '__main__':
             model=model,
             X_train=X_train,
             Y_train=Y_train,
-            X_test=X_test,
-            Y_test=Y_test,
+            X_test=X_val,
+            Y_test=Y_val,
             X_window_test=X_winTest,
             Y_window_test=Y_winTest,
             model_n_params=model_n_params,
-            compute=False
+            compute=True
         )
 
         with open('../saved_data/model_sizes.json', 'w') as f:
@@ -239,141 +247,3 @@ if __name__ == '__main__':
 
         tf.keras.backend.clear_session()
 
-    # # FCN --------------------------------------------------------
-    # fcn_net = FCN(rolling_window_width=roll_win_width)
-    # if fcn_net.model_name in MODELS_TO_RUN:
-    #     fcn_net.build()
-    #     model_n_params = run_model(
-    #         model=fcn_net,
-    #         X_train=X_train,
-    #         Y_train=Y_train,
-    #         X_test=X_test,
-    #         Y_test=Y_test,
-    #         X_window_test=X_winTest,
-    #         Y_window_test=Y_winTest,
-    #         model_n_params=model_n_params
-    #     )
-
-    #     with open('../saved_data/model_sizes.json', 'w') as f:
-    #         json.dump(model_n_params, f)
-
-    # tf.keras.backend.clear_session()
-    # # RNN --------------------------------------------------------
-    # rnn_net = RNN()
-    # if rnn_net.model_name in MODELS_TO_RUN:
-    #     model_n_params = run_model(
-    #         model=rnn_net,
-    #         X_train=X_train,
-    #         Y_train=Y_train,
-    #         X_test=X_test,
-    #         Y_test=Y_test,
-    #         X_window_test=X_winTest,
-    #         Y_window_test=Y_winTest,
-    #         model_n_params=model_n_params
-    #     )
-
-    #     with open('../saved_data/model_sizes.json', 'w') as f:
-    #         json.dump(model_n_params, f)
-
-    # tf.keras.backend.clear_session()
-    # # VanillaTransformer --------------------------------------------------------
-    # vanilla_transformer_net = VanillaTransformer()
-    # if vanilla_transformer_net.model_name in MODELS_TO_RUN:
-    #     model_n_params = run_model(
-    #         model=vanilla_transformer_net,
-    #         X_train=X_train,
-    #         Y_train=Y_train,
-    #         X_test=X_test,
-    #         Y_test=Y_test,
-    #         X_window_test=X_winTest,
-    #         Y_window_test=Y_winTest,
-    #         model_n_params=model_n_params
-    #     )
-
-    #     print(f'\nAttention scores:\n{vanilla_transformer_net.last_attn_scores}\n')
-
-    #     with open('../saved_data/model_sizes.json', 'w') as f:
-    #         json.dump(model_n_params, f)
-
-    # tf.keras.backend.clear_session()
-    # # OOP Transformer (Small) --------------------------------------------------------
-    # transformer_net_small = OOPTransformer(model_name='OOP_Transformer_small')
-    # if transformer_net_small.model_name in MODELS_TO_RUN:
-    #     num_layers = 4
-    #     d_model = 6
-    #     ff_dim = 256
-    #     num_heads = 4
-    #     head_size = 128
-    #     dropout_rate = 0.2
-    #     mlp_dropout = 0.4
-    #     mlp_units = [128]
-
-    #     transformer_net_small.build(
-    #         X_sample=X_train[:64],
-    #         num_layers=num_layers,
-    #         d_model=d_model,
-    #         ff_dim=ff_dim,
-    #         num_heads=num_heads,
-    #         head_size=head_size,
-    #         dropout_rate=dropout_rate,
-    #         mlp_dropout=mlp_dropout,
-    #         mlp_units=mlp_units,
-    #         verbose=True
-    #     )
-
-    #     transformer_net_small.compile()
-
-    #     model_n_params = run_model(
-    #         model=transformer_net_small,
-    #         X_train=X_train,
-    #         Y_train=Y_train,
-    #         X_test=X_test,
-    #         Y_test=Y_test,
-    #         X_window_test=X_winTest,
-    #         Y_window_test=Y_winTest,
-    #         model_n_params=model_n_params
-    #     )
-
-    #     with open('../saved_data/model_sizes.json', 'w') as f:
-    #         json.dump(model_n_params, f)
-
-    # tf.keras.backend.clear_session()
-    # # OOP Transformer --------------------------------------------------------
-    # transformer_net = OOPTransformer()
-    # if transformer_net.model_name in MODELS_TO_RUN:
-    #     num_layers = 4
-    #     d_model = 6
-    #     ff_dim = 256
-    #     num_heads = 8
-    #     head_size = 256
-    #     dropout_rate = 0.2
-    #     mlp_dropout = 0.4
-    #     mlp_units = [128, 256, 64]
-
-    #     transformer_net.build(
-    #         X_sample=X_train[:64],
-    #         num_layers=num_layers,
-    #         d_model=d_model,
-    #         ff_dim=ff_dim,
-    #         num_heads=num_heads,
-    #         head_size=head_size,
-    #         dropout_rate=dropout_rate,
-    #         mlp_dropout=mlp_dropout,
-    #         mlp_units=mlp_units,
-    #         verbose=True
-    #     )
-
-    #     transformer_net.compile()
-    #     model_n_params = run_model(
-    #         model=transformer_net,
-    #         X_train=X_train,
-    #         Y_train=Y_train,
-    #         X_test=X_test,
-    #         Y_test=Y_test,
-    #         X_window_test=X_winTest,
-    #         Y_window_test=Y_winTest,
-    #         model_n_params=model_n_params
-    #     )
-
-    #     with open('../saved_data/model_sizes.json', 'w') as f:
-    #         json.dump(model_n_params, f)

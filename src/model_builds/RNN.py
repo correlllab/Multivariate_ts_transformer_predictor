@@ -18,22 +18,26 @@ class BaseRNN:
         self.imgs_path = f'../saved_data/imgs/{self.model_name}/'
         self.histories_path = f'../saved_data/histories/{self.model_name}_history'
 
-    def fit(self, X_train, Y_train, X_test, Y_test, batch_size=512, epochs=200, save_model=True, verbose=False):
-        self.build_model(
-            input_shape=X_train.shape[1:],
-            dim=128,
-            dropout=0.2,
-            dense_dim=2
-        )
+    def fit(self, X_train, Y_train, X_test, Y_test, batch_size=1024, epochs=200, save_model=True, verbose=False):
+        mirrored_strategy = tf.distribute.MirroredStrategy()
+        with mirrored_strategy.scope():
+            self.build_model(
+                input_shape=X_train.shape[1:],
+                dim=128,
+                dropout=0.2,
+                dense_dim=2
+            )
 
-        learning_rate = 1e-4
-        opt = tf.keras.optimizers.legacy.Adam(learning_rate)
-        opt = tf.keras.mixed_precision.LossScaleOptimizer(opt)
-        loss_object = tf.keras.losses.CategoricalCrossentropy()
+            learning_rate = 1e-4
+            opt = tf.keras.optimizers.legacy.Adam(learning_rate)
+            opt = tf.keras.mixed_precision.LossScaleOptimizer(opt)
+            loss_object = tf.keras.losses.CategoricalCrossentropy()
+            metric = tf.keras.metrics.CategoricalAccuracy()
+
         self.model.compile(
             loss=loss_object,
             optimizer=opt,
-            metrics=[tf.keras.metrics.CategoricalAccuracy()]
+            metrics=[metric]
         )
         if verbose:
             self.model.summary()
@@ -50,7 +54,7 @@ class BaseRNN:
         self.history = self.model.fit(
             x=X_train,
             y=Y_train,
-            validation_split=0.1,
+            validation_split=0.2,
             epochs=epochs,
             batch_size=batch_size,
             callbacks=callbacks,

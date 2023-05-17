@@ -93,7 +93,7 @@ def compute_confusion_matrix(model, file_name, imgs_path, X_winTest, Y_winTest, 
         sns.set(font_scale=1.5)
         conf_mat = sns.heatmap(arr, annot=True).get_figure()
         conf_mat.savefig(imgs_path + 'confusion_matrix.png')
-        plt.close()
+        plt.close('all')
 
     return confMatx
 

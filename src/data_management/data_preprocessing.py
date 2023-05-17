@@ -19,10 +19,12 @@ from utilities.helper_functions import position_encode
 # SHUFFLING ONLY ON EPISODES!!!! NOT ON WINDOWS
 
 class DataPreprocessing:
-    def __init__(self, sampling: str = 'over' or 'under', data: str = 'preemptive' or 'reactive' or 'training') -> None:
+    def __init__(self, sampling: str = 'over' or 'under' or 'none', data: list = []) -> None:
         self.sampling = sampling
-        self.data_name = data
-        self.datadir = os.path.join(os.path.dirname(os.path.abspath('../')), f'data/Npy_files/{data}/')
+        self.data_names = data
+
+        self.data_dirs = []
+        # self.datadir = os.path.join(os.path.dirname(os.path.abspath('../')), f'data/Npy_files/{data}/')
         self.shuffle = True
         self.data = None
         self.truncData = None
@@ -46,13 +48,24 @@ class DataPreprocessing:
         self.rollWinWidth = None
 
 
+    def create_data_dirs(self):
+        for data in self.data_names:
+            self.data_dirs.append(os.path.join(os.path.dirname(os.path.abspath('../')), f'data/Npy_files/{data}/'))
+
+
     def load_data(self, verbose=False):
-        """ Load 100 files so that there is balance between classes """
+        self.create_data_dirs()
         ext      = "*.npy"
-        print(self.datadir)
-        npyFiles = glob.glob(self.datadir + ext)
+        npyFiles = []
+        for data_dir in self.data_dirs:
+            print(data_dir)
+            files = glob.glob(data_dir + ext)
+            if verbose:
+                print( f"Found {len(files)} {ext} files!" )
+            npyFiles += files
+
         if verbose:
-            print( f"Found {len(npyFiles)} {ext} files!" )
+            print(f'Total number of files found is {len(npyFiles)}')
 
         if self.shuffle:
             shuffle( npyFiles )
@@ -64,7 +77,6 @@ class DataPreprocessing:
         N_f    = 0
         for file in npyFiles:
             epMatx = np.array( np.load( file ) ).astype( dtype = float )
-            # print( epMatx[0,7] )
             if epMatx[0,7] == 1.0:
                 N_s += 1
             elif epMatx[0,7] == 0.0:
@@ -90,20 +102,12 @@ class DataPreprocessing:
         for j, epMatx in enumerate( self.data ):
             # Look for the first spike in F_z
             N          = epMatx.shape[0]
-            # if verbose:
-            #     print( f"{j}\n{epMatx.shape} input data shape" )
             chopDex    = 0
             for bgn in range( int(1.5*50), N-winWidth+1 ):
                 end     = bgn+winWidth
                 FzSlice = epMatx[ bgn:end, FzCol ].flatten()
-                # print( FzSlice.shape )
-                # print( np.amax( FzSlice ), np.amin( FzSlice ), type( np.amax( FzSlice ) - np.amin( FzSlice ) ) )
                 if np.abs( np.amax( FzSlice ) - np.amin( FzSlice ) ) >= spikeThresh:
-                    # print( np.amax( FzSlice ), np.amin( FzSlice ) )
-                    # print( FzSlice )
                     chopDex = bgn
-                    # if verbose:
-                    #     print( f"Relevant data at {chopDex*20/1000.0} seconds!" )
                     break
             if (chopDex*20/1000) < 15.0:
                 truncData.append( epMatx[ chopDex:,: ] )
@@ -135,44 +139,8 @@ class DataPreprocessing:
         self.window_data = windowData
 
 
-    # def balance_window_data(self, verbose=False):
-    #     window_limit = 100000
-    #     positive_windows = []
-    #     negative_windows = []
-    #     positive_sum = 0.
-    #     negative_sum = 0.
-    #     positive_flag = False
-    #     negative_flag = False
-    #     stop_flag = False
-    #     i = 0
-    #     while not stop_flag:
-    #         episode = self.window_data[i]
-    #         if episode[0,0,6] == 1.0:
-    #             if positive_sum <= window_limit:
-    #                 positive_sum += episode.shape[0]
-    #                 positive_windows.append(episode)
-    #             else:
-    #                 positive_flag = True
-    #         elif episode[0,0,6] == 0.0:
-    #             if negative_sum <= window_limit:
-    #                 negative_sum += episode.shape[0]
-    #                 negative_windows.append(episode)
-    #             else:
-    #                 negative_flag = True
-
-    #         stop_flag = (positive_flag and negative_flag)
-    #         i += 1
-
-    #     if verbose:
-    #         print(f'Truncated to {positive_sum} positive windows and {negative_sum} negative windows')
-
-    #     # Concat the two lists and shuffle
-    #     self.window_data = [*positive_windows, *negative_windows]
-    #     shuffle(self.window_data)
-
-
     def stack_windows(self, verbose=False):
-        self.testFrac     = 0.10
+        self.testFrac     = 0.20
         self.N_ep         = len( self.window_data )
         self.N_test       = int(self.N_ep * self.testFrac)
         self.N_train      = self.N_ep - self.N_test
@@ -258,10 +226,7 @@ class DataPreprocessing:
 
         for j in range( self.N_test ):
             ep = self.window_data[i]
-            # print()
             for window in ep:
-                # print(datasetTest[k,0,6], end=' ')
-                # print( datasetTest[k,-1,:] )
                 if datasetTest[k,0,6] == 1.0:
                     self.Y_test[k,0] = 0
                     pos += 1
@@ -314,15 +279,8 @@ class DataPreprocessing:
             print('    ====> CLASSES DISTRIBUTION BEFORE:')
             print(f'        Passes = {int(sum(self.Y_train[:,0]))}; Fails = {int(sum(self.Y_train[:,1]))}\n')
 
-        if self.sampling == 'over':
-            # TODO: try oversampler, probably does not work like this
-            # oversampler = RandomOverSampler(sampling_strategy='minority')
-            oversampler = SMOTE()
-            self.X_train_sampled, self.Y_train_sampled = oversampler.fit_resample(self.X_train.reshape(self.X_train.shape[0], -1), self.Y_train)
-            # oversampler.fit_resample(self.X_train[:,:,0], self.Y_train)
-            # self.X_train_sampled = deepcopy(self.X_train[oversampler.sample_indices_])
-            # self.Y_train_sampled = deepcopy(self.Y_train[oversampler.sample_indices_])
-        elif self.sampling == 'under':
+        # No oversampling
+        if self.sampling == 'under':
             undersampler = RandomUnderSampler(sampling_strategy='majority')
             undersampler.fit_resample(self.X_train[:,:,0], self.Y_train)
             self.X_train_sampled = deepcopy(self.X_train[undersampler.sample_indices_])
@@ -334,7 +292,6 @@ class DataPreprocessing:
         if verbose:
             print('    ====> CLASSES DISTRIBUTION AFTER:')
             print(f'        Passes = {int(sum(self.Y_train_sampled[:,0]))}; Fails = {int(sum(self.Y_train_sampled[:,1]))}\n')
-    #         print(self.X_train_sampled.shape, self.Y_train_sampled.shape)
 
 
     def scale_data(self, verbose=False):
@@ -356,9 +313,6 @@ class DataPreprocessing:
         if verbose:
             print('\n====> Getting complete twist windows...\n')
         self.get_complete_twist_windows(verbose=verbose)
-        # if verbose:
-        #     print('\n====> Balancing windows...\n')
-        # self.balance_window_data(verbose=verbose)
         if verbose:
             print('\n====> Stacking windows...\n')
         self.stack_windows(verbose=verbose)
@@ -375,32 +329,32 @@ class DataPreprocessing:
             if verbose:
                 print('\n====> Saving data into npy files...', end='\n')
 
-            save_dir = f'../../data/data_manager/{self.data_name}'
+            save_dir = f'../../data/data_manager/{"_".join(self.data_names)}'
             if not os.path.exists(save_dir):
                 os.makedirs(save_dir)
 
-            with open(f'{save_dir}/{self.data_name}_X_train.npy', 'wb') as f:
+            with open(f'{save_dir}/{"_".join(self.data_names)}_X_train.npy', 'wb') as f:
                 np.save(f, self.X_train, allow_pickle=True)
 
-            with open(f'{save_dir}/{self.data_name}_Y_train.npy', 'wb') as f:
+            with open(f'{save_dir}/{"_".join(self.data_names)}_Y_train.npy', 'wb') as f:
                 np.save(f, self.Y_train, allow_pickle=True)
 
-            with open(f'{save_dir}/{self.data_name}_X_train_sampled.npy', 'wb') as f:
+            with open(f'{save_dir}/{"_".join(self.data_names)}_X_train_sampled.npy', 'wb') as f:
                 np.save(f, self.X_train_sampled, allow_pickle=True)
 
-            with open(f'{save_dir}/{self.data_name}_Y_train_sampled.npy', 'wb') as f:
+            with open(f'{save_dir}/{"_".join(self.data_names)}_Y_train_sampled.npy', 'wb') as f:
                 np.save(f, self.Y_train_sampled, allow_pickle=True)
 
-            with open(f'{save_dir}/{self.data_name}_X_test.npy', 'wb') as f:
+            with open(f'{save_dir}/{"_".join(self.data_names)}_X_test.npy', 'wb') as f:
                 np.save(f, self.X_test, allow_pickle=True)
 
-            with open(f'{save_dir}/{self.data_name}_Y_test.npy', 'wb') as f:
+            with open(f'{save_dir}/{"_".join(self.data_names)}_Y_test.npy', 'wb') as f:
                 np.save(f, self.Y_test, allow_pickle=True)
 
-            with open(f'{save_dir}/{self.data_name}_X_winTest.npy', 'wb') as f:
+            with open(f'{save_dir}/{"_".join(self.data_names)}_X_winTest.npy', 'wb') as f:
                 np.save(f, self.X_winTest, allow_pickle=True)
 
-            with open(f'{save_dir}/{self.data_name}_Y_winTest.npy', 'wb') as f:
+            with open(f'{save_dir}/{"_".join(self.data_names)}_Y_winTest.npy', 'wb') as f:
                 np.save(f, self.Y_winTest, allow_pickle=True)
 
             if verbose:
@@ -408,8 +362,11 @@ class DataPreprocessing:
 
 
 if __name__ == '__main__':
-    dp = DataPreprocessing(sampling='under', data='training')
+    dp = DataPreprocessing(sampling='none', data=['reactive', 'training'])
     dp.run(save_data=False, verbose=True)
-    print(type(dp.truncData))
-    print(type(random.choice(dp.truncData)))
+    suma = 0
+    for i in range(len(dp.X_winTest)):
+        suma += dp.X_winTest[i].shape[0]
+    print(f'X_winTest shape = {dp.X_winTest[0].shape}), suma = {suma}')
+    print(f'X_test shape = {dp.X_test.shape}')
     print('ALL OK')

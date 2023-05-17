@@ -37,25 +37,39 @@ class OOPTransformer:
             mlp_units: List[int],
             verbose: bool = False
     ):
-        self.model = Transformer(
-            num_layers=num_layers,
-            d_model=d_model,
-            num_heads=num_heads,
-            head_size=head_size,
-            ff_dim=ff_dim,
-            mlp_units=mlp_units,
-            target_space_size=2,
-            training=True,
-            dropout_rate=dropout_rate,
-            mlp_dropout=mlp_dropout
-        )
+        mirrored_strategy = tf.distribute.MirroredStrategy()
+        with mirrored_strategy.scope():
+            self.model = Transformer(
+                num_layers=num_layers,
+                d_model=d_model,
+                num_heads=num_heads,
+                head_size=head_size,
+                ff_dim=ff_dim,
+                mlp_units=mlp_units,
+                target_space_size=2,
+                training=True,
+                dropout_rate=dropout_rate,
+                mlp_dropout=mlp_dropout
+            )
 
-        output = self.model(X_sample)
-        attn_scores = self.model.encoder.enc_layers[-1].last_attn_scores
-        if verbose:
-            print(output.shape)
-            print(attn_scores.shape)  # (batch, heads, target_seq, input_seq)
-            print(self.model.summary())
+            output = self.model(X_sample)
+            attn_scores = self.model.encoder.enc_layers[-1].last_attn_scores
+            if verbose:
+                print(output.shape)
+                print(attn_scores.shape)  # (batch, heads, target_seq, input_seq)
+                print(self.model.summary())
+
+            learning_rate = 1e-4
+            opt = tf.keras.optimizers.legacy.Adam(learning_rate)
+            opt = tf.keras.mixed_precision.LossScaleOptimizer(opt)
+            loss_object = tf.keras.losses.CategoricalCrossentropy()
+            metric = tf.keras.metrics.CategoricalAccuracy()
+
+        self.model.compile(
+            loss=loss_object,
+            optimizer=opt,
+            metrics=[metric]
+        )
 
 
     def compile(self):
@@ -64,11 +78,12 @@ class OOPTransformer:
         opt = tf.keras.optimizers.legacy.Adam(learning_rate)
         opt = tf.keras.mixed_precision.LossScaleOptimizer(opt)
         loss_object = tf.keras.losses.CategoricalCrossentropy()
+        metric = tf.keras.metrics.CategoricalAccuracy()
 
         self.model.compile(
             loss=loss_object,
             optimizer=opt,
-            metrics=[tf.keras.metrics.CategoricalAccuracy()]
+            metrics=[metric]
         )
 
 
@@ -79,7 +94,7 @@ class OOPTransformer:
             X_test: Any,
             Y_test: Any,
             epochs: int = 200,
-            batch_size: int = 64,
+            batch_size: int = 256,
             save_model: bool = True
     ):
         callbacks = [
@@ -93,7 +108,7 @@ class OOPTransformer:
         self.history = self.model.fit(
             x=X_train,
             y=Y_train,
-            validation_split=0.1,
+            validation_split=0.2,
             epochs=epochs,
             batch_size=batch_size,
             callbacks=callbacks,

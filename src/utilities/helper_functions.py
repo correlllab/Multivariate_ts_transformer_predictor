@@ -48,6 +48,7 @@ def graph_episode_output( res, index, ground_truth, out_decision, net, imgs_path
     if save_fig:
         plt.savefig(imgs_path + f'{net}_prob_{index}.png')
         plt.clf()
+        plt.close('all')
     else:
         plt.show()
     

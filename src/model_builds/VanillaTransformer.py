@@ -98,31 +98,35 @@ class VanillaTransformer:
         #     x = tf.keras.layers.Dense(dim, activation="relu")(x)
         #     x = tf.keras.layers.Dropout(mlp_dropout)(x)
         outputs = tf.keras.layers.Dense(n_classes, activation='softmax', dtype='float32', kernel_regularizer=tf.keras.regularizers.l2(l2=0.01))(x)
+
         self.model = tf.keras.Model(inputs, outputs)
 
 
-    def fit(self, X_train, Y_train, X_test, Y_test, batch_size=128, epochs=200, save_model=True, verbose=False):
+    def fit(self, X_train, Y_train, X_test, Y_test, batch_size=512, epochs=200, save_model=True, verbose=False):
         input_shape = X_train.shape[1:]
-        self.build_model(
-            input_shape,
-            head_size=128,
-            num_heads=4,
-            ff_dim=256,
-            num_transformer_blocks=4,
-            mlp_units=[128],
-            mlp_dropout=0.4,
-            dropout=0.2,
-        )
+        mirrored_strategy = tf.distribute.MirroredStrategy()
+        with mirrored_strategy.scope():
+            self.build_model(
+                input_shape,
+                head_size=128,
+                num_heads=4,
+                ff_dim=256,
+                num_transformer_blocks=4,
+                mlp_units=[128],
+                mlp_dropout=0.4,
+                dropout=0.2,
+            )
 
 
-        learning_rate = 1e-4
-        opt = tf.keras.optimizers.legacy.Adam(learning_rate)
-        opt = tf.keras.mixed_precision.LossScaleOptimizer(opt)
-        loss_object = tf.keras.losses.CategoricalCrossentropy()
+            learning_rate = 1e-4
+            opt = tf.keras.optimizers.legacy.Adam(learning_rate)
+            opt = tf.keras.mixed_precision.LossScaleOptimizer(opt)
+            loss_object = tf.keras.losses.CategoricalCrossentropy()
+            metric = tf.keras.metrics.CategoricalAccuracy()
         self.model.compile(
             loss=loss_object,
             optimizer=opt,
-            metrics=[tf.keras.metrics.CategoricalAccuracy()],
+            metrics=[metric],
         )
         if verbose:
             self.model.summary()
@@ -151,7 +155,7 @@ class VanillaTransformer:
         self.history = self.model.fit(
             x=X_train,
             y=Y_train,
-            validation_split=0.1,
+            validation_split=0.2,
             epochs=epochs,
             batch_size=batch_size,
             callbacks=callbacks,
