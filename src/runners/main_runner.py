@@ -300,8 +300,8 @@ if __name__ == '__main__':
     metrics_transformer = sim_res['VanillaTransformer']['metrics']
 
     # P_TP var independent
-    n_vals = 100
-    prob = np.linspace(0.0, 0.5, num=n_vals)
+    n_vals = 200
+    prob = np.linspace(0.0, 0.99, num=n_vals)
     result_react = [r_mks] * n_vals
 
     result_fcn = abs(monitored_makespan(
@@ -340,5 +340,123 @@ if __name__ == '__main__':
     plt.plot(prob, result_react - result_tr, label='Time saved Transformer')
 
     plt.legend()
-    plt.savefig('../saved_data/imgs/simulation/sim_img.png')
+    plt.savefig('../saved_data/imgs/simulation/sim_img_TP.png')
+    plt.clf()
+
+    result_fcn = abs(monitored_makespan(
+        MTS=metrics_fcn['MTS'],
+        MTF=metrics_fcn['MTF'],
+        MTN=metrics_fcn['MTN'],
+        P_TP=metrics_fcn['P_TP'],
+        P_FN=metrics_fcn['P_FN'],
+        P_TN=prob,
+        P_FP=metrics_fcn['P_FP'],
+        P_NCF=metrics_fcn['P_NCF'],
+        P_NCS=metrics_fcn['P_NCS']
+    ))
+    result_tr = abs(monitored_makespan(
+        MTS=metrics_transformer['MTS'],
+        MTF=metrics_transformer['MTF'],
+        MTN=metrics_transformer['MTN'],
+        P_TP=metrics_transformer['P_TP'],
+        P_FN=metrics_transformer['P_FN'],
+        P_TN=prob,
+        P_FP=metrics_transformer['P_FP'],
+        P_NCF=metrics_transformer['P_NCF'],
+        P_NCS=metrics_transformer['P_NCS']
+    ))
+
+    plt.plot(prob, result_react, label='Reactive')
+    plt.plot(metrics_fcn['P_TN'], actual_react, marker='x', color='black')
+
+    plt.plot(prob, result_fcn, label='FCN')
+    plt.plot(metrics_fcn['P_TN'], actual_fcn, marker='o', color='black')
+
+    plt.plot(prob, result_tr, label='Transformer')
+    plt.plot(metrics_transformer['P_TN'], actual_transformer, marker='o', color='gray')
+
+    plt.plot(prob, result_react - result_fcn, label='Time saved FCN')
+    plt.plot(prob, result_react - result_tr, label='Time saved Transformer')
+
+    plt.legend()
+    plt.savefig('../saved_data/imgs/simulation/sim_img_TN.png')
+    plt.clf()
+
+    result_fcn = abs(monitored_makespan(
+        MTS=metrics_fcn['MTS'],
+        MTF=prob,
+        MTN=metrics_fcn['MTN'],
+        P_TP=metrics_fcn['P_TP'],
+        P_FN=metrics_fcn['P_FN'],
+        P_TN=metrics_fcn['P_TN'],
+        P_FP=metrics_fcn['P_FP'],
+        P_NCF=metrics_fcn['P_NCF'],
+        P_NCS=metrics_fcn['P_NCS']
+    ))
+    result_tr = abs(monitored_makespan(
+        MTS=metrics_transformer['MTS'],
+        MTF=prob,
+        MTN=metrics_transformer['MTN'],
+        P_TP=metrics_transformer['P_TP'],
+        P_FN=metrics_transformer['P_FN'],
+        P_TN=metrics_transformer['P_TN'],
+        P_FP=metrics_transformer['P_FP'],
+        P_NCF=metrics_transformer['P_NCF'],
+        P_NCS=metrics_transformer['P_NCS']
+    ))
+
+    plt.plot(prob, result_react, label='Reactive')
+    plt.plot(metrics_fcn['MTF'], actual_react, marker='x', color='black')
+
+    plt.plot(prob, result_fcn, label='FCN')
+    plt.plot(metrics_fcn['MTF'], actual_fcn, marker='o', color='black')
+
+    plt.plot(prob, result_tr, label='Transformer')
+    plt.plot(metrics_transformer['MTF'], actual_transformer, marker='o', color='gray')
+
+    plt.plot(prob, result_react - result_fcn, label='Time saved FCN')
+    plt.plot(prob, result_react - result_tr, label='Time saved Transformer')
+
+    plt.legend()
+    plt.savefig('../saved_data/imgs/simulation/sim_img_MTF.png')
+    plt.clf()
+
+    result_fcn = abs(monitored_makespan(
+        MTS=prob,
+        MTF=metrics_fcn['MTF'],
+        MTN=metrics_fcn['MTN'],
+        P_TP=metrics_fcn['P_TP'],
+        P_FN=metrics_fcn['P_FN'],
+        P_TN=metrics_fcn['P_TN'],
+        P_FP=metrics_fcn['P_FP'],
+        P_NCF=metrics_fcn['P_NCF'],
+        P_NCS=metrics_fcn['P_NCS']
+    ))
+    result_tr = abs(monitored_makespan(
+        MTS=prob,
+        MTF=metrics_transformer['MTF'],
+        MTN=metrics_transformer['MTN'],
+        P_TP=metrics_transformer['P_TP'],
+        P_FN=metrics_transformer['P_FN'],
+        P_TN=metrics_transformer['P_TN'],
+        P_FP=metrics_transformer['P_FP'],
+        P_NCF=metrics_transformer['P_NCF'],
+        P_NCS=metrics_transformer['P_NCS']
+    ))
+
+    plt.plot(prob, result_react, label='Reactive')
+    plt.plot(metrics_fcn['MTS'], actual_react, marker='x', color='black')
+
+    plt.plot(prob, result_fcn, label='FCN')
+    plt.plot(metrics_fcn['MTS'], actual_fcn, marker='o', color='black')
+
+    plt.plot(prob, result_tr, label='Transformer')
+    plt.plot(metrics_transformer['MTS'], actual_transformer, marker='o', color='gray')
+
+    plt.plot(prob, result_react - result_fcn, label='Time saved FCN')
+    plt.plot(prob, result_react - result_tr, label='Time saved Transformer')
+
+    plt.legend()
+    plt.savefig('../saved_data/imgs/simulation/sim_img_MTS.png')
+    plt.clf()
 

@@ -52,6 +52,10 @@ def monitored_makespan( MTS, MTF, MTN, P_TP, P_FN, P_TN, P_FP, P_NCS, P_NCF ):
     """ Closed form makespan for monitored case, symbolic simplification from Mathematica """
     return (1 + MTF*(P_FP + P_NCF) + MTS*(P_NCS + P_TP) + MTN*(P_FN + P_TN) ) / (1 - P_FN - P_FP - P_TN)
 
+def monitored_makespan_alternative( MTS, MTF, MTN, P_TP, P_FN, P_TN, P_FP, P_NCS, P_NCF ):
+    """ Closed form makespan for monitored case, symbolic simplification from Mathematica """
+    return (1 + MTF*(P_FP + P_NCF) + MTS*(P_NCS + P_TP) + MTF*(P_FN + P_TN) ) / (1 - P_FN - P_FP - P_TN)
+
 def reactive_makespan(MTS, MTF, ps, pf):
     return -(MTF * pf + MTS * ps + 1) / (pf - 1)
 
@@ -269,17 +273,31 @@ def run_simulation(model: tf.keras.Model, episodes: list, n_simulations: int = 1
     print( f"MTS: {MTS} [s]" )
     print( f"MTF: {MTF} [s]" )
 
-    EMS = abs(monitored_makespan(
-        MTF = MTF, 
-        MTN = MTN, 
-        MTS = MTS,
-        P_TP = perf['TP'] / len(timed_episodes), 
-        P_FN = perf['FN'] / len(timed_episodes), 
-        P_TN = perf['TN'] / len(timed_episodes), 
-        P_FP = perf['FP'] / len(timed_episodes),
-        P_NCS = perf['NCS'] / len(timed_episodes),
-        P_NCF = perf['NCF'] / len(timed_episodes)
-    ))
+    if MTN >= MTF:
+        EMS = abs(monitored_makespan_alternative(
+            MTF = MTF,
+            MTN = MTN,
+            MTS = MTS,
+            P_TP = perf['TP'] / len(timed_episodes),
+            P_FN = perf['FN'] / len(timed_episodes),
+            P_TN = perf['TN'] / len(timed_episodes),
+            P_FP = perf['FP'] / len(timed_episodes),
+            P_NCS = perf['NCS'] / len(timed_episodes),
+            P_NCF = perf['NCF'] / len(timed_episodes)
+        ))
+    else:
+        EMS = abs(monitored_makespan(
+            MTF = MTF,
+            MTN = MTN,
+            MTS = MTS,
+            P_TP = perf['TP'] / len(timed_episodes),
+            P_FN = perf['FN'] / len(timed_episodes),
+            P_TN = perf['TN'] / len(timed_episodes),
+            P_FP = perf['FP'] / len(timed_episodes),
+            P_NCS = perf['NCS'] / len(timed_episodes),
+            P_NCF = perf['NCF'] / len(timed_episodes)
+        ))
+
     print('Expected makespan [s] = ', end='')
     print( EMS, end=' [s]\n' )
     metrics = {
@@ -288,9 +306,9 @@ def run_simulation(model: tf.keras.Model, episodes: list, n_simulations: int = 1
         'MTN': MTN,
         'MTS': MTS,
         'MTF': MTF,
-        'P_TP': perf['TP'] / len(timed_episodes), 
-        'P_FN': perf['FN'] / len(timed_episodes), 
-        'P_TN': perf['TN'] / len(timed_episodes), 
+        'P_TP': perf['TP'] / len(timed_episodes),
+        'P_FN': perf['FN'] / len(timed_episodes),
+        'P_TN': perf['TN'] / len(timed_episodes),
         'P_FP': perf['FP'] / len(timed_episodes),
         'P_NCS': perf['NCS'] / len(timed_episodes),
         'P_NCF': perf['NCF'] / len(timed_episodes)
