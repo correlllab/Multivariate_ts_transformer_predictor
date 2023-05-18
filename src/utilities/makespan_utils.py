@@ -60,7 +60,7 @@ def reactive_makespan(MTS, MTF, ps, pf):
     return -(MTF * pf + MTS * ps + 1) / (pf - 1)
 
 
-def get_mts_mtf(trunc_data):
+def get_mts_mtf(data: list):
     MTS = 0
     MTF = 0
     N_success = 0

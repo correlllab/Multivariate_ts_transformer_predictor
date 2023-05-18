@@ -23,8 +23,8 @@ from utilities.makespan_utils import get_mts_mtf, expected_makespan, monitored_m
 SRC_PATH = os.path.dirname(os.path.realpath(__file__))
 MAIN_PATH = os.path.dirname(os.path.dirname(__file__))
 
-DATA = 'reactive'
-DATA_DIR = f'../../data/data_manager/{DATA}'
+DATA = ['reactive', 'training']
+DATA_DIR = f'../../data/data_manager/{"_".join(DATA)}'
 MODELS_TO_RUN = [
     'FCN',
     'RNN',
@@ -141,7 +141,16 @@ def get_model(name: str, roll_win_width: int = 0, X_sample = None):
         return build_oop_transformer(X_sample=X_sample, model_type='small')
 
 
-CREATE_DATA = False
+def is_sub_array_contained(larger, sub):
+    rows, cols = sub.shape[0], sub.shape[1]
+    for i in range(len(larger) - rows + 1):
+        for j in range(len(larger[0]) - cols + 1):
+            if all(larger[i+k][j+l] == sub[k][l] for k in range(rows) for l in range(cols)):
+                return True
+
+    return False
+
+
 
 if __name__ == '__main__':
     gpus = tensorflow.config.experimental.list_physical_devices(device_type='GPU')
@@ -159,29 +168,34 @@ if __name__ == '__main__':
     for dev in devices:
         print( f"\t{dev}" )
 
-    if CREATE_DATA:
-        dp = DataPreprocessing(sampling='under', data='reactive')
-        dp.run(save_data=True, verbose=True)
-
-    # Load training data
+    # Load data
     print('\nLoading data from files...', end='')
-    with open(f'{DATA_DIR}/{DATA}_X_train.npy', 'rb') as f:
+    with open(f'{DATA_DIR}/{"_".join(DATA)}_X_train.npy', 'rb') as f:
         X_train = np.load(f, allow_pickle=True)
 
-    with open(f'{DATA_DIR}/{DATA}_Y_train.npy', 'rb') as f:
-        Y_train = np.load(f, allow_pickle=True)
+    # with open(f'{DATA_DIR}/{"_".join(DATA)}_Y_train.npy', 'rb') as f:
+    #     Y_train = np.load(f, allow_pickle=True)
 
-    with open(f'{DATA_DIR}/{DATA}_X_test.npy', 'rb') as f:
-        X_test = np.load(f, allow_pickle=True)
+    # with open(f'{DATA_DIR}/{"_".join(DATA)}_X_test.npy', 'rb') as f:
+    #     X_test = np.load(f, allow_pickle=True)
 
-    with open(f'{DATA_DIR}/{DATA}_Y_test.npy', 'rb') as f:
-        Y_test = np.load(f, allow_pickle=True)
+    # with open(f'{DATA_DIR}/{"_".join(DATA)}_Y_test.npy', 'rb') as f:
+    #     Y_test = np.load(f, allow_pickle=True)
 
-    with open(f'{DATA_DIR}/{DATA}_X_winTest.npy', 'rb') as f:
+    with open(f'{DATA_DIR}/{"_".join(DATA)}_X_winTest.npy', 'rb') as f:
         X_window_test = np.load(f, allow_pickle=True)
 
-    with open(f'{DATA_DIR}/{DATA}_Y_winTest.npy', 'rb') as f:
+    with open(f'{DATA_DIR}/{"_".join(DATA)}_Y_winTest.npy', 'rb') as f:
         Y_window_test = np.load(f, allow_pickle=True)
+
+    with open(f'{DATA_DIR}/{"_".join(DATA)}_data.npy', 'rb') as f:
+        data = np.load(f, allow_pickle=True)
+
+    with open(f'{DATA_DIR}/{"_".join(DATA)}_data_test.npy', 'rb') as f:
+        test_data = np.load(f, allow_pickle=True)
+
+    with open(f'{DATA_DIR}/{"_".join(DATA)}_trunc_data.npy', 'rb') as f:
+        trunc_data = np.load(f, allow_pickle=True)
     roll_win_width = int(7.0 * 50)
     print('DONE\n')
 
@@ -213,28 +227,24 @@ if __name__ == '__main__':
         load_keras_model(model_name='VanillaTransformer', makespan_models=makespan_models)
 
     # Call function to compute confusion matrices
+    compute_conf_mats = False
     for model_name in MODELS_TO_RUN:
         model = get_model(name=model_name, roll_win_width=roll_win_width, X_sample=X_train[:64])
         model.model = makespan_models[model_name]
-        fcn_conf_mat = compute_confusion_matrix(
-            model=model.model,
-            file_name=model.file_name,
-            imgs_path=model.imgs_path,
-            X_winTest=X_window_test,
-            Y_winTest=Y_window_test,
-            plot=True
-        )
+        if compute_conf_mats:
+            _ = compute_confusion_matrix(
+                model=model.model,
+                file_name=model.file_name,
+                imgs_path=model.imgs_path,
+                X_winTest=X_window_test,
+                Y_winTest=Y_window_test,
+                plot=True
+            )
 
-    # Makespan prediction with formula
-    # dp = DataPreprocessing(sampling='under', data=DATA)
-    # dp.load_data(verbose=True)
-    # dp.scale_data(verbose=True)
-    # dp.set_episode_beginning(verbose=True)
-    with open('../../data/makespan_data/data.npy', 'rb') as f:
-        data = np.load(f, allow_pickle=True)
-    with open('../../data/makespan_data/trunc_data.npy', 'rb') as f:
-        trunc_data = np.load(f, allow_pickle=True)
-    MTS, MTF, p_success, p_failure = get_mts_mtf(trunc_data=data)
+    # TODO: match episodes in X_winTest to raw episodes, so that we only load full raw episodes (with no truncation of any kind) that belong to X_winTest
+    print(f'\nTest data len = {len(test_data)}\n')
+
+    MTS, MTF, p_success, p_failure = get_mts_mtf(data=test_data)
     r_mks = reactive_makespan(MTF=MTF, MTS=MTS, pf=p_failure, ps=p_success)
     data_table[0][1] = None
     data_table[1][1] = r_mks
@@ -243,7 +253,7 @@ if __name__ == '__main__':
 
     # Run simulations
     react_avg_mks, react_mks = run_reactive_simulation(
-        episodes=data,
+        episodes=test_data,
         n_simulations=1000,
         verbose=True
     )
@@ -267,6 +277,7 @@ if __name__ == '__main__':
 
     sim_res = run_makespan_simulation(
         models_to_run=sim_models,
+        data=test_data,
         n_simulations = 150,
         data_mode='load_data',
         compute=False

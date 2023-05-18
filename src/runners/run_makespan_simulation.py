@@ -50,46 +50,46 @@ def load_keras_weights(model_build: OOPTransformer, model_name: str, makespan_mo
         print(f'{e}: model weights {model_name} do not exist!')
 
 
-def run_makespan_simulation(models_to_run: dict, n_simulations: int = 100, data_mode: str = 'create_data' or 'load_data', compute: bool = True, save_dicts: bool = True, save_plots: bool = True):
-    if data_mode == 'create_data':
-        print('FETCHING DATA...')
-        dp = DataPreprocessing(sampling='under', data='reactive')
-        dp.shuffle = False
-        dp.run(save_data=False, verbose=True)
+def run_makespan_simulation(models_to_run: dict, data: list, n_simulations: int = 100, data_mode: str = 'create_data' or 'load_data', compute: bool = True, save_dicts: bool = True, save_plots: bool = True):
+    # if data_mode == 'create_data':
+    #     print('FETCHING DATA...')
+    #     dp = DataPreprocessing(sampling='under', data='reactive')
+    #     dp.shuffle = False
+    #     dp.run(save_data=False, verbose=True)
 
-        X_train_sampled = dp.X_train_sampled
-        data = dp.data
-        trunc_data = dp.truncData
+    #     X_train_sampled = dp.X_train_sampled
+    #     data = dp.data
+    #     trunc_data = dp.truncData
 
-        if not os.path.exists('../../data/makespan_data/'):
-            os.makedirs('../../data/makespan_data/')
+    #     if not os.path.exists('../../data/makespan_data/'):
+    #         os.makedirs('../../data/makespan_data/')
 
-        print('Creating X_train_sampled...', end='')
-        with open('../../data/makespan_data/X_train_sampled.npy', 'wb') as f:
-            np.save(f, dp.X_train_sampled, allow_pickle=True)
-        print('DONE')
+    #     print('Creating X_train_sampled...', end='')
+    #     with open('../../data/makespan_data/X_train_sampled.npy', 'wb') as f:
+    #         np.save(f, dp.X_train_sampled, allow_pickle=True)
+    #     print('DONE')
 
-        print('Creating data...', end='')
-        with open('../../data/makespan_data/data.npy', 'wb') as f:
-            np.save(f, np.asarray(dp.data, dtype=object), allow_pickle=True)
-        print('DONE')
+    #     print('Creating data...', end='')
+    #     with open('../../data/makespan_data/data.npy', 'wb') as f:
+    #         np.save(f, np.asarray(dp.data, dtype=object), allow_pickle=True)
+    #     print('DONE')
 
-        print('Creating trunc_data...', end='')
-        with open('../../data/makespan_data/trunc_data.npy', 'wb') as f:
-            np.save(f, np.asarray(dp.truncData, dtype=object), allow_pickle=True)
-        print('DONE')
-    elif MODE == 'load_data':
-        print('Loading data from files...', end='')
-        with open('../../data/makespan_data/X_train_sampled.npy', 'rb') as f:
-            X_train_sampled = np.load(f, allow_pickle=True)
+    #     print('Creating trunc_data...', end='')
+    #     with open('../../data/makespan_data/trunc_data.npy', 'wb') as f:
+    #         np.save(f, np.asarray(dp.truncData, dtype=object), allow_pickle=True)
+    #     print('DONE')
+    # elif MODE == 'load_data':
+    #     print('Loading data from files...', end='')
+    #     with open('../../data/makespan_data/X_train_sampled.npy', 'rb') as f:
+    #         X_train_sampled = np.load(f, allow_pickle=True)
 
-        with open('../../data/makespan_data/data.npy', 'rb') as f:
-            data = np.load(f, allow_pickle=True)
-        print('DONE')
+    #     with open('../../data/makespan_data/data.npy', 'rb') as f:
+    #         data = np.load(f, allow_pickle=True)
+    #     print('DONE')
 
-        with open('../../data/makespan_data/trunc_data.npy', 'rb') as f:
-            trunc_data = np.load(f, allow_pickle=True)
-        print('DONE')
+    #     with open('../../data/makespan_data/trunc_data.npy', 'rb') as f:
+    #         trunc_data = np.load(f, allow_pickle=True)
+    #     print('DONE')
 
     # If True it will run pipeline: load models, predict (if True) and generate metrics, if False it will generate metrics from saved files
     # compute = False

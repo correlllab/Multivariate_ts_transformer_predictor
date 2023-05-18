@@ -35,6 +35,8 @@ class DataPreprocessing:
         self.N_train = 0
         self.trainWindows = 0
         self.testWindows = 0
+        self.train_indices = []
+        self.test_indices = []
         self.X_train = None
         self.Y_train = None
         self.X_train_sampled = None
@@ -150,11 +152,13 @@ class DataPreprocessing:
         i = 0
 
         for j in range( self.N_train ):
+            self.train_indices.append(i)
             ep = self.window_data[i]
             self.trainWindows += ep.shape[0]
             i += 1
             
         for j in range( self.N_test ):
+            self.test_indices.append(i)
             ep = self.window_data[i]
             self.testWindows += ep.shape[0]
             i += 1
@@ -274,24 +278,24 @@ class DataPreprocessing:
             print( f"\nDONE! Captured {self.X_winTest.shape}/{self.Y_winTest.shape} TEST episodes." )
 
 
-    def balance_classes(self, verbose=False):
-        if verbose:
-            print('    ====> CLASSES DISTRIBUTION BEFORE:')
-            print(f'        Passes = {int(sum(self.Y_train[:,0]))}; Fails = {int(sum(self.Y_train[:,1]))}\n')
+    # def balance_classes(self, verbose=False):
+    #     if verbose:
+    #         print('    ====> CLASSES DISTRIBUTION BEFORE:')
+    #         print(f'        Passes = {int(sum(self.Y_train[:,0]))}; Fails = {int(sum(self.Y_train[:,1]))}\n')
 
-        # No oversampling
-        if self.sampling == 'under':
-            undersampler = RandomUnderSampler(sampling_strategy='majority')
-            undersampler.fit_resample(self.X_train[:,:,0], self.Y_train)
-            self.X_train_sampled = deepcopy(self.X_train[undersampler.sample_indices_])
-            self.Y_train_sampled = deepcopy(self.Y_train[undersampler.sample_indices_])
-        else:
-            self.X_train_sampled = deepcopy(self.X_train)
-            self.Y_train_sampled = deepcopy(self.Y_train)
+    #     # No oversampling
+    #     if self.sampling == 'under':
+    #         undersampler = RandomUnderSampler(sampling_strategy='majority')
+    #         undersampler.fit_resample(self.X_train[:,:,0], self.Y_train)
+    #         self.X_train_sampled = deepcopy(self.X_train[undersampler.sample_indices_])
+    #         self.Y_train_sampled = deepcopy(self.Y_train[undersampler.sample_indices_])
+    #     else:
+    #         self.X_train_sampled = deepcopy(self.X_train)
+    #         self.Y_train_sampled = deepcopy(self.Y_train)
 
-        if verbose:
-            print('    ====> CLASSES DISTRIBUTION AFTER:')
-            print(f'        Passes = {int(sum(self.Y_train_sampled[:,0]))}; Fails = {int(sum(self.Y_train_sampled[:,1]))}\n')
+    #     if verbose:
+    #         print('    ====> CLASSES DISTRIBUTION AFTER:')
+    #         print(f'        Passes = {int(sum(self.Y_train_sampled[:,0]))}; Fails = {int(sum(self.Y_train_sampled[:,1]))}\n')
 
 
     def scale_data(self, verbose=False):
@@ -319,9 +323,9 @@ class DataPreprocessing:
         if verbose:
             print('\n====> Capturing test episodes...\n')
         self.capture_test_episodes(verbose=verbose)
-        if verbose:
-            print('\n====> Balancing classes...\n')
-        self.balance_classes(verbose=verbose)
+        # if verbose:
+        #     print('\n====> Balancing classes...\n')
+        # self.balance_classes(verbose=verbose)
         if verbose:
             print('\n====> Done preprocessing!\n')
             _ = input('Continue?:')
@@ -333,17 +337,23 @@ class DataPreprocessing:
             if not os.path.exists(save_dir):
                 os.makedirs(save_dir)
 
+            with open(f'{save_dir}/{"_".join(self.data_names)}_data.npy', 'wb') as f:
+                np.save(f, np.asarray(self.data, dtype=object), allow_pickle=True)
+
+            with open(f'{save_dir}/{"_".join(self.data_names)}_data_train.npy', 'wb') as f:
+                np.save(f, np.asarray([self.data[i] for i in self.train_indices], dtype=object), allow_pickle=True)
+
+            with open(f'{save_dir}/{"_".join(self.data_names)}_data_test.npy', 'wb') as f:
+                np.save(f, np.asarray([self.data[i] for i in self.test_indices], dtype=object), allow_pickle=True)
+
+            with open(f'{save_dir}/{"_".join(self.data_names)}_trunc_data.npy', 'wb') as f:
+                np.save(f, np.asarray(self.truncData, dtype=object), allow_pickle=True)
+
             with open(f'{save_dir}/{"_".join(self.data_names)}_X_train.npy', 'wb') as f:
                 np.save(f, self.X_train, allow_pickle=True)
 
             with open(f'{save_dir}/{"_".join(self.data_names)}_Y_train.npy', 'wb') as f:
                 np.save(f, self.Y_train, allow_pickle=True)
-
-            with open(f'{save_dir}/{"_".join(self.data_names)}_X_train_sampled.npy', 'wb') as f:
-                np.save(f, self.X_train_sampled, allow_pickle=True)
-
-            with open(f'{save_dir}/{"_".join(self.data_names)}_Y_train_sampled.npy', 'wb') as f:
-                np.save(f, self.Y_train_sampled, allow_pickle=True)
 
             with open(f'{save_dir}/{"_".join(self.data_names)}_X_test.npy', 'wb') as f:
                 np.save(f, self.X_test, allow_pickle=True)
@@ -363,10 +373,7 @@ class DataPreprocessing:
 
 if __name__ == '__main__':
     dp = DataPreprocessing(sampling='none', data=['reactive', 'training'])
-    dp.run(save_data=False, verbose=True)
-    suma = 0
-    for i in range(len(dp.X_winTest)):
-        suma += dp.X_winTest[i].shape[0]
-    print(f'X_winTest shape = {dp.X_winTest[0].shape}), suma = {suma}')
-    print(f'X_test shape = {dp.X_test.shape}')
+    dp.run(save_data=True, verbose=True)
+    # print(f'X_winTest shape = {dp.X_winTest[0].shape})')
+    # print(f'X_test shape = {dp.X_test.shape}')
     print('ALL OK')

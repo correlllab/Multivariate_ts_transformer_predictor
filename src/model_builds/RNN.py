@@ -19,20 +19,20 @@ class BaseRNN:
         self.histories_path = f'../saved_data/histories/{self.model_name}_history'
 
     def fit(self, X_train, Y_train, X_test, Y_test, batch_size=1024, epochs=200, save_model=True, verbose=False):
-        mirrored_strategy = tf.distribute.MirroredStrategy()
-        with mirrored_strategy.scope():
-            self.build_model(
-                input_shape=X_train.shape[1:],
-                dim=128,
-                dropout=0.2,
-                dense_dim=2
-            )
+        # mirrored_strategy = tf.distribute.MirroredStrategy()
+        # with mirrored_strategy.scope():
+        self.build_model(
+            input_shape=X_train.shape[1:],
+            dim=128,
+            dropout=0.2,
+            dense_dim=2
+        )
 
-            learning_rate = 1e-4
-            opt = tf.keras.optimizers.legacy.Adam(learning_rate)
-            opt = tf.keras.mixed_precision.LossScaleOptimizer(opt)
-            loss_object = tf.keras.losses.CategoricalCrossentropy()
-            metric = tf.keras.metrics.CategoricalAccuracy()
+        learning_rate = 1e-4
+        opt = tf.keras.optimizers.legacy.Adam(learning_rate)
+        opt = tf.keras.mixed_precision.LossScaleOptimizer(opt)
+        loss_object = tf.keras.losses.CategoricalCrossentropy()
+        metric = tf.keras.metrics.CategoricalAccuracy()
 
         self.model.compile(
             loss=loss_object,

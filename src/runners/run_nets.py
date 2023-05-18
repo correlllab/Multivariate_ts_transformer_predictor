@@ -3,6 +3,7 @@ sys.path.append(os.path.realpath('../'))
 # print(sys.path)
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # INFO and WARNING messages are not printed
+os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
 
 import numpy as np
 import tensorflow as tf
@@ -111,8 +112,8 @@ DATA_DIR = f'../../data/data_manager/{"_".join(DATA)}'
 SAVE_DATA = True
 LOAD_DATA_FROM_FILES = True
 MODELS_TO_RUN = [
-    'FCN',
-    'RNN',
+    # 'FCN',
+    # 'RNN',
     'GRU',
     'LSTM',
     'VanillaTransformer',
@@ -138,7 +139,12 @@ def run_model(model, X_train, Y_train, X_test, Y_test, X_window_test, Y_window_t
         )
     else:
         model.history = hist_obj(np.load(model.histories_path, allow_pickle=True))
-    model_n_params[model.model_name] = int(np.sum([np.prod(v.get_shape().as_list()) for v in model.model.trainable_variables]))
+    try:
+        model_n_params[model.model_name] = int(np.sum([np.prod(v.get_shape().as_list()) for v in model.model.trainable_variables]))
+        with open('../saved_data/model_sizes.json', 'w') as f:
+            json.dump(model_n_params, f)
+    except AttributeError as e:
+        print(f'For model {model_name}: {e}')
     plot_acc_loss(history=model.history, imgs_path=model.imgs_path)
     compute_confusion_matrix(
         model=model.model,

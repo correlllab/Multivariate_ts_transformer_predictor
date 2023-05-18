@@ -5,6 +5,7 @@ sys.path.append(os.path.realpath('../utilities'))
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # INFO and WARNING messages are not printed
 
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 import tensorflow as tf
 import seaborn as sns
@@ -65,7 +66,12 @@ def compute_confusion_matrix(model, file_name, imgs_path, X_winTest, Y_winTest, 
             res = model.predict( X_winTest[epNo] )
             ans, aDx = scan_output_for_decision( res, Y_winTest[epNo][0], threshold = 0.90 )
             perf.count( ans )
-            
+            if ans == 'NC':
+                if Y_winTest[epNo][0] == 0.0:
+                    perf.count('NCS')
+                elif Y_winTest[epNo][0] == 1.0:
+                    perf.count('NCF')
+
     print( '\n', file_name, '\n', perf )
 
     try:
@@ -94,6 +100,7 @@ def compute_confusion_matrix(model, file_name, imgs_path, X_winTest, Y_winTest, 
         conf_mat = sns.heatmap(arr, annot=True).get_figure()
         conf_mat.savefig(imgs_path + 'confusion_matrix.png')
         plt.close('all')
+        matplotlib.rc_file_defaults()
 
     return confMatx
 
