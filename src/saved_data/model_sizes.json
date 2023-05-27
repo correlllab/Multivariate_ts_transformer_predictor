@@ -1,1 +1,1 @@
-{"FCN": 63992, "RNN": 69378, "VanillaTransformer": 68808, "OOP_Transformer": 234696, "OOP_Transformer_small": 68808}
+{"FCN": 63992, "RNN": 17538, "VanillaTransformer": 68808, "OOP_Transformer": 285180, "OOP_Transformer_small": 69948, "GRU": 52482, "LSTM": 69378}

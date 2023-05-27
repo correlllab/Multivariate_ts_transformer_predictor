@@ -23,8 +23,56 @@ model_name_table = {
     'Transformer': 'Transformer',
     'VanillaTransformer': 'Vanilla\nTransformer',
     'OOP_Transformer_small': 'OOP Transformer\n(small)',
-    'OOP_Transformer': 'OOP Transformer (big)'
+    'OOP_Transformer': 'OOP Transformer (big)',
+    'Big Transformer': 'Big\nTransformer',
+    'Small Transformer': 'Small\nTransformer'
     }
+
+
+def plot_model_sizes_bar(sizes: dict, out_name: str = ''):
+    fig_width = 600
+    tex_fonts = {
+        # Use LaTeX to write all text
+        # "text.usetex": True,
+        "font.family": "serif",
+        # Use 10pt font in plots, to match 10pt font in document
+        "axes.labelsize": 14,
+        "font.size": 14,
+        # Make the legend/label fonts a little smaller
+        "legend.fontsize": 12,
+        "xtick.labelsize": 12,
+        "ytick.labelsize": 12
+    }
+    plt.rcParams.update(tex_fonts)
+
+    fig, ax = plt.subplots(figsize=set_size(fig_width))
+    fig.tight_layout()
+    # sort dict (greater to lower)
+    sizes = sorted(sizes.items(), key=lambda item: item[1], reverse=False)
+    labels = [model_name_table[s[0]] for s in sizes]
+    values = [s[1] for s in sizes]
+    plt.bar(labels, values)
+
+    for bar in ax.patches:
+        if bar.get_height() != 0:
+            ax.text(
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_height() + bar.get_y() - (bar.get_height() / 2),
+                f'{bar.get_height()}',
+                ha='center',
+                bbox=dict(facecolor='white', alpha=.5),
+                fontsize=15
+            )
+
+    ax.get_yaxis().set_visible(False)
+    # plt.xticks(rotation=25)
+    plt.title('Number of parameters')
+    plt.tight_layout()
+
+    if out_name == '':
+        plt.savefig('../saved_data/imgs/evaluation/model_sizes.png')
+    else:
+        plt.savefig(f'../saved_data/imgs/evaluation/{out_name}.png')
 
 
 def plot_model_sizes(sizes: dict, out_name: str = ''):

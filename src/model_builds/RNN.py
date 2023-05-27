@@ -54,7 +54,7 @@ class BaseRNN:
         self.history = self.model.fit(
             x=X_train,
             y=Y_train,
-            validation_split=0.2,
+            # validation_split=0.2,
             epochs=epochs,
             batch_size=batch_size,
             callbacks=callbacks,

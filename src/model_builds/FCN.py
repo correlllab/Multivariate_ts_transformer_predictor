@@ -63,7 +63,6 @@ class FCN:
         if verbose:
             self.model.summary()
 
-        # TODO: canviar aixo a variables a dins de la mirrored strategy
         self.model.compile(
             # optimizer=Adam(
             #     beta_1 = 0.9, #0.7,#0.8, #0.9, # - "β1 = 0.9"
@@ -76,6 +75,8 @@ class FCN:
 
 
     def fit(self, X_train, Y_train, X_test, Y_test, batch_size=2048, epochs=200, save_model=True):
+        self.build(verbose=False)
+
         callbacks = [
             tensorflow.keras.callbacks.EarlyStopping(
                 monitor='val_loss',
@@ -94,7 +95,7 @@ class FCN:
                 batch_size       = batch_size, 
                 epochs           = epochs, #250, #50, #250, # 2022-09-12: Trained for 250 total
                 verbose          = True, 
-                validation_split = 0.2,
+                # validation_split = 0.2,
                 # steps_per_epoch  = int(trainWindows/batch_size), # https://stackoverflow.com/a/49924566
                 steps_per_epoch = len(X_train) // batch_size,
                 validation_steps = len(X_test) // batch_size,

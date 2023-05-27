@@ -43,11 +43,6 @@ def scan_output_for_decision( output, trueLabel, threshold = 0.90 ):
     return 'NC', output.shape[0], row
 
 
-def expected_makespan( MTF, MTN, MTS, P_TP, P_FN, P_TN, P_FP ):
-    """ Return the expected makespan for the given parameters """
-    return -( MTF*P_FP + MTN*P_FN + MTN*P_TN + MTS*P_TP + 1) / (P_FN + P_FP + P_TN - 1)
-
-
 def monitored_makespan( MTS, MTF, MTN, P_TP, P_FN, P_TN, P_FP, P_NCS, P_NCF ):
     """ Closed form makespan for monitored case, symbolic simplification from Mathematica """
     return (1 + MTF*(P_FP + P_NCF) + MTS*(P_NCS + P_TP) + MTN*(P_FN + P_TN) ) / (1 - P_FN - P_FP - P_TN)
@@ -60,14 +55,14 @@ def reactive_makespan(MTS, MTF, ps, pf):
     return -(MTF * pf + MTS * ps + 1) / (pf - 1)
 
 
-def get_mts_mtf(data: list):
+def get_mts_mtf(data):
     MTS = 0
     MTF = 0
     N_success = 0
     N_failure = 0
     ts_s      = 20.0/1000.0
     rolling_window_width = int(7.0 * 50)
-    for ep_index, episode in enumerate(trunc_data):
+    for ep_index, episode in enumerate(data):
         episode_len_s = episode.shape[0] * ts_s
         raw_label = episode[0:rolling_window_width, :][0, 7]
         if raw_label == 0.0:
@@ -80,7 +75,7 @@ def get_mts_mtf(data: list):
     MTS /= N_success # Mean Time to Success
     MTF /= N_failure # Mean Time to Failure
 
-    return MTS, MTF, N_success/len(trunc_data), N_failure/len(trunc_data)
+    return MTS, MTF, N_success/len(data), N_failure/len(data)
 
 
 def make_predictions(model_name: str, model: tf.keras.Model, trunc_data, verbose: bool = False):
@@ -113,22 +108,21 @@ def make_predictions(model_name: str, model: tf.keras.Model, trunc_data, verbose
 
 
 
-def classify(model: tf.keras.Model, episode: np.ndarray, true_label: float, window_width: int, ts_s: float = 20.0/1000.0):
+def classify(model: tf.keras.Model, episode: np.ndarray, true_label: float, window_width: int, confidence: float = 0.9, ts_s: float = 20.0/1000.0):
     with tf.device('/GPU:0'):
         time_steps = episode.shape[0]
         n_windows = time_steps - window_width + 1
         episode_X_list = []
-        for i in range(n_windows):
-            if i >= window_width:
-                # episode_window = episode[i:i + window_width, :]
-                episode_window = episode[i - window_width:i, :]
-                episode_X_list.append(episode_window[:, 1:7])
+        for i in range(window_width, n_windows):
+            # episode_window = episode[i:i + window_width, :]
+            episode_window = episode[i - window_width:i, :]
+            episode_X_list.append(episode_window[:, 1:7])
         episode_X = tf.stack(episode_X_list)
         prediction = model.predict(episode_X, use_multiprocessing=True)
         ans, t_c, row = scan_output_for_decision(
             np.array(prediction),
             np.array([tf.keras.utils.to_categorical(true_label, num_classes=2)] * len(prediction)),
-            threshold=0.9
+            threshold=confidence
         )
 
     # Return the classification answer and the time (in seconds) at which the classification happened
@@ -163,7 +157,121 @@ def run_reactive_simulation(episodes: list, n_simulations: int = 100, verbose: b
     return total_time / n_simulations, mks
 
 
-def run_simulation(model: tf.keras.Model, episodes: list, n_simulations: int = 1000, verbose: bool = False):
+def get_makespan_for_model(model_name: str, model: tf.keras.Model, episodes: list, confidence: float = 0.9, verbose: bool = False):
+    perf = CounterDict()
+    rolling_window_width = int(7.0 * 50)
+    ts_s = 20.0 / 1000.0
+
+    MTP = 0.0
+    MTN = 0.0
+
+    MTS, MTF, p_success, p_failure = get_mts_mtf(data=episodes)
+
+    N_positive_classif = 0.0
+    N_negative_classif = 0.0
+
+    # Params for selecting first F_z hit
+    winWidth    = 10
+    FzCol       =  3
+    spikeThresh = 0.05
+
+    count = 0
+
+    for ep in episodes:
+        episode_time = ep.shape[0] * ts_s
+        N = ep.shape[0]
+        chopDex = 0
+        for bgn in range( int(1.5*50), N-winWidth+1 ):
+            end     = bgn+winWidth
+            FzSlice = ep[ bgn:end, FzCol ].flatten()
+            if np.abs( np.amax( FzSlice ) - np.amin( FzSlice ) ) >= spikeThresh:
+                chopDex = end
+                break
+        if (chopDex * ts_s) < 15.0:
+            ep_matrix = ep[chopDex:, :]
+            true_label = 0.0
+            if ep_matrix[0, 7] == 0.0:
+                true_label = 1.0
+            ans, t_c = classify(
+                model=model,
+                episode=ep_matrix,
+                true_label=true_label,
+                window_width=rolling_window_width,
+                confidence=confidence,
+                ts_s=ts_s
+            )
+
+            if ans == 'NC':
+                perf.count(ans)
+                if true_label == 1.0:
+                    perf.count('NCF')
+                elif true_label == 0.0:
+                    perf.count('NCS')
+            else:
+                perf.count(ans)
+                if ans in ('TN', 'FN'):
+                    MTN += t_c + (chopDex * ts_s)
+                    N_negative_classif += 1
+                elif ans in ('TP', 'FP'):
+                    MTP += t_c + (chopDex * ts_s)
+                    N_positive_classif += 1
+
+
+    if N_positive_classif != 0 and N_negative_classif != 0:
+        MTP /= N_positive_classif
+        MTN /= N_negative_classif
+
+        confMatx = {
+            # Actual Positives
+            'TP' : (perf['TP'] if ('TP' in perf) else 0) / ((perf['TP'] if ('TP' in perf) else 0) + (perf['FN'] if ('FN' in perf) else 0)),
+            'FN' : (perf['FN'] if ('FN' in perf) else 0) / ((perf['TP'] if ('TP' in perf) else 0) + (perf['FN'] if ('FN' in perf) else 0)),
+            # Actual Negatives
+            'TN' : (perf['TN'] if ('TN' in perf) else 0) / ((perf['TN'] if ('TN' in perf) else 0) + (perf['FP'] if ('FP' in perf) else 0)),
+            'FP' : (perf['FP'] if ('FP' in perf) else 0) / ((perf['TN'] if ('TN' in perf) else 0) + (perf['FP'] if ('FP' in perf) else 0)),
+            'NC' : (perf['NCS'] + perf['NCF'] if ('NCS' in perf and 'NCF' in perf) else 0) / len(episodes),
+        }
+
+        predicted_makespan = monitored_makespan(
+            MTF = MTF,
+            MTN = MTN,
+            MTS = MTS,
+            P_TP = perf['TP'] / len(episodes),
+            P_FN = perf['FN'] / len(episodes),
+            P_TN = perf['TN'] / len(episodes),
+            P_FP = perf['FP'] / len(episodes),
+            P_NCS = perf['NCS'] / len(episodes),
+            P_NCF = perf['NCF'] / len(episodes)
+        )
+
+        result = {
+            'perf': perf,
+            'conf_mat': confMatx,
+            'variables': {
+                'MTS': MTS,
+                'MTF': MTF,
+                'MTP': MTP,
+                'MTN': MTN,
+                'P_TP': perf['TP'] / len(episodes),
+                'P_FN': perf['FN'] / len(episodes),
+                'P_TN': perf['TN'] / len(episodes),
+                'P_FP': perf['FP'] / len(episodes),
+                'P_NCS': perf['NCS'] / len(episodes),
+                'P_NCF': perf['NCF'] / len(episodes)
+            },
+            'predicted_makespan': predicted_makespan
+        }
+
+        path = f'../saved_data/test_data_makespan_confidence_{int(confidence*100)}'
+        if not os.path.exists(path):
+            os.makedirs(path)
+
+        with open(f'{path}/{model_name}.json', 'w') as f:
+            json.dump(result, f)
+    elif os.path.exists(f'../saved_data/test_data_makespan_confidence_{int(confidence*100)}/{model_name}.json'):
+        os.remove(f'../saved_data/test_data_makespan_confidence_{int(confidence*100)}/{model_name}.json')
+
+
+def run_simulation(model_name: str, model: tf.keras.Model, episodes: list, confidence: float = 0.9, n_simulations: int = 1000, verbose: bool = False):
     perf = CounterDict()
     N_posCls  = 0 # --------- Number of positive classifications
     N_negCls  = 0 # --------- Number of negative classifications
@@ -211,6 +319,7 @@ def run_simulation(model: tf.keras.Model, episodes: list, n_simulations: int = 1
                     episode=ep_matrix,
                     true_label=true_label,
                     window_width=rolling_window_width,
+                    confidence=confidence,
                     ts_s=ts_s
                 )
 
@@ -235,10 +344,11 @@ def run_simulation(model: tf.keras.Model, episodes: list, n_simulations: int = 1
                         episode_obj.TTN = t_c + (chopDex * ts_s)
                         N_negCls += 1
                     elif ans in ('TP', 'FP'):
+                        if ans == 'TP':
+                            win = 1
                         makespan += episode_time
-                        win = True
-                        MTP += episode_time
-                        episode_obj.TTP = episode_time
+                        MTP += t_c + (chopDex * ts_s)
+                        episode_obj.TTP = t_c + (chopDex * ts_s)
                         N_posCls += 1
 
                 if true_label == 1.0:
@@ -252,258 +362,309 @@ def run_simulation(model: tf.keras.Model, episodes: list, n_simulations: int = 1
         total_time += makespan
         mks.append(makespan)
 
-    confMatx = {
-        # Actual Positives
-        'TP' : (perf['TP'] if ('TP' in perf) else 0) / ((perf['TP'] if ('TP' in perf) else 0) + (perf['FN'] if ('FN' in perf) else 0)),
-        'FN' : (perf['FN'] if ('FN' in perf) else 0) / ((perf['TP'] if ('TP' in perf) else 0) + (perf['FN'] if ('FN' in perf) else 0)),
-        # Actual Negatives
-        'TN' : (perf['TN'] if ('TN' in perf) else 0) / ((perf['TN'] if ('TN' in perf) else 0) + (perf['FP'] if ('FP' in perf) else 0)),
-        'FP' : (perf['FP'] if ('FP' in perf) else 0) / ((perf['TN'] if ('TN' in perf) else 0) + (perf['FP'] if ('FP' in perf) else 0)),
-        'NC' : (perf['NCS'] + perf['NCF'] if ('NCS' in perf and 'NCF' in perf) else 0) / len(timed_episodes),
-    }
+    # At certain confidence thresholds, RNN can only output NC so we have to prevent that case
+    if N_posCls != 0 and N_negCls != 0:
+        confMatx = {
+            # Actual Positives
+            'TP' : (perf['TP'] if ('TP' in perf) else 0) / ((perf['TP'] if ('TP' in perf) else 0) + (perf['FN'] if ('FN' in perf) else 0)),
+            'FN' : (perf['FN'] if ('FN' in perf) else 0) / ((perf['TP'] if ('TP' in perf) else 0) + (perf['FN'] if ('FN' in perf) else 0)),
+            # Actual Negatives
+            'TN' : (perf['TN'] if ('TN' in perf) else 0) / ((perf['TN'] if ('TN' in perf) else 0) + (perf['FP'] if ('FP' in perf) else 0)),
+            'FP' : (perf['FP'] if ('FP' in perf) else 0) / ((perf['TN'] if ('TN' in perf) else 0) + (perf['FP'] if ('FP' in perf) else 0)),
+            'NC' : (perf['NCS'] + perf['NCF'] if ('NCS' in perf and 'NCF' in perf) else 0) / len(timed_episodes),
+        }
 
-    MTP /= N_posCls #- Mean Time to Positive Classification
-    MTN /= N_negCls #- Mean Time to Negative Classification
-    MTS /= N_success
-    MTF /= N_failure
-    # MTS, MTF, _, _ = get_mts_mtf(trunc_data=episodes)
+        MTP /= N_posCls #- Mean Time to Positive Classification
+        MTN /= N_negCls #- Mean Time to Negative Classification
+        MTS /= N_success
+        MTF /= N_failure
+        # MTS, MTF, _, _ = get_mts_mtf(trunc_data=episodes)
 
-    print( f"MTP: {MTP} [s]" )
-    print( f"MTN: {MTN} [s]" )
-    print( f"MTS: {MTS} [s]" )
-    print( f"MTF: {MTF} [s]" )
+        print( f"MTP: {MTP} [s]" )
+        print( f"MTN: {MTN} [s]" )
+        print( f"MTS: {MTS} [s]" )
+        print( f"MTF: {MTF} [s]" )
 
-    if MTN >= MTF:
-        EMS = abs(monitored_makespan_alternative(
-            MTF = MTF,
-            MTN = MTN,
-            MTS = MTS,
-            P_TP = perf['TP'] / len(timed_episodes),
-            P_FN = perf['FN'] / len(timed_episodes),
-            P_TN = perf['TN'] / len(timed_episodes),
-            P_FP = perf['FP'] / len(timed_episodes),
-            P_NCS = perf['NCS'] / len(timed_episodes),
-            P_NCF = perf['NCF'] / len(timed_episodes)
-        ))
+        if MTN >= MTF:
+            EMS = abs(monitored_makespan_alternative(
+                MTF = MTF,
+                MTN = MTN,
+                MTS = MTS,
+                P_TP = perf['TP'] / len(timed_episodes),
+                P_FN = perf['FN'] / len(timed_episodes),
+                P_TN = perf['TN'] / len(timed_episodes),
+                P_FP = perf['FP'] / len(timed_episodes),
+                P_NCS = perf['NCS'] / len(timed_episodes),
+                P_NCF = perf['NCF'] / len(timed_episodes)
+            ))
+        else:
+            EMS = abs(monitored_makespan(
+                MTF = MTF,
+                MTN = MTN,
+                MTS = MTS,
+                P_TP = perf['TP'] / len(timed_episodes),
+                P_FN = perf['FN'] / len(timed_episodes),
+                P_TN = perf['TN'] / len(timed_episodes),
+                P_FP = perf['FP'] / len(timed_episodes),
+                P_NCS = perf['NCS'] / len(timed_episodes),
+                P_NCF = perf['NCF'] / len(timed_episodes)
+            ))
+
+        print('Expected makespan [s] = ', end='')
+        print( EMS, end=' [s]\n' )
+        metrics = {
+            'EMS': EMS,
+            'MTP': MTP,
+            'MTN': MTN,
+            'MTS': MTS,
+            'MTF': MTF,
+            'P_TP': perf['TP'] / len(timed_episodes),
+            'P_FN': perf['FN'] / len(timed_episodes),
+            'P_TN': perf['TN'] / len(timed_episodes),
+            'P_FP': perf['FP'] / len(timed_episodes),
+            'P_NCS': perf['NCS'] / len(timed_episodes),
+            'P_NCF': perf['NCF'] / len(timed_episodes)
+        }
+
+        result = {
+            'perf': perf,
+            'conf_mat': confMatx,
+            'variables': metrics,
+            'equation_predicted_makespan': EMS,
+            'simulation_makespan': total_time / n_simulations,
+            'simulation_makespan_list': mks
+        }
     else:
-        EMS = abs(monitored_makespan(
-            MTF = MTF,
-            MTN = MTN,
-            MTS = MTS,
-            P_TP = perf['TP'] / len(timed_episodes),
-            P_FN = perf['FN'] / len(timed_episodes),
-            P_TN = perf['TN'] / len(timed_episodes),
-            P_FP = perf['FP'] / len(timed_episodes),
-            P_NCS = perf['NCS'] / len(timed_episodes),
-            P_NCF = perf['NCF'] / len(timed_episodes)
-        ))
+        confMatx = {
+            # Actual Positives
+            'TP' : 0,
+            'FN' : 0,
+            # Actual Negatives
+            'TN' : 0,
+            'FP' : 0,
+            'NC' : (perf['NCS'] + perf['NCF'] if ('NCS' in perf and 'NCF' in perf) else 0) / len(timed_episodes),
+        }
 
-    print('Expected makespan [s] = ', end='')
-    print( EMS, end=' [s]\n' )
-    metrics = {
-        'EMS': EMS,
-        'MTP': MTP,
-        'MTN': MTN,
-        'MTS': MTS,
-        'MTF': MTF,
-        'P_TP': perf['TP'] / len(timed_episodes),
-        'P_FN': perf['FN'] / len(timed_episodes),
-        'P_TN': perf['TN'] / len(timed_episodes),
-        'P_FP': perf['FP'] / len(timed_episodes),
-        'P_NCS': perf['NCS'] / len(timed_episodes),
-        'P_NCF': perf['NCF'] / len(timed_episodes)
-    }
+        metrics = {
+            'EMS': 'N/A',
+            'MTP': 'Inf',
+            'MTN': 'Inf',
+            'MTS': 'N/A',
+            'MTF': 'N/A',
+            'P_TP': 'N/A',
+            'P_FN': 'N/A',
+            'P_TN': 'N/A',
+            'P_FP': 'N/A',
+            'P_NCS': 0.5,
+            'P_NCF': 0.5
+        }
+
+        result = {
+            'perf': perf,
+            'conf_mat': confMatx,
+            'variables': metrics,
+            'equation_predicted_makespan': 'N/A',
+            'simulation_makespan': total_time / n_simulations,
+            'simulation_makespan_list': mks
+        }
+
+    path = f'../saved_data/test_data_simulation_confidence_{int(confidence*100)}'
+    if not os.path.exists(path):
+        os.makedirs(path)
+
+    with open(f'{path}/{model_name}.json', 'w') as f:
+        json.dump(result, f)
 
     return total_time / n_simulations, mks, metrics, confMatx
 
 
 # TODO: fix this function, something wrong with MTP, MTN, MTS, MTF
-def run_makespan_prediction_for_model(model_name: str, verbose: bool = False):
-    perf = CounterDict()
+# def run_makespan_prediction_for_model(model_name: str, verbose: bool = False):
+#     perf = CounterDict()
 
-    N_posCls  = 0 # --------- Number of positive classifications
-    N_negCls  = 0 # --------- Number of negative classifications
-    N_success = 0 # --------- Number of true task successes
-    N_failure = 0 # --------- Number of true task failures
-    ts_s      = 20.0/1000.0 # Seconds per timestep
-    MTP       = 0.0 # ------- Mean Time to Positive Classification
-    MTN       = 0.0 # ------- Mean Time to Negative Classification
-    MTS       = 0.0 # ------- Mean Time to Success
-    MTF       = 0.0 # ------- Mean Time to Failure
-    # xList     = dp.X_winTest
-    # yList     = dp.Y_winTest
-    # winLen    = dp.truncData[0].shape[1]
+#     N_posCls  = 0 # --------- Number of positive classifications
+#     N_negCls  = 0 # --------- Number of negative classifications
+#     N_success = 0 # --------- Number of true task successes
+#     N_failure = 0 # --------- Number of true task failures
+#     ts_s      = 20.0/1000.0 # Seconds per timestep
+#     MTP       = 0.0 # ------- Mean Time to Positive Classification
+#     MTN       = 0.0 # ------- Mean Time to Negative Classification
+#     MTS       = 0.0 # ------- Mean Time to Success
+#     MTF       = 0.0 # ------- Mean Time to Failure
+#     # xList     = dp.X_winTest
+#     # yList     = dp.Y_winTest
+#     # winLen    = dp.truncData[0].shape[1]
 
-    episode_predictions = np.array(np.load(f'../saved_data/episode_predictions/{model_name}_episode_predictions.npy', allow_pickle=True))
-    if verbose:
-        print(f'\nEpisode predictions matrix shape = {episode_predictions.shape}\n')
+#     episode_predictions = np.array(np.load(f'../saved_data/episode_predictions/{model_name}_episode_predictions.npy', allow_pickle=True))
+#     if verbose:
+#         print(f'\nEpisode predictions matrix shape = {episode_predictions.shape}\n')
 
-    timed_episodes = []
+#     timed_episodes = []
 
-    rolling_window_width = int(7.0 * 50)
-    print( f"Each window is {rolling_window_width} timesteps long!" )
-    for episode in episode_predictions:
-        predictions = episode[0]
-        true_label = episode[1]
-        n_windows = len(predictions)
-        episode_len_s = (n_windows + rolling_window_width - 1) * ts_s
-        n_steps = 0
-        for prediction in predictions:
-            ans, ad_x, row = scan_output_for_decision(
-                np.array([prediction]),
-                np.array([tf.keras.utils.to_categorical(true_label, num_classes=2)]),
-                threshold=0.9
-            )
-            n_steps += 1
-            if ans != 'NC':
-                break
+#     rolling_window_width = int(7.0 * 50)
+#     print( f"Each window is {rolling_window_width} timesteps long!" )
+#     for episode in episode_predictions:
+#         predictions = episode[0]
+#         true_label = episode[1]
+#         n_windows = len(predictions)
+#         episode_len_s = (n_windows + rolling_window_width - 1) * ts_s
+#         n_steps = 0
+#         for prediction in predictions:
+#             ans, ad_x, row = scan_output_for_decision(
+#                 np.array([prediction]),
+#                 np.array([tf.keras.utils.to_categorical(true_label, num_classes=2)]),
+#                 threshold=0.9
+#             )
+#             n_steps += 1
+#             if ans != 'NC':
+#                 break
 
-        print(f'Window {n_steps}/{n_windows}: Prediction = [{row[0]:.2f}, {row[1]:.2f}] | True label = {true_label} | Answer = {ans}')
+#         print(f'Window {n_steps}/{n_windows}: Prediction = [{row[0]:.2f}, {row[1]:.2f}] | True label = {true_label} | Answer = {ans}')
 
-        # perf.count(ans)
-        if ans == 'NC':
-            if true_label == 0.0:
-                perf.count('NCS')
-            elif true_label == 1.0:
-                perf.count('NCF')
-        else:
-            perf.count(ans)
+#         # perf.count(ans)
+#         if ans == 'NC':
+#             if true_label == 0.0:
+#                 perf.count('NCS')
+#             elif true_label == 1.0:
+#                 perf.count('NCF')
+#         else:
+#             perf.count(ans)
 
-        # episode len = number of rows of episode:
-        # episode_len_s = N_rows * ts_s
-        # episode_len_s = (rolling_window_width + n_steps - 1) * ts_s
-        # episode_len_s = (rolling_window_width + X_episodes.shape[0] - 1) * ts_s
+#         # episode len = number of rows of episode:
+#         # episode_len_s = N_rows * ts_s
+#         # episode_len_s = (rolling_window_width + n_steps - 1) * ts_s
+#         # episode_len_s = (rolling_window_width + X_episodes.shape[0] - 1) * ts_s
 
-        episode_obj = EpisodePerf()
-        episode_obj.trueLabel = true_label
-        episode_obj.answer = ans
-        episode_obj.runTime = episode_len_s
+#         episode_obj = EpisodePerf()
+#         episode_obj.trueLabel = true_label
+#         episode_obj.answer = ans
+#         episode_obj.runTime = episode_len_s
 
-        tAns_s = (rolling_window_width + n_steps - 1) * ts_s
-        if ans in ( 'TP', 'FP' ):
-            MTP += tAns_s
-            episode_obj.TTP = tAns_s
-            N_posCls += 1
-        elif ans in ( 'TN', 'FN' ):
-            MTN += tAns_s
-            episode_obj.TTN = tAns_s
-            N_negCls += 1
-
-
-        if true_label == 0.0:
-            MTS += episode_len_s
-            N_success += 1
-            episode_obj.TTS = episode_len_s
-        elif true_label == 1.0:
-            MTF += episode_len_s
-            N_failure += 1
-            episode_obj.TTF = episode_len_s
-
-        timed_episodes.append(episode_obj)
-
-    times = []
-    for ep in timed_episodes:
-        times.append(ep.runTime) 
-
-    confMatx = {
-        # Actual Positives
-        'TP' : (perf['TP'] if ('TP' in perf) else 0) / ((perf['TP'] if ('TP' in perf) else 0) + (perf['FN'] if ('FN' in perf) else 0)),
-        'FN' : (perf['FN'] if ('FN' in perf) else 0) / ((perf['TP'] if ('TP' in perf) else 0) + (perf['FN'] if ('FN' in perf) else 0)),
-        # Actual Negatives
-        'TN' : (perf['TN'] if ('TN' in perf) else 0) / ((perf['TN'] if ('TN' in perf) else 0) + (perf['FP'] if ('FP' in perf) else 0)),
-        'FP' : (perf['FP'] if ('FP' in perf) else 0) / ((perf['TN'] if ('TN' in perf) else 0) + (perf['FP'] if ('FP' in perf) else 0)),
-        'NC' : (perf['NCS'] + perf['NCF'] if ('NCS' in perf and 'NCF' in perf) else 0) / len(episode_predictions),
-    }
-
-    print()
-    print( perf )
-    print( confMatx )
-
-    MTP /= N_posCls #- Mean Time to Positive Classification
-    MTN /= N_negCls #- Mean Time to Negative Classification
-    MTS /= N_success # Mean Time to Success
-    MTF /= N_failure # Mean Time to Failure
-
-    print()
-    print( f"MTP: {MTP} [s]" )
-    print( f"MTN: {MTN} [s]" )
-    print( f"MTS: {MTS} [s]" )
-    print( f"MTF: {MTF} [s]" )
-    print( f"Success: {N_success}" )
-    print( f"Failure: {N_failure}" )
-
-    if verbose:
-        print('MC MONITORED BASELINE...')
+#         tAns_s = (rolling_window_width + n_steps - 1) * ts_s
+#         if ans in ( 'TP', 'FP' ):
+#             MTP += tAns_s
+#             episode_obj.TTP = tAns_s
+#             N_posCls += 1
+#         elif ans in ( 'TN', 'FN' ):
+#             MTN += tAns_s
+#             episode_obj.TTN = tAns_s
+#             N_negCls += 1
 
 
-    N   = 200000 # Number of trials
-    MTS = 0.0 # Mean time to success
+#         if true_label == 0.0:
+#             MTS += episode_len_s
+#             N_success += 1
+#             episode_obj.TTS = episode_len_s
+#         elif true_label == 1.0:
+#             MTF += episode_len_s
+#             N_failure += 1
+#             episode_obj.TTF = episode_len_s
 
-    print( f"Sampling {N} episodes from {len(timed_episodes)} trials" )
+#         timed_episodes.append(episode_obj)
 
-    for i in range(N):
-        failing = 1
-        TS_i    = 0.0
-        while( failing ):
+#     times = []
+#     for ep in timed_episodes:
+#         times.append(ep.runTime) 
 
-            # Draw episode
-            ep = choice(timed_episodes)
+#     confMatx = {
+#         # Actual Positives
+#         'TP' : (perf['TP'] if ('TP' in perf) else 0) / ((perf['TP'] if ('TP' in perf) else 0) + (perf['FN'] if ('FN' in perf) else 0)),
+#         'FN' : (perf['FN'] if ('FN' in perf) else 0) / ((perf['TP'] if ('TP' in perf) else 0) + (perf['FN'] if ('FN' in perf) else 0)),
+#         # Actual Negatives
+#         'TN' : (perf['TN'] if ('TN' in perf) else 0) / ((perf['TN'] if ('TN' in perf) else 0) + (perf['FP'] if ('FP' in perf) else 0)),
+#         'FP' : (perf['FP'] if ('FP' in perf) else 0) / ((perf['TN'] if ('TN' in perf) else 0) + (perf['FP'] if ('FP' in perf) else 0)),
+#         'NC' : (perf['NCS'] + perf['NCF'] if ('NCS' in perf and 'NCF' in perf) else 0) / len(episode_predictions),
+#     }
 
-            # If classifier decides Negative, then we only take TTN hit but commit to another attempt
-            if ep.answer[-1] == 'N':
-                failing = True
-                TS_i += ep.TTN
-                # if i%int(N/10) == 0:
-                #     print( ep.TTN )
-            # Else we always let the episode play out and task makes decision for us
-            elif ep.answer[-1] == 'P':
-                failing = not int(ep.trueLabel)
-                TS_i += ep.runTime
-            else:
-                failing = not int(ep.trueLabel)
-                TS_i += ep.runTime
-        MTS += TS_i
+#     print()
+#     print( perf )
+#     print( confMatx )
+
+#     MTP /= N_posCls #- Mean Time to Positive Classification
+#     MTN /= N_negCls #- Mean Time to Negative Classification
+#     MTS /= N_success # Mean Time to Success
+#     MTF /= N_failure # Mean Time to Failure
+
+#     print()
+#     print( f"MTP: {MTP} [s]" )
+#     print( f"MTN: {MTN} [s]" )
+#     print( f"MTS: {MTS} [s]" )
+#     print( f"MTF: {MTF} [s]" )
+#     print( f"Success: {N_success}" )
+#     print( f"Failure: {N_failure}" )
+
+#     if verbose:
+#         print('MC MONITORED BASELINE...')
+
+
+#     N   = 200000 # Number of trials
+#     MTS = 0.0 # Mean time to success
+
+#     print( f"Sampling {N} episodes from {len(timed_episodes)} trials" )
+
+#     for i in range(N):
+#         failing = 1
+#         TS_i    = 0.0
+#         while( failing ):
+
+#             # Draw episode
+#             ep = choice(timed_episodes)
+
+#             # If classifier decides Negative, then we only take TTN hit but commit to another attempt
+#             if ep.answer[-1] == 'N':
+#                 failing = True
+#                 TS_i += ep.TTN
+#                 # if i%int(N/10) == 0:
+#                 #     print( ep.TTN )
+#             # Else we always let the episode play out and task makes decision for us
+#             elif ep.answer[-1] == 'P':
+#                 failing = not int(ep.trueLabel)
+#                 TS_i += ep.runTime
+#             else:
+#                 failing = not int(ep.trueLabel)
+#                 TS_i += ep.runTime
+#         MTS += TS_i
         
-    MTS /= N
-    print( f"    Task Mean Time to Success: {MTS} [s]" )
+#     MTS /= N
+#     print( f"    Task Mean Time to Success: {MTS} [s]" )
 
 
-    print('    Expected makespan:', end=' ')
-    # EMS = expected_makespan( 
-    #     MTF = MTF, 
-    #     MTN = MTN, 
-    #     MTS = MTS, 
-    #     P_TP = confMatx['TP'] * (N_success/(N_success + N_failure)) , 
-    #     P_FN = confMatx['FN'] * (N_success/(N_success + N_failure)) , 
-    #     P_TN = confMatx['TN'] * (N_failure/(N_success + N_failure)) , 
-    #     P_FP = confMatx['FP'] * (N_failure/(N_success + N_failure))  
-    # )
-    EMS = monitored_makespan(
-        MTF = MTF, 
-        MTN = MTN, 
-        MTS = MTS,
-        P_TP = confMatx['TP'] / len(episode_predictions), 
-        P_FN = confMatx['FN'] / len(episode_predictions), 
-        P_TN = confMatx['TN'] / len(episode_predictions), 
-        P_FP = confMatx['FP'] / len(episode_predictions),
-        P_NCS = perf['NCS'] / len(episode_predictions),
-        P_NCF = perf['NCF'] / len(episode_predictions)
-    )
-    print( EMS, end=' [s]\n' )
-    metrics = {
-        'EMS': [EMS],
-        'MTP': [MTP],
-        'MTN': [MTN],
-        'MTS': [MTS],
-        'MTF': [MTF],
-        'P_TP': confMatx['TP'] / len(episode_predictions), 
-        'P_FN': confMatx['FN'] / len(episode_predictions), 
-        'P_TN': confMatx['TN'] / len(episode_predictions), 
-        'P_FP': confMatx['FP'] / len(episode_predictions),
-        'P_NCS': perf['NCS'] / len(episode_predictions),
-        'P_NCF': perf['NCF'] / len(episode_predictions)
-    }
-    return metrics, confMatx, times
+#     print('    Expected makespan:', end=' ')
+#     # EMS = expected_makespan( 
+#     #     MTF = MTF, 
+#     #     MTN = MTN, 
+#     #     MTS = MTS, 
+#     #     P_TP = confMatx['TP'] * (N_success/(N_success + N_failure)) , 
+#     #     P_FN = confMatx['FN'] * (N_success/(N_success + N_failure)) , 
+#     #     P_TN = confMatx['TN'] * (N_failure/(N_success + N_failure)) , 
+#     #     P_FP = confMatx['FP'] * (N_failure/(N_success + N_failure))  
+#     # )
+#     EMS = monitored_makespan(
+#         MTF = MTF, 
+#         MTN = MTN, 
+#         MTS = MTS,
+#         P_TP = confMatx['TP'] / len(episode_predictions), 
+#         P_FN = confMatx['FN'] / len(episode_predictions), 
+#         P_TN = confMatx['TN'] / len(episode_predictions), 
+#         P_FP = confMatx['FP'] / len(episode_predictions),
+#         P_NCS = perf['NCS'] / len(episode_predictions),
+#         P_NCF = perf['NCF'] / len(episode_predictions)
+#     )
+#     print( EMS, end=' [s]\n' )
+#     metrics = {
+#         'EMS': [EMS],
+#         'MTP': [MTP],
+#         'MTN': [MTN],
+#         'MTS': [MTS],
+#         'MTF': [MTF],
+#         'P_TP': confMatx['TP'] / len(episode_predictions), 
+#         'P_FN': confMatx['FN'] / len(episode_predictions), 
+#         'P_TN': confMatx['TN'] / len(episode_predictions), 
+#         'P_FP': confMatx['FP'] / len(episode_predictions),
+#         'P_NCS': perf['NCS'] / len(episode_predictions),
+#         'P_NCF': perf['NCF'] / len(episode_predictions)
+#     }
+#     return metrics, confMatx, times
 
 
 # Plotting ----------------------------------------------------------------------------
@@ -676,7 +837,7 @@ def plot_runtimes(res: dict, models_to_use: list, save_plots: bool = True):
         plt.plot()
 
 
-def plot_simulation_makespans(res: dict, models: list, reactive_mks: list = [], plot_reactive: bool =False, save_plots: bool = True):
+def plot_simulation_makespans(res: dict, models: list, confidence:float, reactive_mks: list = [], plot_reactive: bool =False, save_plots: bool = True):
     # Setup
     # plt.style.use('seaborn')
     # From Latex \textwidth
@@ -699,7 +860,7 @@ def plot_simulation_makespans(res: dict, models: list, reactive_mks: list = [], 
     means_textstr_dict = dict.fromkeys(models, None)
     if plot_reactive and reactive_mks != []:
         means_textstr_dict = {**{'Reactive': ''.join(f'Reactive: {np.mean(reactive_mks):.2f} \u00B1 {np.std(reactive_mks):.2f}')}, **means_textstr_dict}
-    for model_name in models:
+    for model_name in models.keys():
         # if model_name != 'FCN':
         #     hits = np.sum([1 if vt < fcn else 0 for vt, fcn in zip(res[model_name]['makespan_sim_hist'], res['FCN']['makespan_sim_hist'])])
         #     performance = (hits * 100) / len(res[model_name]['makespan_sim_hist'])
@@ -707,28 +868,33 @@ def plot_simulation_makespans(res: dict, models: list, reactive_mks: list = [], 
             #     textstr_dict[model_name] = ''.join(f'Makespan is lower for {performance:.2f}% of the trials\nwith Transformer')
             # else:
             #     textstr_dict[model_name] = ''.join(f'Makespan is lower for {performance:.2f}% of the trials\nwith {model_name}')
-        if model_name == 'VanillaTransformer':
-            means_textstr_dict[model_name] = ''.join(f'Transformer: {res[model_name]["makespan_sim_avg"]:.2f} \u00B1 {res[model_name]["makespan_sim_std"]:.2f}')
-        else:
-            means_textstr_dict[model_name] = ''.join(f'{model_name}: {res[model_name]["makespan_sim_avg"]:.2f} \u00B1 {res[model_name]["makespan_sim_std"]:.2f}')
+        # if model_name == 'VanillaTransformer':
+        #     means_textstr_dict[model_name] = ''.join(f'Transformer: {res[model_name]["makespan_sim_avg"]:.2f} \u00B1 {res[model_name]["makespan_sim_std"]:.2f}')
+        # else:
+            # means_textstr_dict[model_name] = ''.join(f'{model_name}: {res[model_name]["makespan_sim_avg"]:.2f} \u00B1 {res[model_name]["makespan_sim_std"]:.2f}')
+        means_textstr_dict[model_name] = ''.join(f'{model_name}: {res[f"{model_name}_{int(confidence*100)}"]["makespan_sim_avg"]:.2f} \u00B1 {res[f"{model_name}_{int(confidence*100)}"]["makespan_sim_std"]:.2f}')
 
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
 
     fig, axes = plt.subplots(1, 1, figsize=set_size(fig_width))
     # plt.tight_layout()
-    axes.title.set_text(f'Simulated makespans for each model (N = {len(res[list(res.keys())[0]]["makespan_sim_hist"])})')
+    axes.title.set_text(f'Simulated makespans for each model (N = {len(res[f"{list(res.keys())[0]}_{int(confidence*100)}"]["makespan_sim_hist"])})')
     runtimes = []
     if plot_reactive and reactive_mks != []:
         runtimes.append(reactive_mks)
     for model_name in models:
-        runtimes.append(res[model_name]['makespan_sim_hist'])
+        runtimes.append(res[f"{model_name}_{int(confidence*100)}"]['makespan_sim_hist'])
 
-    if 'VanillaTransformer' in models:
-        models = [m for m in models if m != 'VanillaTransformer']
-    models.append('Transformer')
+    # if 'VanillaTransformer' in models:
+    #     models = [m for m in models if m != 'VanillaTransformer']
+    # models.append('Transformer')
     if plot_reactive and reactive_mks != []:
-        models.insert(0, 'Reactive')
-    axes.hist(runtimes, alpha=0.5, label=models, bins=10)
+        labels = list(models.keys())
+        labels.insert(0, 'Reactive')
+    else:
+        labels = list(models.keys())
+
+    axes.hist(runtimes, alpha=0.5, label=labels, bins=10)
     axes.legend()
     axes.set_xlabel('Episode Makespan [s]')
     axes.set_ylabel('Count [Episode]')
@@ -747,7 +913,7 @@ def plot_simulation_makespans(res: dict, models: list, reactive_mks: list = [], 
             y -= 0.11
 
     if save_plots:
-        plt.savefig('../saved_data/imgs/makespan_prediction/makespan_simulation_histogram.png')
+        plt.savefig(f'../saved_data/imgs/makespan_prediction/makespan_simulation_histogram_confidence_{int(confidence*100)}.png')
         plt.clf()
     else:
         plt.plot()

@@ -1,4 +1,4 @@
-import os, sys
+import os, sys, json
 sys.path.append(os.path.realpath('../'))
 print( sys.version )
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # INFO and WARNING messages are not printed
@@ -18,7 +18,8 @@ from model_builds.RNN import RNN, GRU, LSTM
 from model_builds.VanillaTransformer import VanillaTransformer
 from model_builds.OOPTransformer import OOPTransformer
 from utilities.metrics_plots import compute_confusion_matrix
-from utilities.makespan_utils import get_mts_mtf, expected_makespan, monitored_makespan, reactive_makespan, plot_simulation_makespans
+from utilities.makespan_utils import get_makespan_for_model, get_mts_mtf, scan_output_for_decision, monitored_makespan, reactive_makespan, plot_simulation_makespans
+from utilities.utils import CounterDict
 
 SRC_PATH = os.path.dirname(os.path.realpath(__file__))
 MAIN_PATH = os.path.dirname(os.path.dirname(__file__))
@@ -30,7 +31,9 @@ MODELS_TO_RUN = [
     'RNN',
     'GRU',
     'LSTM',
-    'VanillaTransformer'
+    'VanillaTransformer',
+    'OOP_Transformer_small',
+    'OOP_Transformer'
 ]
 
 
@@ -84,7 +87,8 @@ def build_vanilla_transformer():
 def build_oop_transformer(X_sample, model_type: str):
     name = 'OOP_Transformer'
     if model_type == 'small':
-        name = name + '_' + model_type
+        # name = name + '_' + model_type
+        name = 'Transformer'
 
     transformer_net = OOPTransformer(model_name=name)
 
@@ -119,7 +123,7 @@ def build_oop_transformer(X_sample, model_type: str):
             verbose=False
         )
 
-    transformer_net.compile()
+    # transformer_net.compile()
 
     return transformer_net
 
@@ -139,17 +143,6 @@ def get_model(name: str, roll_win_width: int = 0, X_sample = None):
         return build_oop_transformer(X_sample=X_sample, model_type='big')
     elif name == 'OOP_Transformer_small':
         return build_oop_transformer(X_sample=X_sample, model_type='small')
-
-
-def is_sub_array_contained(larger, sub):
-    rows, cols = sub.shape[0], sub.shape[1]
-    for i in range(len(larger) - rows + 1):
-        for j in range(len(larger[0]) - cols + 1):
-            if all(larger[i+k][j+l] == sub[k][l] for k in range(rows) for l in range(cols)):
-                return True
-
-    return False
-
 
 
 if __name__ == '__main__':
@@ -200,12 +193,20 @@ if __name__ == '__main__':
     print('DONE\n')
 
     # Create table to be printed
-    headers = ['Measure', 'Reactive', 'FCN Simulation', 'RNN', 'GRU', 'LSTM', 'Transformer Simulation']
+    headers = ['Measure', 'Reactive', 'FCN', 'RNN', 'GRU', 'LSTM', 'Transformer', 'Transformer_big', 'VanillaTransformer']
     data_table = [
-        ['Makespan [s]', None, None, None, None, None, None],
-        ['Predicted [s]', None, None, None, None, None, None],
-        ['MTS', None, None, None, None, None, None],
-        ['MTF', None, None, None, None, None, None]
+        ['Makespan [s] (simulation)', None, None, None, None, None, None, None, None],
+        ['Predicted [s] (equation)', None, None, None, None, None, None, None, None],
+        ['MTS', None, None, None, None, None, None, None, None],
+        ['MTF', None, None, None, None, None, None, None, None],
+        ['MTP', None, None, None, None, None, None, None, None],
+        ['MTN', None, None, None, None, None, None, None, None],
+        ['P_TP', None, None, None, None, None, None, None, None],
+        ['P_FN', None, None, None, None, None, None, None, None],
+        ['P_TN', None, None, None, None, None, None, None, None],
+        ['P_FP', None, None, None, None, None, None, None, None],
+        ['P_NCS', None, None, None, None, None, None, None, None],
+        ['P_NCF', None, None, None, None, None, None, None, None]
     ]
 
     # Load models
@@ -226,6 +227,14 @@ if __name__ == '__main__':
     if 'VanillaTransformer' in MODELS_TO_RUN:
         load_keras_model(model_name='VanillaTransformer', makespan_models=makespan_models)
 
+    if 'OOP_Transformer_small' in MODELS_TO_RUN:
+        transformer = get_model(name='OOP_Transformer_small', roll_win_width=roll_win_width, X_sample=X_train[:64])
+        load_keras_weights(model_build=transformer, model_name='OOP_Transformer_small', makespan_models=makespan_models, verbose=True)
+
+    if 'OOP_Transformer' in MODELS_TO_RUN:
+        transformer = get_model(name='OOP_Transformer', roll_win_width=roll_win_width, X_sample=X_train[:64])
+        load_keras_weights(model_build=transformer, model_name='OOP_Transformer', makespan_models=makespan_models, verbose=True)
+
     # Call function to compute confusion matrices
     compute_conf_mats = False
     for model_name in MODELS_TO_RUN:
@@ -234,10 +243,13 @@ if __name__ == '__main__':
         if compute_conf_mats:
             _ = compute_confusion_matrix(
                 model=model.model,
+                model_name=model.model_name,
                 file_name=model.file_name,
                 imgs_path=model.imgs_path,
                 X_winTest=X_window_test,
                 Y_winTest=Y_window_test,
+                confidence=0.9,
+                simulation=True,
                 plot=True
             )
 
@@ -265,209 +277,246 @@ if __name__ == '__main__':
         'RNN': makespan_models['RNN'],
         'GRU': makespan_models['GRU'],
         'LSTM': makespan_models['LSTM'],
-        'VanillaTransformer': makespan_models['VanillaTransformer']
+        'VanillaTransformer': makespan_models['VanillaTransformer'],
+        'Transformer': makespan_models['OOP_Transformer_small'],
+        'Transformer_big': makespan_models['OOP_Transformer']
     }
     plot_models = {
         'FCN': makespan_models['FCN'],
         'RNN': makespan_models['RNN'],
         'GRU': makespan_models['GRU'],
         'LSTM': makespan_models['LSTM'],
-        'VanillaTransformer': makespan_models['VanillaTransformer']
+        'VanillaTransformer': makespan_models['VanillaTransformer'],
+        'Transformer': makespan_models['OOP_Transformer_small'],
+        'Transformer_big': makespan_models['OOP_Transformer']
     }
 
-    sim_res = run_makespan_simulation(
-        models_to_run=sim_models,
-        data=test_data,
-        n_simulations = 150,
-        data_mode='load_data',
-        compute=False
-    )
 
-    plot_simulation_makespans(
-        res=sim_res,
-        models=plot_models,
-        reactive_mks=react_mks[:150],
-        plot_reactive=True,
-        save_plots=True
-    )
+    confidence_list = [0.85, 0.9, 0.95, 0.99]
+    for confidence in confidence_list:
+        print(f'For confidence {confidence}:')
+        for model_name, model in sim_models.items():
+            print(f'\n--> Computing for model {model_name}')
+            get_makespan_for_model(
+                model_name=model_name,
+                model=model,
+                episodes=test_data,
+                confidence=confidence,
+                verbose=True
+            )
 
-    for i, model_name in enumerate(MODELS_TO_RUN):
-        data_table[0][i+2] = sim_res[model_name]['makespan_sim_avg']
-        data_table[1][i+2] = sim_res[model_name]['metrics']['EMS']
-        data_table[2][i+2] = sim_res[model_name]['metrics']['MTS']
-        data_table[3][i+2] = sim_res[model_name]['metrics']['MTF']
+    # sim_results = dict.fromkeys(confidence_list, {})
+    # for confidence in confidence_list:
+    #     sim_results[confidence] = run_makespan_simulation(
+    #         models_to_run=sim_models,
+    #         data=test_data,
+    #         n_simulations = 500,
+    #         confidence=confidence,
+    #         compute=True
+    #     )
 
-    print(tabulate(data_table, headers=headers))
+    #     plot_simulation_makespans(
+    #         res=sim_results[confidence],
+    #         models=plot_models,
+    #         confidence=confidence,
+    #         reactive_mks=react_mks[:150],
+    #         plot_reactive=True,
+    #         save_plots=True
+    #     )
 
-    # Time saving plots
-    actual_react = react_avg_mks
-    actual_fcn = sim_res['FCN']['makespan_sim_avg']
-    actual_transformer = sim_res['VanillaTransformer']['makespan_sim_avg']
+    # for confidence in confidence_list:
+    #     for i, model_name in enumerate(sim_models.keys()):
+    #         if sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['EMS'] == 'N/A':
+    #             data_table[0][i+2] = 'N/A'
+    #         else:
+    #             data_table[0][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['makespan_sim_avg']
+    #         data_table[1][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['EMS']
+    #         data_table[2][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['MTS']
+    #         data_table[3][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['MTF']
+    #         data_table[4][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['MTP']
+    #         data_table[5][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['MTN']
+    #         data_table[6][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['P_TP']
+    #         data_table[7][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['P_FN']
+    #         data_table[8][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['P_TN']
+    #         data_table[9][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['P_FP']
+    #         data_table[10][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['P_NCS']
+    #         data_table[11][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['P_NCF']
 
-    cm_fcn = sim_res['FCN']['conf_mat']
-    cm_transformer = sim_res['VanillaTransformer']['conf_mat']
+    #     print(f'\nConfidence = {confidence}')
+    #     print(tabulate(data_table, headers=headers))
 
-    metrics_fcn = sim_res['FCN']['metrics']
-    metrics_transformer = sim_res['VanillaTransformer']['metrics']
+    # with open('../saved_data/simulation_results.json', 'w') as f:
+    #     json.dump(sim_results, f)
 
-    # P_TP var independent
-    n_vals = 200
-    prob = np.linspace(0.0, 0.99, num=n_vals)
-    result_react = [r_mks] * n_vals
+    # # Time saving plots
+    # actual_react = react_avg_mks
+    # actual_fcn = sim_res['FCN']['makespan_sim_avg']
+    # actual_transformer = sim_res['Transformer']['makespan_sim_avg']
 
-    result_fcn = abs(monitored_makespan(
-        MTS=metrics_fcn['MTS'],
-        MTF=metrics_fcn['MTF'],
-        MTN=metrics_fcn['MTN'],
-        P_TP=prob,
-        P_FN=metrics_fcn['P_FN'],
-        P_TN=metrics_fcn['P_TN'],
-        P_FP=metrics_fcn['P_FP'],
-        P_NCF=metrics_fcn['P_NCF'],
-        P_NCS=metrics_fcn['P_NCS']
-    ))
-    result_tr = abs(monitored_makespan(
-        MTS=metrics_transformer['MTS'],
-        MTF=metrics_transformer['MTF'],
-        MTN=metrics_transformer['MTN'],
-        P_TP=prob,
-        P_FN=metrics_transformer['P_FN'],
-        P_TN=metrics_transformer['P_TN'],
-        P_FP=metrics_transformer['P_FP'],
-        P_NCF=metrics_transformer['P_NCF'],
-        P_NCS=metrics_transformer['P_NCS']
-    ))
+    # cm_fcn = sim_res['FCN']['conf_mat']
+    # cm_transformer = sim_res['Transformer']['conf_mat']
 
-    plt.plot(prob, result_react, label='Reactive')
-    plt.plot(metrics_fcn['P_TP'], actual_react, marker='x', color='black')
+    # metrics_fcn = sim_res['FCN']['metrics']
+    # metrics_transformer = sim_res['Transformer']['metrics']
 
-    plt.plot(prob, result_fcn, label='FCN')
-    plt.plot(metrics_fcn['P_TP'], actual_fcn, marker='o', color='black')
+    # # P_TP var independent
+    # n_vals = 200
+    # prob = np.linspace(0.0, 0.99, num=n_vals)
+    # result_react = [r_mks] * n_vals
 
-    plt.plot(prob, result_tr, label='Transformer')
-    plt.plot(metrics_transformer['P_TP'], actual_transformer, marker='o', color='gray')
+    # result_fcn = abs(monitored_makespan(
+    #     MTS=metrics_fcn['MTS'],
+    #     MTF=metrics_fcn['MTF'],
+    #     MTN=metrics_fcn['MTN'],
+    #     P_TP=prob,
+    #     P_FN=metrics_fcn['P_FN'],
+    #     P_TN=metrics_fcn['P_TN'],
+    #     P_FP=metrics_fcn['P_FP'],
+    #     P_NCF=metrics_fcn['P_NCF'],
+    #     P_NCS=metrics_fcn['P_NCS']
+    # ))
+    # result_tr = abs(monitored_makespan(
+    #     MTS=metrics_transformer['MTS'],
+    #     MTF=metrics_transformer['MTF'],
+    #     MTN=metrics_transformer['MTN'],
+    #     P_TP=prob,
+    #     P_FN=metrics_transformer['P_FN'],
+    #     P_TN=metrics_transformer['P_TN'],
+    #     P_FP=metrics_transformer['P_FP'],
+    #     P_NCF=metrics_transformer['P_NCF'],
+    #     P_NCS=metrics_transformer['P_NCS']
+    # ))
 
-    plt.plot(prob, result_react - result_fcn, label='Time saved FCN')
-    plt.plot(prob, result_react - result_tr, label='Time saved Transformer')
+    # plt.plot(prob, result_react, label='Reactive')
+    # plt.plot(metrics_fcn['P_TP'], actual_react, marker='x', color='black')
 
-    plt.legend()
-    plt.savefig('../saved_data/imgs/simulation/sim_img_TP.png')
-    plt.clf()
+    # plt.plot(prob, result_fcn, label='FCN')
+    # plt.plot(metrics_fcn['P_TP'], actual_fcn, marker='o', color='black')
 
-    result_fcn = abs(monitored_makespan(
-        MTS=metrics_fcn['MTS'],
-        MTF=metrics_fcn['MTF'],
-        MTN=metrics_fcn['MTN'],
-        P_TP=metrics_fcn['P_TP'],
-        P_FN=metrics_fcn['P_FN'],
-        P_TN=prob,
-        P_FP=metrics_fcn['P_FP'],
-        P_NCF=metrics_fcn['P_NCF'],
-        P_NCS=metrics_fcn['P_NCS']
-    ))
-    result_tr = abs(monitored_makespan(
-        MTS=metrics_transformer['MTS'],
-        MTF=metrics_transformer['MTF'],
-        MTN=metrics_transformer['MTN'],
-        P_TP=metrics_transformer['P_TP'],
-        P_FN=metrics_transformer['P_FN'],
-        P_TN=prob,
-        P_FP=metrics_transformer['P_FP'],
-        P_NCF=metrics_transformer['P_NCF'],
-        P_NCS=metrics_transformer['P_NCS']
-    ))
+    # plt.plot(prob, result_tr, label='Transformer')
+    # plt.plot(metrics_transformer['P_TP'], actual_transformer, marker='o', color='gray')
 
-    plt.plot(prob, result_react, label='Reactive')
-    plt.plot(metrics_fcn['P_TN'], actual_react, marker='x', color='black')
+    # plt.plot(prob, result_react - result_fcn, label='Time saved FCN')
+    # plt.plot(prob, result_react - result_tr, label='Time saved Transformer')
 
-    plt.plot(prob, result_fcn, label='FCN')
-    plt.plot(metrics_fcn['P_TN'], actual_fcn, marker='o', color='black')
+    # plt.legend()
+    # plt.savefig('../saved_data/imgs/simulation/sim_img_TP.png')
+    # plt.clf()
 
-    plt.plot(prob, result_tr, label='Transformer')
-    plt.plot(metrics_transformer['P_TN'], actual_transformer, marker='o', color='gray')
+    # result_fcn = abs(monitored_makespan(
+    #     MTS=metrics_fcn['MTS'],
+    #     MTF=metrics_fcn['MTF'],
+    #     MTN=metrics_fcn['MTN'],
+    #     P_TP=metrics_fcn['P_TP'],
+    #     P_FN=metrics_fcn['P_FN'],
+    #     P_TN=prob,
+    #     P_FP=metrics_fcn['P_FP'],
+    #     P_NCF=metrics_fcn['P_NCF'],
+    #     P_NCS=metrics_fcn['P_NCS']
+    # ))
+    # result_tr = abs(monitored_makespan(
+    #     MTS=metrics_transformer['MTS'],
+    #     MTF=metrics_transformer['MTF'],
+    #     MTN=metrics_transformer['MTN'],
+    #     P_TP=metrics_transformer['P_TP'],
+    #     P_FN=metrics_transformer['P_FN'],
+    #     P_TN=prob,
+    #     P_FP=metrics_transformer['P_FP'],
+    #     P_NCF=metrics_transformer['P_NCF'],
+    #     P_NCS=metrics_transformer['P_NCS']
+    # ))
 
-    plt.plot(prob, result_react - result_fcn, label='Time saved FCN')
-    plt.plot(prob, result_react - result_tr, label='Time saved Transformer')
+    # plt.plot(prob, result_react, label='Reactive')
+    # plt.plot(metrics_fcn['P_TN'], actual_react, marker='x', color='black')
 
-    plt.legend()
-    plt.savefig('../saved_data/imgs/simulation/sim_img_TN.png')
-    plt.clf()
+    # plt.plot(prob, result_fcn, label='FCN')
+    # plt.plot(metrics_fcn['P_TN'], actual_fcn, marker='o', color='black')
 
-    result_fcn = abs(monitored_makespan(
-        MTS=metrics_fcn['MTS'],
-        MTF=prob,
-        MTN=metrics_fcn['MTN'],
-        P_TP=metrics_fcn['P_TP'],
-        P_FN=metrics_fcn['P_FN'],
-        P_TN=metrics_fcn['P_TN'],
-        P_FP=metrics_fcn['P_FP'],
-        P_NCF=metrics_fcn['P_NCF'],
-        P_NCS=metrics_fcn['P_NCS']
-    ))
-    result_tr = abs(monitored_makespan(
-        MTS=metrics_transformer['MTS'],
-        MTF=prob,
-        MTN=metrics_transformer['MTN'],
-        P_TP=metrics_transformer['P_TP'],
-        P_FN=metrics_transformer['P_FN'],
-        P_TN=metrics_transformer['P_TN'],
-        P_FP=metrics_transformer['P_FP'],
-        P_NCF=metrics_transformer['P_NCF'],
-        P_NCS=metrics_transformer['P_NCS']
-    ))
+    # plt.plot(prob, result_tr, label='Transformer')
+    # plt.plot(metrics_transformer['P_TN'], actual_transformer, marker='o', color='gray')
 
-    plt.plot(prob, result_react, label='Reactive')
-    plt.plot(metrics_fcn['MTF'], actual_react, marker='x', color='black')
+    # plt.plot(prob, result_react - result_fcn, label='Time saved FCN')
+    # plt.plot(prob, result_react - result_tr, label='Time saved Transformer')
 
-    plt.plot(prob, result_fcn, label='FCN')
-    plt.plot(metrics_fcn['MTF'], actual_fcn, marker='o', color='black')
+    # plt.legend()
+    # plt.savefig('../saved_data/imgs/simulation/sim_img_TN.png')
+    # plt.clf()
 
-    plt.plot(prob, result_tr, label='Transformer')
-    plt.plot(metrics_transformer['MTF'], actual_transformer, marker='o', color='gray')
+    # result_fcn = abs(monitored_makespan(
+    #     MTS=metrics_fcn['MTS'],
+    #     MTF=prob,
+    #     MTN=metrics_fcn['MTN'],
+    #     P_TP=metrics_fcn['P_TP'],
+    #     P_FN=metrics_fcn['P_FN'],
+    #     P_TN=metrics_fcn['P_TN'],
+    #     P_FP=metrics_fcn['P_FP'],
+    #     P_NCF=metrics_fcn['P_NCF'],
+    #     P_NCS=metrics_fcn['P_NCS']
+    # ))
+    # result_tr = abs(monitored_makespan(
+    #     MTS=metrics_transformer['MTS'],
+    #     MTF=prob,
+    #     MTN=metrics_transformer['MTN'],
+    #     P_TP=metrics_transformer['P_TP'],
+    #     P_FN=metrics_transformer['P_FN'],
+    #     P_TN=metrics_transformer['P_TN'],
+    #     P_FP=metrics_transformer['P_FP'],
+    #     P_NCF=metrics_transformer['P_NCF'],
+    #     P_NCS=metrics_transformer['P_NCS']
+    # ))
 
-    plt.plot(prob, result_react - result_fcn, label='Time saved FCN')
-    plt.plot(prob, result_react - result_tr, label='Time saved Transformer')
+    # plt.plot(prob, result_react, label='Reactive')
+    # plt.plot(metrics_fcn['MTF'], actual_react, marker='x', color='black')
 
-    plt.legend()
-    plt.savefig('../saved_data/imgs/simulation/sim_img_MTF.png')
-    plt.clf()
+    # plt.plot(prob, result_fcn, label='FCN')
+    # plt.plot(metrics_fcn['MTF'], actual_fcn, marker='o', color='black')
 
-    result_fcn = abs(monitored_makespan(
-        MTS=prob,
-        MTF=metrics_fcn['MTF'],
-        MTN=metrics_fcn['MTN'],
-        P_TP=metrics_fcn['P_TP'],
-        P_FN=metrics_fcn['P_FN'],
-        P_TN=metrics_fcn['P_TN'],
-        P_FP=metrics_fcn['P_FP'],
-        P_NCF=metrics_fcn['P_NCF'],
-        P_NCS=metrics_fcn['P_NCS']
-    ))
-    result_tr = abs(monitored_makespan(
-        MTS=prob,
-        MTF=metrics_transformer['MTF'],
-        MTN=metrics_transformer['MTN'],
-        P_TP=metrics_transformer['P_TP'],
-        P_FN=metrics_transformer['P_FN'],
-        P_TN=metrics_transformer['P_TN'],
-        P_FP=metrics_transformer['P_FP'],
-        P_NCF=metrics_transformer['P_NCF'],
-        P_NCS=metrics_transformer['P_NCS']
-    ))
+    # plt.plot(prob, result_tr, label='Transformer')
+    # plt.plot(metrics_transformer['MTF'], actual_transformer, marker='o', color='gray')
 
-    plt.plot(prob, result_react, label='Reactive')
-    plt.plot(metrics_fcn['MTS'], actual_react, marker='x', color='black')
+    # plt.plot(prob, result_react - result_fcn, label='Time saved FCN')
+    # plt.plot(prob, result_react - result_tr, label='Time saved Transformer')
 
-    plt.plot(prob, result_fcn, label='FCN')
-    plt.plot(metrics_fcn['MTS'], actual_fcn, marker='o', color='black')
+    # plt.legend()
+    # plt.savefig('../saved_data/imgs/simulation/sim_img_MTF.png')
+    # plt.clf()
 
-    plt.plot(prob, result_tr, label='Transformer')
-    plt.plot(metrics_transformer['MTS'], actual_transformer, marker='o', color='gray')
+    # result_fcn = abs(monitored_makespan(
+    #     MTS=prob,
+    #     MTF=metrics_fcn['MTF'],
+    #     MTN=metrics_fcn['MTN'],
+    #     P_TP=metrics_fcn['P_TP'],
+    #     P_FN=metrics_fcn['P_FN'],
+    #     P_TN=metrics_fcn['P_TN'],
+    #     P_FP=metrics_fcn['P_FP'],
+    #     P_NCF=metrics_fcn['P_NCF'],
+    #     P_NCS=metrics_fcn['P_NCS']
+    # ))
+    # result_tr = abs(monitored_makespan(
+    #     MTS=prob,
+    #     MTF=metrics_transformer['MTF'],
+    #     MTN=metrics_transformer['MTN'],
+    #     P_TP=metrics_transformer['P_TP'],
+    #     P_FN=metrics_transformer['P_FN'],
+    #     P_TN=metrics_transformer['P_TN'],
+    #     P_FP=metrics_transformer['P_FP'],
+    #     P_NCF=metrics_transformer['P_NCF'],
+    #     P_NCS=metrics_transformer['P_NCS']
+    # ))
 
-    plt.plot(prob, result_react - result_fcn, label='Time saved FCN')
-    plt.plot(prob, result_react - result_tr, label='Time saved Transformer')
+    # plt.plot(prob, result_react, label='Reactive')
+    # plt.plot(metrics_fcn['MTS'], actual_react, marker='x', color='black')
 
-    plt.legend()
-    plt.savefig('../saved_data/imgs/simulation/sim_img_MTS.png')
-    plt.clf()
+    # plt.plot(prob, result_fcn, label='FCN')
+    # plt.plot(metrics_fcn['MTS'], actual_fcn, marker='o', color='black')
+
+    # plt.plot(prob, result_tr, label='Transformer')
+    # plt.plot(metrics_transformer['MTS'], actual_transformer, marker='o', color='gray')
+
+    # plt.plot(prob, result_react - result_fcn, label='Time saved FCN')
+    # plt.plot(prob, result_react - result_tr, label='Time saved Transformer')
+
+    # plt.legend()
+    # plt.savefig('../saved_data/imgs/simulation/sim_img_MTS.png')
+    # plt.clf()
 

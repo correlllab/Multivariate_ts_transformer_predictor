@@ -1,4 +1,4 @@
-import sys, os, pickle, json
+import sys, os, pickle, json, time
 sys.path.append(os.path.realpath('../'))
 # print(sys.path)
 
@@ -18,11 +18,30 @@ from model_builds.OOPTransformer import OOPTransformer
 from utilities.metrics_plots import plot_acc_loss, compute_confusion_matrix, make_probabilities_plots
 
 
+def load_keras_model(model_name: str, verbose: bool = True):
+    try:
+        model = tf.keras.models.load_model(f'../saved_models/{model_name}.keras')
+        if verbose:
+            print(f'--> Loaded {model_name}')
+        return model
+    except OSError as e:
+        print(f'{e}: model {model_name}.keras does not exist!\n')
+    
+
+def load_keras_weights(model_build: OOPTransformer, model_name: str, verbose: bool = True):
+    try:
+        model_build.model.load_weights(f'../saved_models/{model_name}/').expect_partial()
+        if verbose:
+            print(f'--> Loaded {model_name}')
+    except OSError as e:
+        print(f'{e}: model weights {model_name} do not exist!')
+
+
 def build_fcn(roll_win_width:int):
     # FCN
-    fcn_net = FCN(rolling_window_width=roll_win_width)
-    fcn_net.build()
-    return fcn_net
+    # fcn_net = FCN(rolling_window_width=roll_win_width)
+    # fcn_net.build()
+    return FCN(rolling_window_width=roll_win_width)
 
 
 def build_rnn():
@@ -108,14 +127,16 @@ def get_model(name: str, roll_win_width: int = 0, X_sample = None):
 
 
 DATA = ['reactive', 'training']
+# DATA = ['training']
+# DATA = ['reactive']
 DATA_DIR = f'../../data/data_manager/{"_".join(DATA)}'
 SAVE_DATA = True
 LOAD_DATA_FROM_FILES = True
 MODELS_TO_RUN = [
-    # 'FCN',
-    # 'RNN',
+    'FCN',
     'GRU',
     'LSTM',
+    'RNN',
     'VanillaTransformer',
     'OOP_Transformer',
     'OOP_Transformer_small'
@@ -129,6 +150,7 @@ class hist_obj:
 
 def run_model(model, X_train, Y_train, X_test, Y_test, X_window_test, Y_window_test, model_n_params, compute: bool = True):
     if compute:
+        model_start_time = time.time()
         model.fit(
             X_train=X_train,
             Y_train=Y_train,
@@ -137,8 +159,14 @@ def run_model(model, X_train, Y_train, X_test, Y_test, X_window_test, Y_window_t
             epochs=200,
             save_model=True
         )
+        model_training_time = (time.time() - model_start_time) / 60.0
+        print(f'\n{model_name} training time = {model_training_time} minutes\n')
     else:
         model.history = hist_obj(np.load(model.histories_path, allow_pickle=True))
+        if model.model_name in ('FCN', 'RNN', 'GRU', 'LSTM', 'VanillaTransformer'):
+            model.model = load_keras_model(model_name=model.model_name, verbose=True)
+        elif model.model_name in ('OOP_Transformer', 'OOP_Transformer_small'):
+            load_keras_weights(model_build=model, model_name=model.model_name, verbose=True)
     try:
         model_n_params[model.model_name] = int(np.sum([np.prod(v.get_shape().as_list()) for v in model.model.trainable_variables]))
         with open('../saved_data/model_sizes.json', 'w') as f:
@@ -148,6 +176,7 @@ def run_model(model, X_train, Y_train, X_test, Y_test, X_window_test, Y_window_t
     plot_acc_loss(history=model.history, imgs_path=model.imgs_path)
     compute_confusion_matrix(
         model=model.model,
+        model_name=model.model_name,
         file_name=model.file_name,
         imgs_path=model.imgs_path,
         X_winTest=X_window_test,
@@ -162,7 +191,7 @@ def run_model(model, X_train, Y_train, X_test, Y_test, X_window_test, Y_window_t
         Y_winTest=Y_window_test
     )
 
-    return model_n_params
+    return model_n_params, model_training_time
 
 
 if __name__ == '__main__':
@@ -183,7 +212,7 @@ if __name__ == '__main__':
 
     dp = DataPreprocessing(sampling='none', data=DATA)
     if LOAD_DATA_FROM_FILES:
-        print('\nLoading data from files...', end='')
+        print(f'\nLoading data from files (using {DATA})...', end='')
         with open(f'{DATA_DIR}/{"_".join(DATA)}_X_train.npy', 'rb') as f:
             X_train = np.load(f, allow_pickle=True)
 
@@ -218,8 +247,8 @@ if __name__ == '__main__':
     # From the previous we have 0.8 train split and 0.2 test split, now we need to separate
     # the train split into train-validation splits
 
-    # Generate train-validation split with 0.9 train and 0.1 validation
-    X_train, X_val, Y_train, Y_val = train_test_split(X_train, Y_train, train_size=0.9)
+    # Generate train-validation split with 0.8 train and 0.2 validation
+    X_train, X_val, Y_train, Y_val = train_test_split(X_train, Y_train, train_size=0.8)
 
     if os.path.exists('../saved_data/model_sizes.json'):
         with open('../saved_data/model_sizes.json', 'r') as f:
@@ -229,6 +258,10 @@ if __name__ == '__main__':
 
     print(model_n_params)
 
+    with open('../saved_data/training_times.txt', 'r+') as f:
+        f.truncate(0)
+
+    overall_start_time = time.time()
     for model_name in MODELS_TO_RUN:
         model = get_model(
             name=model_name,
@@ -236,7 +269,7 @@ if __name__ == '__main__':
             X_sample=X_train[:64]
         )
         print(f'--> Training {model_name}...')
-        model_n_params = run_model(
+        model_n_params, model_training_time = run_model(
             model=model,
             X_train=X_train,
             Y_train=Y_train,
@@ -248,8 +281,16 @@ if __name__ == '__main__':
             compute=True
         )
 
+        with open('../saved_data/training_times.txt', 'a') as f:
+            f.write(f'{model_name} training time = {model_training_time} minutes\n')
+
         with open('../saved_data/model_sizes.json', 'w') as f:
             json.dump(model_n_params, f)
 
         tf.keras.backend.clear_session()
+
+    full_training_time = (time.time() - overall_start_time) / 60.0
+    print(f'Whole training time = {full_training_time} minutes')
+    with open('../saved_data/training_times.txt', 'a') as f:
+        f.write(f'Full training time = {full_training_time} minutes\n')
 

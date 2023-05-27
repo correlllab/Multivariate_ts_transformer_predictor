@@ -29,7 +29,7 @@ class DataPreprocessing:
         self.data = None
         self.truncData = None
         self.window_data = None
-        self.testFrac = 0.10
+        self.testFrac = 0.20
         self.N_ep = 0
         self.N_test = 0
         self.N_train = 0
@@ -39,12 +39,8 @@ class DataPreprocessing:
         self.test_indices = []
         self.X_train = None
         self.Y_train = None
-        self.X_train_sampled = None
-        self.Y_train_sampled = None
-        self.X_train_enc = None
         self.X_test = None
         self.Y_test = None
-        self.X_test_enc = None
         self.X_winTest = None
         self.Y_winTest = None
         self.rollWinWidth = None
@@ -142,7 +138,7 @@ class DataPreprocessing:
 
 
     def stack_windows(self, verbose=False):
-        self.testFrac     = 0.20
+        self.testFrac     = 0.50
         self.N_ep         = len( self.window_data )
         self.N_test       = int(self.N_ep * self.testFrac)
         self.N_train      = self.N_ep - self.N_test
@@ -156,7 +152,7 @@ class DataPreprocessing:
             ep = self.window_data[i]
             self.trainWindows += ep.shape[0]
             i += 1
-            
+
         for j in range( self.N_test ):
             self.test_indices.append(i)
             ep = self.window_data[i]
@@ -278,30 +274,27 @@ class DataPreprocessing:
             print( f"\nDONE! Captured {self.X_winTest.shape}/{self.Y_winTest.shape} TEST episodes." )
 
 
-    # def balance_classes(self, verbose=False):
-    #     if verbose:
-    #         print('    ====> CLASSES DISTRIBUTION BEFORE:')
-    #         print(f'        Passes = {int(sum(self.Y_train[:,0]))}; Fails = {int(sum(self.Y_train[:,1]))}\n')
+    def balance_classes(self, verbose=False):
+        if verbose:
+            print('    ====> CLASSES DISTRIBUTION BEFORE:')
+            print(f'        Passes = {int(sum(self.Y_train[:,0]))}; Fails = {int(sum(self.Y_train[:,1]))}\n')
 
-    #     # No oversampling
-    #     if self.sampling == 'under':
-    #         undersampler = RandomUnderSampler(sampling_strategy='majority')
-    #         undersampler.fit_resample(self.X_train[:,:,0], self.Y_train)
-    #         self.X_train_sampled = deepcopy(self.X_train[undersampler.sample_indices_])
-    #         self.Y_train_sampled = deepcopy(self.Y_train[undersampler.sample_indices_])
-    #     else:
-    #         self.X_train_sampled = deepcopy(self.X_train)
-    #         self.Y_train_sampled = deepcopy(self.Y_train)
+        # No oversampling
+        if self.sampling == 'under':
+            undersampler = RandomUnderSampler(sampling_strategy='majority')
+            undersampler.fit_resample(self.X_train[:,:,0], self.Y_train)
+            self.X_train = self.X_train[undersampler.sample_indices_]
+            self.Y_train = self.Y_train[undersampler.sample_indices_]
 
-    #     if verbose:
-    #         print('    ====> CLASSES DISTRIBUTION AFTER:')
-    #         print(f'        Passes = {int(sum(self.Y_train_sampled[:,0]))}; Fails = {int(sum(self.Y_train_sampled[:,1]))}\n')
+        if verbose:
+            print('    ====> CLASSES DISTRIBUTION AFTER:')
+            print(f'        Passes = {int(sum(self.Y_train[:,0]))}; Fails = {int(sum(self.Y_train[:,1]))}\n')
 
 
     def scale_data(self, verbose=False):
         for index, ep in enumerate(self.data):
-            transformer = RobustScaler().fit(ep[:, 1:7])
-            self.data[index][:, 1:7] = transformer.transform(ep[:, 1:7])
+            scaler = RobustScaler().fit(ep[:, 1:7])
+            self.data[index][:, 1:7] = scaler.transform(ep[:, 1:7])
 
 
     def run(self, save_data=False, verbose=False):
@@ -323,9 +316,9 @@ class DataPreprocessing:
         if verbose:
             print('\n====> Capturing test episodes...\n')
         self.capture_test_episodes(verbose=verbose)
-        # if verbose:
-        #     print('\n====> Balancing classes...\n')
-        # self.balance_classes(verbose=verbose)
+        if verbose:
+            print('\n====> Balancing classes...\n')
+        self.balance_classes(verbose=verbose)
         if verbose:
             print('\n====> Done preprocessing!\n')
             _ = input('Continue?:')
@@ -372,7 +365,9 @@ class DataPreprocessing:
 
 
 if __name__ == '__main__':
-    dp = DataPreprocessing(sampling='none', data=['reactive', 'training'])
+    dp = DataPreprocessing(sampling='under', data=['reactive', 'training'])
+    # dp = DataPreprocessing(sampling='under', data=['training'])
+    # dp = DataPreprocessing(sampling='under', data=['reactive'])
     dp.run(save_data=True, verbose=True)
     # print(f'X_winTest shape = {dp.X_winTest[0].shape})')
     # print(f'X_test shape = {dp.X_test.shape}')

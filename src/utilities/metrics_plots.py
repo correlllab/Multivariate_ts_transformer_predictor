@@ -1,11 +1,10 @@
-import sys, os
+import sys, os, json
 sys.path.append(os.path.realpath('../utilities'))
 # print(sys.path)
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # INFO and WARNING messages are not printed
 
 import numpy as np
-import matplotlib
 import matplotlib.pyplot as plt
 import tensorflow as tf
 import seaborn as sns
@@ -14,9 +13,9 @@ from utilities.utils import CounterDict, set_size
 from helper_functions import scan_output_for_decision, graph_episode_output
 
 
-def plot_acc_loss(history, imgs_path):
+def plot_acc_loss(history, imgs_path, save_plot=True):
     # Setup
-    # plt.style.use('seaborn')
+    plt.style.use('seaborn')
     # From Latex \textwidth
     fig_width = 800
     tex_fonts = {
@@ -24,6 +23,7 @@ def plot_acc_loss(history, imgs_path):
         # "text.usetex": True,
         "font.family": "serif",
         # Use 10pt font in plots, to match 10pt font in document
+        "axes.titlesize": 17,
         "axes.labelsize": 14,
         "font.size": 14,
         # Make the legend/label fonts a little smaller
@@ -52,26 +52,30 @@ def plot_acc_loss(history, imgs_path):
     axes[1, 1].plot(np.array(val_loss), label='Validation loss', color='orange')
     axes[1, 1].title.set_text('Valiadation loss over epochs')
 
+    if save_plot:
+        plt.savefig(imgs_path + 'acc_loss_plots.png')
+        plt.clf()
+    else:
+        plt.show()
 
-    plt.savefig(imgs_path + 'acc_loss_plots.png')
-    plt.clf()
 
-
-def compute_confusion_matrix(model, file_name, imgs_path, X_winTest, Y_winTest, plot=False):
+def compute_confusion_matrix(model, model_name, file_name, imgs_path, X_winTest, Y_winTest, confidence=0.90, simulation=False, plot=False):
     perf = CounterDict()
 
     for epNo in range( len( X_winTest ) ):
         print( '>', end=' ' )
         with tf.device('/GPU:0'):
-            res = model.predict( X_winTest[epNo] )
-            ans, aDx = scan_output_for_decision( res, Y_winTest[epNo][0], threshold = 0.90 )
+            # res = model.predict( X_winTest[epNo] )
+            res = model.predict( X_winTest[epNo][350:, :, :] )
+            ans, aDx = scan_output_for_decision( res, Y_winTest[epNo][0], threshold = confidence )
             perf.count( ans )
-            if ans == 'NC':
-                if Y_winTest[epNo][0] == 0.0:
-                    perf.count('NCS')
-                elif Y_winTest[epNo][0] == 1.0:
-                    perf.count('NCF')
 
+            if ans == 'NC':
+                if all(Y_winTest[epNo][0] == tf.keras.utils.to_categorical(0.0, num_classes=2)):
+                    perf.count('NCS')
+                elif all(Y_winTest[epNo][0] == tf.keras.utils.to_categorical(1.0, num_classes=2)):
+                    perf.count('NCF')
+            
     print( '\n', file_name, '\n', perf )
 
     try:
@@ -83,13 +87,19 @@ def compute_confusion_matrix(model, file_name, imgs_path, X_winTest, Y_winTest, 
             'TN' : (perf['TN'] if ('TN' in perf) else 0) / ((perf['TN'] if ('TN' in perf) else 0) + (perf['FP'] if ('FP' in perf) else 0)),
             'FP' : (perf['FP'] if ('FP' in perf) else 0) / ((perf['TN'] if ('TN' in perf) else 0) + (perf['FP'] if ('FP' in perf) else 0)),
             'NC' : (perf['NC'] if ('NC' in perf) else 0) / len( X_winTest ),
+            'NCS' : (perf['NCS'] if ('NCS' in perf) else 0) / len( X_winTest ),
+            'NCF' : (perf['NCF'] if ('NCF' in perf) else 0) / len( X_winTest ),
         }
     except ZeroDivisionError as e:
         print(f'Building VanillaTransformer confusion matrix: {e}')
         confMatx = None
         plot = False
 
-    print( confMatx )
+    print(f'For model {model_name}:\n{confMatx}')
+    with open(f'../saved_data/test_conf_mats/{model_name}_test_data_perf_at_{confidence}.json', 'w') as f:
+        json.dump(perf, f)
+    with open(f'../saved_data/test_conf_mats/{model_name}_test_data_conf_mat_at_{confidence}.json', 'w') as f:
+        json.dump(confMatx, f)
 
     if plot:
         arr = [
@@ -98,9 +108,14 @@ def compute_confusion_matrix(model, file_name, imgs_path, X_winTest, Y_winTest, 
             ]
         sns.set(font_scale=1.5)
         conf_mat = sns.heatmap(arr, annot=True).get_figure()
-        conf_mat.savefig(imgs_path + 'confusion_matrix.png')
+        if simulation:
+            sim_path = f'../saved_data/simulation_{confidence}'
+            if not os.path.exists(sim_path):
+                os.makedirs(sim_path)
+            conf_mat.savefig(f'{sim_path}/confusion_matrix_{int(confidence*100)}.png')
+        else:
+            conf_mat.savefig(imgs_path + 'confusion_matrix_' + str(int(confidence*100)) + '.png')
         plt.close('all')
-        matplotlib.rc_file_defaults()
 
     return confMatx
 

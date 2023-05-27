@@ -72,21 +72,6 @@ class OOPTransformer:
         )
 
 
-    def compile(self):
-        # learning_rate = CustomSchedule()
-        learning_rate = 1e-4
-        opt = tf.keras.optimizers.legacy.Adam(learning_rate)
-        opt = tf.keras.mixed_precision.LossScaleOptimizer(opt)
-        loss_object = tf.keras.losses.CategoricalCrossentropy()
-        metric = tf.keras.metrics.CategoricalAccuracy()
-
-        self.model.compile(
-            loss=loss_object,
-            optimizer=opt,
-            metrics=[metric]
-        )
-
-
     def fit(
             self,
             X_train: Any,
@@ -108,7 +93,7 @@ class OOPTransformer:
         self.history = self.model.fit(
             x=X_train,
             y=Y_train,
-            validation_split=0.2,
+            # validation_split=0.2,
             epochs=epochs,
             batch_size=batch_size,
             callbacks=callbacks,

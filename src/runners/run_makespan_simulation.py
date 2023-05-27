@@ -50,53 +50,7 @@ def load_keras_weights(model_build: OOPTransformer, model_name: str, makespan_mo
         print(f'{e}: model weights {model_name} do not exist!')
 
 
-def run_makespan_simulation(models_to_run: dict, data: list, n_simulations: int = 100, data_mode: str = 'create_data' or 'load_data', compute: bool = True, save_dicts: bool = True, save_plots: bool = True):
-    # if data_mode == 'create_data':
-    #     print('FETCHING DATA...')
-    #     dp = DataPreprocessing(sampling='under', data='reactive')
-    #     dp.shuffle = False
-    #     dp.run(save_data=False, verbose=True)
-
-    #     X_train_sampled = dp.X_train_sampled
-    #     data = dp.data
-    #     trunc_data = dp.truncData
-
-    #     if not os.path.exists('../../data/makespan_data/'):
-    #         os.makedirs('../../data/makespan_data/')
-
-    #     print('Creating X_train_sampled...', end='')
-    #     with open('../../data/makespan_data/X_train_sampled.npy', 'wb') as f:
-    #         np.save(f, dp.X_train_sampled, allow_pickle=True)
-    #     print('DONE')
-
-    #     print('Creating data...', end='')
-    #     with open('../../data/makespan_data/data.npy', 'wb') as f:
-    #         np.save(f, np.asarray(dp.data, dtype=object), allow_pickle=True)
-    #     print('DONE')
-
-    #     print('Creating trunc_data...', end='')
-    #     with open('../../data/makespan_data/trunc_data.npy', 'wb') as f:
-    #         np.save(f, np.asarray(dp.truncData, dtype=object), allow_pickle=True)
-    #     print('DONE')
-    # elif MODE == 'load_data':
-    #     print('Loading data from files...', end='')
-    #     with open('../../data/makespan_data/X_train_sampled.npy', 'rb') as f:
-    #         X_train_sampled = np.load(f, allow_pickle=True)
-
-    #     with open('../../data/makespan_data/data.npy', 'rb') as f:
-    #         data = np.load(f, allow_pickle=True)
-    #     print('DONE')
-
-    #     with open('../../data/makespan_data/trunc_data.npy', 'rb') as f:
-    #         trunc_data = np.load(f, allow_pickle=True)
-    #     print('DONE')
-
-    # If True it will run pipeline: load models, predict (if True) and generate metrics, if False it will generate metrics from saved files
-    # compute = False
-    # If True, it will save dicts upon metric generation
-    # save_dicts = True
-    # If True it will save generated plots
-    # save_plots = True
+def run_makespan_simulation(models_to_run: dict, data: list, confidence: float,  n_simulations: int = 100, compute: bool = True, save_dicts: bool = True):
     with open('../saved_data/makespan/makespan_results.txt', 'r') as f:
         res = json.loads(f.read())
     if compute:
@@ -105,31 +59,35 @@ def run_makespan_simulation(models_to_run: dict, data: list, n_simulations: int 
                 res[model_name] = {'metrics': {}, 'conf_mat': {}, 'times': {}, 'makespan_sim_hist': [], 'makespan_sim_avg': -1, 'makespan_sim_std': -1}
             print(f'====> For model {model_name}:')
             avg_mks, mks, metrics, conf_mat = run_simulation(
+                model_name=model_name,
                 model=model,
                 episodes=data,
+                confidence=confidence,
                 n_simulations=n_simulations,
                 verbose=True
             )
-            res[model_name]['metrics'] = metrics
-            res[model_name]['conf_mat'] = conf_mat
-            res[model_name]['makespan_sim_hist'] = mks
-            res[model_name]['makespan_sim_avg'] = avg_mks
-            res[model_name]['makespan_sim_std'] = np.std(res[model_name]['makespan_sim_hist'])
+            if f'{model_name}_{int(confidence*100)}' not in res.keys():
+                res[f'{model_name}_{int(confidence*100)}'] = {'metrics': {}, 'conf_mat': {}, 'times': {}, 'makespan_sim_hist': [], 'makespan_sim_avg': -1, 'makespan_sim_std': -1}
+            res[f'{model_name}_{int(confidence*100)}']['metrics'] = metrics
+            res[f'{model_name}_{int(confidence*100)}']['conf_mat'] = conf_mat
+            res[f'{model_name}_{int(confidence*100)}']['makespan_sim_hist'] = mks
+            res[f'{model_name}_{int(confidence*100)}']['makespan_sim_avg'] = avg_mks
+            res[f'{model_name}_{int(confidence*100)}']['makespan_sim_std'] = np.std(res[model_name]['makespan_sim_hist'])
     else:
         for model_name, model in models_to_run.items():
-            if model_name not in res.keys():
-                res[model_name] = {'metrics': {}, 'conf_mat': {}, 'times': {}, 'makespan_sim_hist': [], 'makespan_sim_avg': -1, 'makespan_sim_std': -1}
+            if f'{model_name}_{int(confidence*100)}' not in res.keys():
+                res[f'{model_name}_{int(confidence*100)}'] = {'metrics': {}, 'conf_mat': {}, 'times': {}, 'makespan_sim_hist': [], 'makespan_sim_avg': -1, 'makespan_sim_std': -1}
             print(f'====> Updating expected makespan from equation for {model_name}:')
             res[model_name]['metrics']['EMS'] = abs(monitored_makespan(
-                MTS=res[model_name]['metrics']['MTS'],
-                MTF=res[model_name]['metrics']['MTF'],
-                MTN=res[model_name]['metrics']['MTN'],
-                P_TP=res[model_name]['metrics']['P_TP'],
-                P_FN=res[model_name]['metrics']['P_FN'],
-                P_TN=res[model_name]['metrics']['P_TN'],
-                P_FP=res[model_name]['metrics']['P_FP'],
-                P_NCF=res[model_name]['metrics']['P_NCF'],
-                P_NCS=res[model_name]['metrics']['P_NCS']
+                MTS=res[f'{model_name}_{int(confidence*100)}']['metrics']['MTS'],
+                MTF=res[f'{model_name}_{int(confidence*100)}']['metrics']['MTF'],
+                MTN=res[f'{model_name}_{int(confidence*100)}']['metrics']['MTN'],
+                P_TP=res[f'{model_name}_{int(confidence*100)}']['metrics']['P_TP'],
+                P_FN=res[f'{model_name}_{int(confidence*100)}']['metrics']['P_FN'],
+                P_TN=res[f'{model_name}_{int(confidence*100)}']['metrics']['P_TN'],
+                P_FP=res[f'{model_name}_{int(confidence*100)}']['metrics']['P_FP'],
+                P_NCF=res[f'{model_name}_{int(confidence*100)}']['metrics']['P_NCF'],
+                P_NCS=res[f'{model_name}_{int(confidence*100)}']['metrics']['P_NCS']
             ))
 
     print(f'res = {res}\n')
@@ -137,8 +95,6 @@ def run_makespan_simulation(models_to_run: dict, data: list, n_simulations: int 
     if save_dicts:
         with open('../saved_data/makespan/makespan_results.txt', 'w') as f:
             f.write(json.dumps(res))
-
-    # plot_simulation_makespans(res=res, models=models_to_run, save_plots=save_plots)
 
     return res
 

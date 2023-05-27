@@ -1,0 +1,3 @@
+OOP_Transformer training time = 158.14049890041352 minutes
+OOP_Transformer_small training time = 79.57865166664124 minutes
+Full training time = 244.57956555287043 minutes
