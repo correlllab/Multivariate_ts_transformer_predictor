@@ -15,6 +15,7 @@ data/makespan_data/
 
 # Data from data_manager class
 data/data_manager/
+data/instance_data/
 
 # Python notebooks stuff
 .ipynb_checkpoints

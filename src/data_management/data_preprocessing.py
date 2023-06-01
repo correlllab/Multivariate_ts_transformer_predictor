@@ -14,7 +14,6 @@ from sklearn.preprocessing import RobustScaler
 
 from random import shuffle
 from copy import deepcopy
-from utilities.helper_functions import position_encode
 
 # SHUFFLING ONLY ON EPISODES!!!! NOT ON WINDOWS
 
@@ -138,7 +137,7 @@ class DataPreprocessing:
 
 
     def stack_windows(self, verbose=False):
-        self.testFrac     = 0.50
+        self.testFrac     = 0.20
         self.N_ep         = len( self.window_data )
         self.N_test       = int(self.N_ep * self.testFrac)
         self.N_train      = self.N_ep - self.N_test

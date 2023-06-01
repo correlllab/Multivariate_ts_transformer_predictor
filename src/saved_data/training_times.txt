@@ -1,3 +1,8 @@
-OOP_Transformer training time = 158.14049890041352 minutes
-OOP_Transformer_small training time = 79.57865166664124 minutes
-Full training time = 244.57956555287043 minutes
+FCN training time = 0 minutes
+GRU training time = 0 minutes
+LSTM training time = 0 minutes
+RNN training time = 0 minutes
+VanillaTransformer training time = 0 minutes
+OOP_Transformer training time = 0 minutes
+OOP_Transformer_small training time = 0 minutes
+Full training time = 30.22198954025904 minutes

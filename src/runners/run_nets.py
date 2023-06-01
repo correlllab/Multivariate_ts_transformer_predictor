@@ -15,7 +15,7 @@ from model_builds.FCN import FCN
 from model_builds.RNN import RNN, GRU, LSTM
 from model_builds.VanillaTransformer import VanillaTransformer
 from model_builds.OOPTransformer import OOPTransformer
-from utilities.metrics_plots import plot_acc_loss, compute_confusion_matrix, make_probabilities_plots
+from utilities.metrics_plots import plot_acc_loss, plot_evaluation_on_test_window_data
 
 
 def load_keras_model(model_name: str, verbose: bool = True):
@@ -162,6 +162,7 @@ def run_model(model, X_train, Y_train, X_test, Y_test, X_window_test, Y_window_t
         model_training_time = (time.time() - model_start_time) / 60.0
         print(f'\n{model_name} training time = {model_training_time} minutes\n')
     else:
+        model_training_time = 0
         model.history = hist_obj(np.load(model.histories_path, allow_pickle=True))
         if model.model_name in ('FCN', 'RNN', 'GRU', 'LSTM', 'VanillaTransformer'):
             model.model = load_keras_model(model_name=model.model_name, verbose=True)
@@ -174,24 +175,15 @@ def run_model(model, X_train, Y_train, X_test, Y_test, X_window_test, Y_window_t
     except AttributeError as e:
         print(f'For model {model_name}: {e}')
     plot_acc_loss(history=model.history, imgs_path=model.imgs_path)
-    compute_confusion_matrix(
-        model=model.model,
-        model_name=model.model_name,
-        file_name=model.file_name,
-        imgs_path=model.imgs_path,
-        X_winTest=X_window_test,
-        Y_winTest=Y_window_test,
-        plot=True
-    )
-    make_probabilities_plots(
-        model=model.model,
-        model_name=model.model_name,
-        imgs_path=model.imgs_path,
-        X_winTest=X_window_test,
-        Y_winTest=Y_window_test
+    preds, _ = plot_evaluation_on_test_window_data(
+        model=model,
+        model_name=model_name,
+        X_data=X_window_test,
+        Y_data=Y_window_test,
+        confidence=0.9,
     )
 
-    return model_n_params, model_training_time
+    return model_n_params, model_training_time, preds
 
 
 if __name__ == '__main__':
@@ -232,6 +224,7 @@ if __name__ == '__main__':
             Y_winTest = np.load(f, allow_pickle=True)
         roll_win_width = int(7.0 * 50)
         print('DONE\n')
+        print(f'Number of test episodes = {len(X_winTest)}')
     else:
         print('\nCreating data with DataPreprocessng class...', end='')
         dp.run(save_data=SAVE_DATA, verbose=True)
@@ -261,6 +254,7 @@ if __name__ == '__main__':
     with open('../saved_data/training_times.txt', 'r+') as f:
         f.truncate(0)
 
+    preds_dict = {}
     overall_start_time = time.time()
     for model_name in MODELS_TO_RUN:
         model = get_model(
@@ -269,7 +263,7 @@ if __name__ == '__main__':
             X_sample=X_train[:64]
         )
         print(f'--> Training {model_name}...')
-        model_n_params, model_training_time = run_model(
+        model_n_params, model_training_time, preds = run_model(
             model=model,
             X_train=X_train,
             Y_train=Y_train,
@@ -278,8 +272,9 @@ if __name__ == '__main__':
             X_window_test=X_winTest,
             Y_window_test=Y_winTest,
             model_n_params=model_n_params,
-            compute=True
+            compute=False
         )
+        preds_dict[model_name] = preds
 
         with open('../saved_data/training_times.txt', 'a') as f:
             f.write(f'{model_name} training time = {model_training_time} minutes\n')
@@ -293,4 +288,6 @@ if __name__ == '__main__':
     print(f'Whole training time = {full_training_time} minutes')
     with open('../saved_data/training_times.txt', 'a') as f:
         f.write(f'Full training time = {full_training_time} minutes\n')
+
+    # TODO plot ROC AUC
 
