@@ -260,6 +260,7 @@ if __name__ == '__main__':
     MTS, MTF, p_success, p_failure = get_mts_mtf(data=test_data)
     # MTS, MTF, p_success, p_failure = get_mts_mtf(data=data)
     r_mks = reactive_makespan(MTF=MTF, MTS=MTS, pf=p_failure, ps=p_success)
+    print(f'Reactive policy equation makespan = {r_mks}')
     data_table[0][1] = None
     data_table[1][1] = r_mks
     data_table[2][1] = MTS
@@ -360,18 +361,26 @@ if __name__ == '__main__':
 
     # Equation and simulation makespan bar plots:
     for confidence in confidence_list:
-        plot_roc_window_data(models=sim_models, X_data=X_window_test, Y_data=Y_window_test, confidence=confidence)
+        plot_roc_window_data(
+            models=sim_models,
+            X_data=X_window_test,
+            Y_data=Y_window_test,
+            confidence=confidence
+        )
 
         # plot_equation_simulation_makespan_barplots(
         #     models=plot_models,
         #     confidence=confidence,
+        #     reactive_eq=r_mks,
+        #     reactive_sim=react_mks,
+        #     plot_reactive=False,
         #     save=True
         # )
 
         # plot_simulation_makespans(
         #     models=plot_models,
         #     confidence=confidence,
-        #     reactive_mks=react_mks[:150],
+        #     reactive_mks=react_mks[:500],
         #     plot_reactive=True,
         #     save_plots=True
         # )

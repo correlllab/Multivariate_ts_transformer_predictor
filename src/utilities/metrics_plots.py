@@ -226,6 +226,9 @@ def get_decision( output, trueLabel, threshold = 0.90 ):
         if np.amax( row ) >= threshold:
             break
 
+    if i >= len(output) - 1:
+        return 'NC'
+
     if np.amax(row) == row[0]:
         return 1 - row[0]
 
@@ -256,22 +259,40 @@ def plot_roc_window_data(models: dict, X_data: list, Y_data: list, confidence: f
     cmap = cm.get_cmap('Spectral', len(models.keys()))
     colors = [rgb2hex(cmap(i)[:3]) for i in range(cmap.N)]
     i = 0
+
+    results = {}
+
     for model_name, model in models.items():
         print(f'--> For model {model_name}...')
         res = []
+        labels = []
         for epNo in range(len(X_data)):
             with tf.device('/GPU:0'):
                 pred = model.predict(X_data[epNo])
                 value = get_decision(pred, Y_data[epNo][0], threshold=confidence)
-                res.append(value)
+                if value != 'NC':
+                    res.append(value)
+                    labels.append(Y_data[epNo][0][1])
 
-        labels = [l[0][1] for l in Y_data]
-        fpr, tpr, _ = metrics.roc_curve(labels, res)
-        auc = metrics.roc_auc_score(labels, res)
+        # labels = [l[0][1] for l in Y_data]
+        if len(res) != 0:
+            fpr, tpr, _ = metrics.roc_curve(labels, res)
+            auc = metrics.roc_auc_score(labels, res)
 
-        plt.plot(fpr, tpr, label=f'{model_name} (AUC = {auc:.4f})', color=colors[i])
+            results[model_name] = {'fpr': fpr.tolist(), 'tpr': tpr.tolist(), 'auc': auc}
+
+            label_name = model_name
+            if model_name == 'Transformer':
+                label_name = 'Small Transformer'
+            elif model_name == 'Transformer_big':
+                label_name = 'Big Transformer'
+
+            plt.plot(fpr, tpr, label=f'{label_name} (AUC = {auc:.4f})', color=colors[i])
 
         i += 1
+
+    with open(f'../saved_data/ROC/results_confidence_{int(confidence * 100)}.json', 'w') as f:
+        json.dump(results, f)
 
     plt.axline((1, 1), slope=1, linestyle='dashed', color='black')
     plt.tight_layout()
@@ -307,8 +328,12 @@ def plot_roc_window_data_from_preds(models: dict, preds: dict, Y_data: list, con
         labels = [l[0][1] for l in Y_data]
         fpr, tpr, _ = metrics.roc_curve(labels, pred)
         auc = metrics.roc_auc_score(labels, pred)
-
-        plt.plot(fpr, tpr, label=f'{model_name} (AUC = {auc:.4f})', color=colors[i])
+        label_name = model_name
+        if model_name == 'Transformer':
+            label_name = 'Small Transformer'
+        elif model_name == 'Transformer_big':
+            label_name = 'Big Transformer'
+        plt.plot(fpr, tpr, label=f'{label_name} (AUC = {auc:.4f})', color=colors[i])
 
         i += 1
 
@@ -320,12 +345,7 @@ def plot_roc_window_data_from_preds(models: dict, preds: dict, Y_data: list, con
     plt.close('all')
 
 
-# TODO
-def plot_roc_raw_data():
-    pass
-
-
-def plot_equation_simulation_makespan_barplots(models: dict, confidence: float, save: bool = True):
+def plot_equation_simulation_makespan_barplots(models: dict, confidence: float, reactive_eq: float, reactive_sim: list, plot_reactive: bool = True, save: bool = True):
     img_path = f'../saved_data/imgs/equation_simulation_makespans_barplot_confidence_{int(confidence * 100)}.png'
     eq_file_dir = f'../saved_data/test_data_makespan_confidence_{int(confidence * 100)}'
     sim_file_dir = f'../saved_data/test_data_simulation_confidence_{int(confidence * 100)}'
@@ -350,33 +370,62 @@ def plot_equation_simulation_makespan_barplots(models: dict, confidence: float, 
         "axes.labelsize": 14,
         "font.size": 14,
         # Make the legend/label fonts a little smaller
-        "legend.fontsize": 12,
-        "xtick.labelsize": 12,
-        "ytick.labelsize": 12
+        "legend.fontsize": 14,
+        "xtick.labelsize": 14,
+        "ytick.labelsize": 14
     }
     plt.rcParams.update(tex_fonts)
-    width = 0.25
-    r = np.arange(len(list(models.keys())))
 
-    plt.bar(
+    fig, axes = plt.subplots(1, 1, figsize=set_size(fig_width, subplots=(1, 1)))
+
+    width = 0.25
+    if plot_reactive:
+        r = np.arange(len(list(models.keys())) + 1)
+    else:
+        r = np.arange(len(list(models.keys())) )
+
+    eq_heights = []
+    if plot_reactive and reactive_eq:
+        eq_heights.append(reactive_eq)
+    for v in makespans.values():
+        eq_heights.append(v['eq'])
+
+    sim_heights = []
+    sim_errors = []
+    if plot_reactive and reactive_sim != []:
+        sim_heights.append(np.mean(reactive_sim))
+        sim_errors.append(np.std(reactive_sim))
+    for v in makespans.values():
+        sim_heights.append(np.mean(v['sim']))
+        sim_errors.append(np.std(v['sim']))
+
+    axes.bar(
         x=r,
-        height=[v['eq'] for v in makespans.values()],
+        height=eq_heights,
         width=width,
         label='Equation makespans [s]',
         alpha=0.5
     )
 
-    plt.bar(
+    axes.bar(
         x=r + width,
-        height=[np.mean(v['sim']) for v in makespans.values()],
-        yerr=[np.std(v['sim']) for v in makespans.values()],
+        height=sim_heights,
+        yerr=sim_errors,
         width=width,
         label='Simulation makespans [s]',
         alpha=0.5,
         capsize=10
     )
 
-    plt.xticks(r + width/2, [model_name for model_name in makespans.keys()])
+    labels = []
+    if plot_reactive and reactive_eq and reactive_sim != []:
+        labels.append('Reactive')
+    for model_name in makespans.keys():
+        if model_name == 'Transformer':
+            labels.append('Small Transformer')
+        else:
+            labels.append(model_name)
+    plt.xticks(r + width/2, labels)
     plt.tight_layout()
     plt.legend()
     plt.savefig(img_path)

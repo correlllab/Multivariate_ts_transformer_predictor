@@ -685,27 +685,32 @@ def plot_simulation_makespans(models: dict, confidence:float, reactive_mks: list
     if plot_reactive and reactive_mks != []:
         means_textstr_dict = {**{'Reactive': ''.join(f'Reactive: {np.mean(reactive_mks):.2f} \u00B1 {np.std(reactive_mks):.2f}')}, **means_textstr_dict}
     for model_name in models.keys():
-        means_textstr_dict[model_name] = ''.join(f'{model_name}: {np.mean(makespans[model_name]):.2f} \u00B1 {np.std(makespans[model_name]):.2f}')
+        if model_name == 'Transformer':
+            name = 'Small Transformer'
+        else:
+            name = model_name
+        means_textstr_dict[model_name] = ''.join(f'{name}: {np.mean(makespans[model_name]):.2f} \u00B1 {np.std(makespans[model_name]):.2f}')
 
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
 
     fig, axes = plt.subplots(1, 1, figsize=set_size(fig_width))
     # plt.tight_layout()
-    axes.title.set_text(f'Simulated makespans for each model (N = {len(makespans[list(makespans.keys())[0]])}, confidence = {int(confidence * 100)}%)')
+    # axes.title.set_text(f'Simulated makespans for each model\n(N = {len(makespans[list(makespans.keys())[0]])}, confidence = {int(confidence * 100)}%)')
     runtimes = []
     if plot_reactive and reactive_mks != []:
         runtimes.append(reactive_mks)
     for model_name in models.keys():
         runtimes.append(makespans[model_name])
 
-    # if 'VanillaTransformer' in models:
-    #     models = [m for m in models if m != 'VanillaTransformer']
-    # models.append('Transformer')
+
+    labels = []
     if plot_reactive and reactive_mks != []:
-        labels = list(models.keys())
-        labels.insert(0, 'Reactive')
-    else:
-        labels = list(models.keys())
+        labels.append('Reactive') 
+    for model_name in list(models.keys()):
+        if model_name == 'Transformer':
+            labels.append('Small Transformer')
+        else:
+            labels.append(model_name)
 
     axes.hist(runtimes, alpha=0.5, label=labels, bins=10)
     axes.legend()
@@ -722,7 +727,7 @@ def plot_simulation_makespans(models: dict, confidence:float, reactive_mks: list
 
     for model_name, textstr in means_textstr_dict.items():
         if textstr is not None:
-            axes.text(x, y, textstr, transform=axes.transAxes, bbox=props, fontsize=20)
+            axes.text(x, y, textstr, transform=axes.transAxes, bbox=props, fontsize=17)
             y -= 0.11
 
     if save_plots:
