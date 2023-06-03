@@ -42,7 +42,7 @@ def plot_ft_classification_for_model(model_names, models, episodes, confidence=0
     FzCol = 3
     spikeThresh = 0.05
 
-    fig_width = 900
+    fig_width = 1000
     tex_fonts = {
         # Use LaTeX to write all text
         # "text.usetex": True,
@@ -69,17 +69,18 @@ def plot_ft_classification_for_model(model_names, models, episodes, confidence=0
         ty = episode[:, 5]
         tz = episode[:, 6]
 
-        axes[0, i].plot(np.arange(0, episode_steps * ts_ms, ts_ms), fx)
-        axes[0, i].plot(np.arange(0, episode_steps * ts_ms, ts_ms), fy)
-        axes[0, i].plot(np.arange(0, episode_steps * ts_ms, ts_ms), fz)
+        axes[0, i].plot(np.arange(0, episode_steps * ts_ms, ts_ms), fx, label='F_x')
+        axes[0, i].plot(np.arange(0, episode_steps * ts_ms, ts_ms), fy, label='F_y')
+        axes[0, i].plot(np.arange(0, episode_steps * ts_ms, ts_ms), fz, label='F_z')
+        axes[0, i].legend()
         axes[0, i].set_title('Force -vs- Time')
         axes[0, i].set_xlabel('Time in milliseconds')
         axes[0, i].set_ylabel('Force')
 
-        axes[1, i].plot(np.arange(0, episode_steps * ts_ms, ts_ms), tx)
-        axes[1, i].plot(np.arange(0, episode_steps * ts_ms, ts_ms), ty)
-        axes[1, i].plot(np.arange(0, episode_steps * ts_ms, ts_ms), tz)
-        # axes[1, i].set_xticklabels(np.arange(0, episode_steps*ts_ms, 1000))
+        axes[1, i].plot(np.arange(0, episode_steps * ts_ms, ts_ms), tx, label='T_x')
+        axes[1, i].plot(np.arange(0, episode_steps * ts_ms, ts_ms), ty, label='T_y')
+        axes[1, i].plot(np.arange(0, episode_steps * ts_ms, ts_ms), tz, label='T_z')
+        axes[1, i].legend()
         axes[1, i].set_title('Torque -vs- Time')
         axes[1, i].set_xlabel('Time in milliseconds')
         axes[1, i].set_ylabel('Torque')
@@ -120,12 +121,17 @@ def plot_ft_classification_for_model(model_names, models, episodes, confidence=0
             axes[j, i].stackplot(X, *L, labels=('Pr(Pass)', 'Pr(Fail)'), baseline='zero')
             axes[j, i].axhline(y=0.9, color='black', linestyle='--')
             axes[j, i].axhline(y=0.1, color='black', linestyle='--')
+            axes[j, i].legend()
+            axes[j, i].set_title(f'{model_name}: {ans}')
+            axes[j, i].set_xlabel('Time in milliseconds')
+            axes[j, i].set_ylabel('Probability')
+
 
             j += 1
         i += 1
 
     plt.tight_layout()
-    plt.show()
+    plt.savefig('../saved_data/imgs/ft_classification.png')
 
 
 if __name__ == '__main__':

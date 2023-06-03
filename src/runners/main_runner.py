@@ -17,7 +17,7 @@ from model_builds.FCN import FCN
 from model_builds.RNN import RNN, GRU, LSTM
 from model_builds.VanillaTransformer import VanillaTransformer
 from model_builds.OOPTransformer import OOPTransformer
-from utilities.metrics_plots import compute_confusion_matrix, plot_roc_window_data, plot_equation_simulation_makespan_barplots
+from utilities.metrics_plots import compute_confusion_matrix, plot_roc_window_data, plot_equation_simulation_makespan_barplots, make_probabilities_plots
 from utilities.makespan_utils import get_makespan_for_model, get_mts_mtf, scan_output_for_decision, monitored_makespan, reactive_makespan, plot_simulation_makespans
 from utilities.utils import CounterDict
 from utilities.plot_classification_examples import plot_ft_classification_for_model
@@ -26,7 +26,7 @@ SRC_PATH = os.path.dirname(os.path.realpath(__file__))
 MAIN_PATH = os.path.dirname(os.path.dirname(__file__))
 
 DATA = ['reactive', 'training']
-DATA_DIR = f'../../data/data_manager/{"_".join(DATA)}'
+DATA_DIR = f'../../data/instance_data/{"_".join(DATA)}'
 MODELS_TO_RUN = [
     'FCN',
     'RNN',
@@ -237,21 +237,29 @@ if __name__ == '__main__':
         load_keras_weights(model_build=transformer, model_name='OOP_Transformer', makespan_models=makespan_models, verbose=True)
 
     # Call function to compute confusion matrices
-    compute_conf_mats = False
+    compute_conf_mats = True
     for model_name in MODELS_TO_RUN:
         model = get_model(name=model_name, roll_win_width=roll_win_width, X_sample=X_train[:64])
         model.model = makespan_models[model_name]
+        print(f'--> For model {model.model_name}')
         if compute_conf_mats:
-            _ = compute_confusion_matrix(
+            # _ = compute_confusion_matrix(
+            #     model=model.model,
+            #     model_name=model.model_name,
+            #     file_name=model.file_name,
+            #     imgs_path=model.imgs_path,
+            #     X_winTest=X_window_test,
+            #     Y_winTest=Y_window_test,
+            #     confidence=0.9,
+            #     simulation=False,
+            #     plot=True
+            # )
+            make_probabilities_plots(
                 model=model.model,
-                model_name=model.model_name,
-                file_name=model.file_name,
-                imgs_path=model.imgs_path,
+                model_name=model_name,
+                imgs_path=f'../saved_data/imgs/{model_name}/',
                 X_winTest=X_window_test,
-                Y_winTest=Y_window_test,
-                confidence=0.9,
-                simulation=True,
-                plot=True
+                Y_winTest=Y_window_test
             )
 
     # TODO: match episodes in X_winTest to raw episodes, so that we only load full raw episodes (with no truncation of any kind) that belong to X_winTest
@@ -360,7 +368,7 @@ if __name__ == '__main__':
     # ROC:
     # plot_roc_window_data(models=sim_models, X_data=X_window_test, Y_data=Y_window_test)
 
-    indices = [0, 6, 8]
+    indices = [40, 6, 44]
     plot_ft_classification_for_model(
         model_names=plot_models.keys(),
         models=plot_models.values(),

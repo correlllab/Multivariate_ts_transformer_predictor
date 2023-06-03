@@ -204,6 +204,7 @@ def compute_confusion_matrix(model, model_name, file_name, imgs_path, X_winTest,
 def make_probabilities_plots(model, model_name, imgs_path, X_winTest, Y_winTest):
     for epNo in range( len( X_winTest ) ):
         with tf.device('/GPU:0'):
+            print(epNo, ':')
             res = model.predict( X_winTest[epNo] )
             print( Y_winTest[epNo][0], '\n' )
             out_decision = scan_output_for_decision( res, Y_winTest[epNo][0], threshold = 0.90 )

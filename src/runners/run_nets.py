@@ -175,13 +175,14 @@ def run_model(model, X_train, Y_train, X_test, Y_test, X_window_test, Y_window_t
     except AttributeError as e:
         print(f'For model {model_name}: {e}')
     plot_acc_loss(history=model.history, imgs_path=model.imgs_path)
-    preds, _ = plot_evaluation_on_test_window_data(
-        model=model,
-        model_name=model_name,
-        X_data=X_window_test,
-        Y_data=Y_window_test,
-        confidence=0.9,
-    )
+    preds = []
+    # preds, _ = plot_evaluation_on_test_window_data(
+    #     model=model,
+    #     model_name=model_name,
+    #     X_data=X_window_test,
+    #     Y_data=Y_window_test,
+    #     confidence=0.9,
+    # )
 
     return model_n_params, model_training_time, preds
 
