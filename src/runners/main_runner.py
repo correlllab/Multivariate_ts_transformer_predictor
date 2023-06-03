@@ -17,7 +17,7 @@ from model_builds.FCN import FCN
 from model_builds.RNN import RNN, GRU, LSTM
 from model_builds.VanillaTransformer import VanillaTransformer
 from model_builds.OOPTransformer import OOPTransformer
-from utilities.metrics_plots import compute_confusion_matrix, plot_roc_window_data, plot_equation_simulation_makespan_barplots, make_probabilities_plots
+from utilities.metrics_plots import compute_confusion_matrix, plot_roc_window_data, plot_equation_simulation_makespan_barplots, make_probabilities_plots, plot_monte_carlo_simulation_barplots
 from utilities.makespan_utils import get_makespan_for_model, get_mts_mtf, scan_output_for_decision, monitored_makespan, reactive_makespan, plot_simulation_makespans
 from utilities.utils import CounterDict
 from utilities.plot_classification_examples import plot_ft_classification_for_model
@@ -237,7 +237,7 @@ if __name__ == '__main__':
         load_keras_weights(model_build=transformer, model_name='OOP_Transformer', makespan_models=makespan_models, verbose=True)
 
     # Call function to compute confusion matrices
-    compute_conf_mats = True
+    compute_conf_mats = False
     for model_name in MODELS_TO_RUN:
         model = get_model(name=model_name, roll_win_width=roll_win_width, X_sample=X_train[:64])
         model.model = makespan_models[model_name]
@@ -290,7 +290,6 @@ if __name__ == '__main__':
         'RNN': makespan_models['RNN'],
         'GRU': makespan_models['GRU'],
         'LSTM': makespan_models['LSTM'],
-        # 'VanillaTransformer': makespan_models['VanillaTransformer'],
         'Transformer': makespan_models['OOP_Transformer_small'],
         'Transformer_big': makespan_models['OOP_Transformer']
     }
@@ -299,7 +298,6 @@ if __name__ == '__main__':
         # 'RNN': makespan_models['RNN'],
         'GRU': makespan_models['GRU'],
         # 'LSTM': makespan_models['LSTM'],
-        # 'VanillaTransformer': makespan_models['VanillaTransformer'],
         'Transformer': makespan_models['OOP_Transformer_small'],
         # 'Transformer_big': makespan_models['OOP_Transformer']
     }
@@ -365,19 +363,17 @@ if __name__ == '__main__':
     #     json.dump(sim_results, f)
 
     # PLotting:
-    # ROC:
-    # plot_roc_window_data(models=sim_models, X_data=X_window_test, Y_data=Y_window_test)
-
-    indices = [40, 6, 44]
-    plot_ft_classification_for_model(
-        model_names=plot_models.keys(),
-        models=plot_models.values(),
-        episodes=[test_data[idx] for idx in indices],
-        confidence=0.9
-    )
+    # Plot 3 episode examples and their classifications by the FCN, GRU and Small Transformer
+    # indices = [40, 6, 95]
+    # plot_ft_classification_for_model(
+    #     model_names=plot_models.keys(),
+    #     models=plot_models.values(),
+    #     episodes=[test_data[idx] for idx in indices],
+    #     confidence=0.9
+    # )
 
     # Equation and simulation makespan bar plots:
-    # for confidence in confidence_list:
+    for confidence in confidence_list:
         # plot_roc_window_data(
         #     models=sim_models,
         #     X_data=X_window_test,
@@ -393,6 +389,11 @@ if __name__ == '__main__':
         #     plot_reactive=False,
         #     save=True
         # )
+
+        plot_monte_carlo_simulation_barplots(
+            models=plot_models,
+            confidence=confidence
+        )
 
         # plot_simulation_makespans(
         #     models=plot_models,

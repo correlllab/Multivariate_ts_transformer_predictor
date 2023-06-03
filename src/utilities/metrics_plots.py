@@ -432,3 +432,77 @@ def plot_equation_simulation_makespan_barplots(models: dict, confidence: float, 
     plt.savefig(img_path)
     plt.clf()
     plt.close('all')
+
+
+def plot_monte_carlo_simulation_barplots(models: dict, confidence: float, save: bool = True):
+    img_path = f'../saved_data/imgs/monte_carlo_simulation_barplot_confidence_{int(confidence * 100)}.png'
+    sim_file_dir = f'../saved_data/test_data_simulation_confidence_{int(confidence * 100)}'
+
+    makespans = {model_name: {'sim_eq': None, 'sim': []} for model_name in models.keys()}
+    for model_name in models.keys():
+        with open(f'{sim_file_dir}/{model_name}.json', 'r') as f:
+            data = json.load(f)
+        makespans[model_name]['sim'] = data['simulation_makespan_list']
+        makespans[model_name]['sim_eq'] = data['equation_predicted_makespan']
+
+    fig_width = 800
+    tex_fonts = {
+        # Use LaTeX to write all text
+        # "text.usetex": True,
+        "font.family": "serif",
+        # Use 10pt font in plots, to match 10pt font in document
+        "axes.titlesize": 17,
+        "axes.labelsize": 14,
+        "font.size": 14,
+        # Make the legend/label fonts a little smaller
+        "legend.fontsize": 14,
+        "xtick.labelsize": 14,
+        "ytick.labelsize": 14
+    }
+    plt.rcParams.update(tex_fonts)
+
+    fig, axes = plt.subplots(1, 1, figsize=set_size(fig_width, subplots=(1, 1)))
+
+    width = 0.25
+    r = np.arange(len(list(models.keys())) )
+
+    eq_heights = []
+    for v in makespans.values():
+        eq_heights.append(v['sim_eq'])
+
+    sim_heights = []
+    sim_errors = []
+    for v in makespans.values():
+        sim_heights.append(np.mean(v['sim']))
+        sim_errors.append(np.std(v['sim']))
+
+    axes.bar(
+        x=r,
+        height=eq_heights,
+        width=width,
+        label='Equation makespans [s]',
+        alpha=0.5
+    )
+
+    axes.bar(
+        x=r + width,
+        height=sim_heights,
+        yerr=sim_errors,
+        width=width,
+        label='Simulation makespans [s]',
+        alpha=0.5,
+        capsize=10
+    )
+
+    labels = []
+    for model_name in makespans.keys():
+        if model_name == 'Transformer':
+            labels.append('Small Transformer')
+        else:
+            labels.append(model_name)
+    plt.xticks(r + width/2, labels)
+    plt.tight_layout()
+    plt.legend()
+    plt.savefig(img_path)
+    plt.clf()
+    plt.close('all')

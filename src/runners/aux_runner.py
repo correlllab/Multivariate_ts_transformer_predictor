@@ -24,6 +24,19 @@ class hist_obj:
 
 
 if __name__ == '__main__':
+    models = [
+        'FCN',
+        'RNN',
+        'GRU',
+        'LSTM',
+        'VanillaTransformer',
+        'OOP_Transformer_small',
+        'OOP_Transformer'
+    ]
+    for model_name in models:
+        hist = np.load(f'../saved_data/histories/{model_name}_history', allow_pickle=True)
+        hist = hist_obj(hist)
+        plot_acc_loss(history=hist, imgs_path=f'../saved_data/imgs/{model_name}/')
     # run_makespan_prediction_for_model(model_name='FCN', verbose=True)
     # model_name = 'OOP_Transformer'
     # hist = np.load(f'../saved_data/histories/{model_name}_history', allow_pickle=True)
@@ -47,15 +60,6 @@ if __name__ == '__main__':
 
     # MTS, MTF, _, _ = get_mts_mtf(data=test_data)
 
-    models = [
-        'FCN',
-        'RNN',
-        'GRU',
-        'LSTM',
-        'VanillaTransformer',
-        'OOP_Transformer_small',
-        'OOP_Transformer'
-    ]
     # confidence_list = [0.85, 0.9, 0.95, 0.99]
     # for confidence in confidence_list:
     #     print(f'For confidence {confidence}:')
@@ -90,12 +94,12 @@ if __name__ == '__main__':
     #             with open(file_path, 'w') as f:
     #                 json.dump(model_data, f)
 
-    for model_name in models:
-        with open(f'../saved_data/test_conf_mats/{model_name}_test_data_perf_at_0.9.json', 'r') as f:
-            model_perf = json.load(f)
-        print(f'\nFor model {model_name}:')
-        print(f'--> Precision = {(model_perf["TP"] / (model_perf["TP"] + model_perf["FP"]))*100:.2f}')
-        print(f'--> Recall = {(model_perf["TP"] / (model_perf["TP"] + model_perf["FN"]))*100:.2f}')
-        print(f'--> Sensitivity = {(model_perf["TN"] / (model_perf["TN"] + model_perf["FP"]))*100:.2f}')
-        print(f'--> Specificity = {(model_perf["TP"] / (model_perf["TP"] + model_perf["FN"]))*100:.2f}')
-        print(f'--> Accuracy = {((model_perf["TP"] + model_perf["TN"]) / (model_perf["TP"] + model_perf["FN"] + model_perf["FP"] + model_perf["TN"]))*100:.2f}')
+    # for model_name in models:
+    #     with open(f'../saved_data/test_conf_mats/{model_name}_test_data_perf_at_0.9.json', 'r') as f:
+    #         model_perf = json.load(f)
+    #     print(f'\nFor model {model_name}:')
+    #     print(f'--> Precision = {(model_perf["TP"] / (model_perf["TP"] + model_perf["FP"]))*100:.2f}')
+    #     print(f'--> Recall = {(model_perf["TP"] / (model_perf["TP"] + model_perf["FN"]))*100:.2f}')
+    #     print(f'--> Sensitivity = {(model_perf["TN"] / (model_perf["TN"] + model_perf["FP"]))*100:.2f}')
+    #     print(f'--> Specificity = {(model_perf["TP"] / (model_perf["TP"] + model_perf["FN"]))*100:.2f}')
+    #     print(f'--> Accuracy = {((model_perf["TP"] + model_perf["TN"]) / (model_perf["TP"] + model_perf["FN"] + model_perf["FP"] + model_perf["TN"]))*100:.2f}')
