@@ -6,12 +6,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # INFO and WARNING messages are not pri
 
 import numpy as np
 import tensorflow as tf
-from random import choice
 
-from data_management.data_preprocessing import DataPreprocessing
-from model_builds.FCN import FCN
-from model_builds.RNN import RNN
-from model_builds.VanillaTransformer import VanillaTransformer
 from model_builds.OOPTransformer import OOPTransformer
 
 from utilities.makespan_utils import *
@@ -22,7 +17,6 @@ MODELS_TO_RUN = [
     # 'RNN',
     # 'GRU',
     # 'LSTM',
-    'VanillaTransformer',
     # 'OOP_Transformer',
     # 'OOP_Transformer_small'
     ]
@@ -124,60 +118,57 @@ if __name__ == '__main__':
     if 'RNN' in MODELS_TO_RUN:
         load_keras_model(model_name='RNN', makespan_models=makespan_models)
 
-    if 'VanillaTransformer' in MODELS_TO_RUN:
-        load_keras_model(model_name='VanillaTransformer', makespan_models=makespan_models)
+    if 'OOP_Transformer' in MODELS_TO_RUN:
+        oop_transformer = OOPTransformer()
+        num_layers = 4
+        d_model = 6
+        ff_dim = 256
+        num_heads = 8
+        head_size = 256
+        dropout_rate = 0.2
+        mlp_dropout = 0.4
+        mlp_units = [128, 256, 64]
 
-    # if 'OOP_Transformer' in MODELS_TO_RUN:
-    #     oop_transformer = OOPTransformer()
-    #     num_layers = 4
-    #     d_model = 6
-    #     ff_dim = 256
-    #     num_heads = 8
-    #     head_size = 256
-    #     dropout_rate = 0.2
-    #     mlp_dropout = 0.4
-    #     mlp_units = [128, 256, 64]
+        oop_transformer.build(
+            X_sample=X_train_sampled[:64],
+            num_layers=num_layers,
+            d_model=d_model,
+            ff_dim=ff_dim,
+            num_heads=num_heads,
+            head_size=head_size,
+            dropout_rate=dropout_rate,
+            mlp_dropout=mlp_dropout,
+            mlp_units=mlp_units,
+            verbose=False
+        )
+        oop_transformer.compile()
+        load_keras_weights(model_build=oop_transformer, model_name='OOP_Transformer', makespan_models=makespan_models)
 
-    #     oop_transformer.build(
-    #         X_sample=X_train_sampled[:64],
-    #         num_layers=num_layers,
-    #         d_model=d_model,
-    #         ff_dim=ff_dim,
-    #         num_heads=num_heads,
-    #         head_size=head_size,
-    #         dropout_rate=dropout_rate,
-    #         mlp_dropout=mlp_dropout,
-    #         mlp_units=mlp_units,
-    #         verbose=False
-    #     )
-    #     oop_transformer.compile()
-    #     load_keras_weights(model_build=oop_transformer, model_name='OOP_Transformer', makespan_models=makespan_models)
+    if 'OOP_Transformer_small' in MODELS_TO_RUN:
+        oop_transformer_small = OOPTransformer()
+        num_layers = 4
+        d_model = 6
+        ff_dim = 256
+        num_heads = 4
+        head_size = 128
+        dropout_rate = 0.2
+        mlp_dropout = 0.4
+        mlp_units = [128]
 
-    # if 'OOP_Transformer_small' in MODELS_TO_RUN:
-    #     oop_transformer_small = OOPTransformer()
-    #     num_layers = 4
-    #     d_model = 6
-    #     ff_dim = 256
-    #     num_heads = 4
-    #     head_size = 128
-    #     dropout_rate = 0.2
-    #     mlp_dropout = 0.4
-    #     mlp_units = [128]
-
-    #     oop_transformer_small.build(
-    #         X_sample=X_train_sampled[:64],
-    #         num_layers=num_layers,
-    #         d_model=d_model,
-    #         ff_dim=ff_dim,
-    #         num_heads=num_heads,
-    #         head_size=head_size,
-    #         dropout_rate=dropout_rate,
-    #         mlp_dropout=mlp_dropout,
-    #         mlp_units=mlp_units,
-    #         verbose=False
-    #     )
-    #     oop_transformer_small.compile()
-    #     load_keras_weights(model_build=oop_transformer_small, model_name='OOP_Transformer_small', makespan_models=makespan_models)
+        oop_transformer_small.build(
+            X_sample=X_train_sampled[:64],
+            num_layers=num_layers,
+            d_model=d_model,
+            ff_dim=ff_dim,
+            num_heads=num_heads,
+            head_size=head_size,
+            dropout_rate=dropout_rate,
+            mlp_dropout=mlp_dropout,
+            mlp_units=mlp_units,
+            verbose=False
+        )
+        oop_transformer_small.compile()
+        load_keras_weights(model_build=oop_transformer_small, model_name='OOP_Transformer_small', makespan_models=makespan_models)
 
     _ = run_makespan_simulation(
         models_to_run=makespan_models,

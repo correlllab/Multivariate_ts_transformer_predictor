@@ -15,7 +15,6 @@ from run_makespan_simulation import run_reactive_simulation, run_makespan_simula
 from data_management.data_preprocessing import DataPreprocessing
 from model_builds.FCN import FCN
 from model_builds.RNN import RNN, GRU, LSTM
-from model_builds.VanillaTransformer import VanillaTransformer
 from model_builds.OOPTransformer import OOPTransformer
 from utilities.metrics_plots import compute_confusion_matrix, plot_roc_window_data, plot_equation_simulation_makespan_barplots, make_probabilities_plots, plot_monte_carlo_simulation_barplots
 from utilities.makespan_utils import get_makespan_for_model, get_mts_mtf, scan_output_for_decision, monitored_makespan, reactive_makespan, plot_simulation_makespans
@@ -32,7 +31,6 @@ MODELS_TO_RUN = [
     'RNN',
     'GRU',
     'LSTM',
-    'VanillaTransformer',
     'OOP_Transformer_small',
     'OOP_Transformer'
 ]
@@ -78,11 +76,6 @@ def build_gru():
 def build_lstm():
     # LSTM
     return LSTM()
-
-
-def build_vanilla_transformer():
-    # VanillaTransformer
-    return VanillaTransformer()
 
 
 def build_oop_transformer(X_sample, model_type: str):
@@ -138,8 +131,6 @@ def get_model(name: str, roll_win_width: int = 0, X_sample = None):
         return build_gru()
     elif name == 'LSTM':
         return build_lstm()
-    elif name == 'VanillaTransformer':
-        return build_vanilla_transformer()
     elif name == 'OOP_Transformer':
         return build_oop_transformer(X_sample=X_sample, model_type='big')
     elif name == 'OOP_Transformer_small':
@@ -194,7 +185,7 @@ if __name__ == '__main__':
     print('DONE\n')
 
     # Create table to be printed
-    headers = ['Measure', 'Reactive', 'FCN', 'RNN', 'GRU', 'LSTM', 'Transformer', 'Transformer_big', 'VanillaTransformer']
+    headers = ['Measure', 'Reactive', 'FCN', 'RNN', 'GRU', 'LSTM', 'Transformer', 'Transformer_big']
     data_table = [
         ['Makespan [s] (simulation)', None, None, None, None, None, None, None, None],
         ['Predicted [s] (equation)', None, None, None, None, None, None, None, None],
@@ -225,9 +216,6 @@ if __name__ == '__main__':
     if 'LSTM' in MODELS_TO_RUN:
         load_keras_model(model_name='LSTM', makespan_models=makespan_models)
 
-    if 'VanillaTransformer' in MODELS_TO_RUN:
-        load_keras_model(model_name='VanillaTransformer', makespan_models=makespan_models)
-
     if 'OOP_Transformer_small' in MODELS_TO_RUN:
         transformer = get_model(name='OOP_Transformer_small', roll_win_width=roll_win_width, X_sample=X_train[:64])
         load_keras_weights(model_build=transformer, model_name='OOP_Transformer_small', makespan_models=makespan_models, verbose=True)
@@ -238,22 +226,24 @@ if __name__ == '__main__':
 
     # Call function to compute confusion matrices
     compute_conf_mats = False
+    make_prob_plots = False
     for model_name in MODELS_TO_RUN:
         model = get_model(name=model_name, roll_win_width=roll_win_width, X_sample=X_train[:64])
         model.model = makespan_models[model_name]
         print(f'--> For model {model.model_name}')
         if compute_conf_mats:
-            # _ = compute_confusion_matrix(
-            #     model=model.model,
-            #     model_name=model.model_name,
-            #     file_name=model.file_name,
-            #     imgs_path=model.imgs_path,
-            #     X_winTest=X_window_test,
-            #     Y_winTest=Y_window_test,
-            #     confidence=0.9,
-            #     simulation=False,
-            #     plot=True
-            # )
+            _ = compute_confusion_matrix(
+                model=model.model,
+                model_name=model.model_name,
+                file_name=model.file_name,
+                imgs_path=model.imgs_path,
+                X_winTest=X_window_test,
+                Y_winTest=Y_window_test,
+                confidence=0.9,
+                simulation=False,
+                plot=True
+            )
+        if make_prob_plots:
             make_probabilities_plots(
                 model=model.model,
                 model_name=model_name,
@@ -262,12 +252,9 @@ if __name__ == '__main__':
                 Y_winTest=Y_window_test
             )
 
-    # TODO: match episodes in X_winTest to raw episodes, so that we only load full raw episodes (with no truncation of any kind) that belong to X_winTest
     print(f'\nTest data len = {len(test_data)}\n')
-    # print(f'\nTest data len = {len(data)}\n')
 
     MTS, MTF, p_success, p_failure = get_mts_mtf(data=test_data)
-    # MTS, MTF, p_success, p_failure = get_mts_mtf(data=data)
     r_mks = reactive_makespan(MTF=MTF, MTS=MTS, pf=p_failure, ps=p_success)
     print(f'Reactive policy equation makespan = {r_mks}')
     data_table[0][1] = None
@@ -278,7 +265,6 @@ if __name__ == '__main__':
     # Run simulations
     react_avg_mks, react_mks = run_reactive_simulation(
         episodes=test_data,
-        # episodes=data,
         n_simulations=1000,
         verbose=True
     )
@@ -305,101 +291,114 @@ if __name__ == '__main__':
     confidence_list = [0.85, 0.9, 0.95, 0.99]
 
     # To get equation makespan:
-    # for confidence in confidence_list:
-    #     print(f'For confidence {confidence}:')
-    #     for model_name, model in sim_models.items():
-    #         print(f'\n--> Computing for model {model_name}')
-    #         get_makespan_for_model(
-    #             model_name=model_name,
-    #             model=model,
-    #             episodes=test_data,
-    #             confidence=confidence,
-    #             verbose=True
-    #         )
+    get_eq_makespan = False
+    if get_eq_makespan:
+        for confidence in confidence_list:
+            print(f'For confidence {confidence}:')
+            for model_name, model in sim_models.items():
+                print(f'\n--> Computing for model {model_name}')
+                get_makespan_for_model(
+                    model_name=model_name,
+                    model=model,
+                    episodes=test_data,
+                    confidence=confidence,
+                    verbose=True
+                )
 
     # To get simulated makespan:
-    # sim_results = dict.fromkeys(confidence_list, {})
-    # for confidence in confidence_list:
-    #     sim_results[confidence] = run_makespan_simulation(
-    #         models_to_run=sim_models,
-    #         data=test_data,
-    #         # data=data,
-    #         n_simulations = 500,
-    #         confidence=confidence,
-    #         compute=True
-    #     )
+    run_simulation = False
+    sim_results = {k: {} for k in confidence_list.keys()}
+    for confidence in confidence_list:
+        if run_simulation:
+            sim_results[confidence] = run_makespan_simulation(
+                models_to_run=sim_models,
+                data=test_data,
+                n_simulations = 500,
+                confidence=confidence,
+                compute=True
+            )
 
-    #     plot_simulation_makespans(
-    #         res=sim_results[confidence],
-    #         models=plot_models,
-    #         confidence=confidence,
-    #         reactive_mks=react_mks[:150],
-    #         plot_reactive=True,
-    #         save_plots=True
-    #     )
+            plot_simulation_makespans(
+                res=sim_results[confidence],
+                models=plot_models,
+                confidence=confidence,
+                reactive_mks=react_mks[:150],
+                plot_reactive=True,
+                save_plots=True
+            )
 
-    # for confidence in confidence_list:
-    #     for i, model_name in enumerate(sim_models.keys()):
-    #         if sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['EMS'] == 'N/A':
-    #             data_table[0][i+2] = 'N/A'
-    #         else:
-    #             data_table[0][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['makespan_sim_avg']
-    #         data_table[1][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['EMS']
-    #         data_table[2][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['MTS']
-    #         data_table[3][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['MTF']
-    #         data_table[4][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['MTP']
-    #         data_table[5][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['MTN']
-    #         data_table[6][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['P_TP']
-    #         data_table[7][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['P_FN']
-    #         data_table[8][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['P_TN']
-    #         data_table[9][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['P_FP']
-    #         data_table[10][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['P_NCS']
-    #         data_table[11][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['P_NCF']
+    for confidence in confidence_list:
+        for i, model_name in enumerate(sim_models.keys()):
+            if sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['EMS'] == 'N/A':
+                data_table[0][i+2] = 'N/A'
+            else:
+                data_table[0][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['makespan_sim_avg']
+            data_table[1][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['EMS']
+            data_table[2][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['MTS']
+            data_table[3][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['MTF']
+            data_table[4][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['MTP']
+            data_table[5][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['MTN']
+            data_table[6][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['P_TP']
+            data_table[7][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['P_FN']
+            data_table[8][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['P_TN']
+            data_table[9][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['P_FP']
+            data_table[10][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['P_NCS']
+            data_table[11][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['P_NCF']
 
-    #     print(f'\nConfidence = {confidence}')
-    #     print(tabulate(data_table, headers=headers))
+        print(f'\nConfidence = {confidence}')
+        print(tabulate(data_table, headers=headers))
 
-    # with open('../saved_data/simulation_results.json', 'w') as f:
-    #     json.dump(sim_results, f)
+    with open('../saved_data/simulation_results.json', 'w') as f:
+        json.dump(sim_results, f)
 
     # PLotting:
     # Plot 3 episode examples and their classifications by the FCN, GRU and Small Transformer
-    # indices = [40, 6, 95]
-    # plot_ft_classification_for_model(
-    #     model_names=plot_models.keys(),
-    #     models=plot_models.values(),
-    #     episodes=[test_data[idx] for idx in indices],
-    #     confidence=0.9
-    # )
-
-    # Equation and simulation makespan bar plots:
-    for confidence in confidence_list:
-        # plot_roc_window_data(
-        #     models=sim_models,
-        #     X_data=X_window_test,
-        #     Y_data=Y_window_test,
-        #     confidence=confidence
-        # )
-
-        # plot_equation_simulation_makespan_barplots(
-        #     models=plot_models,
-        #     confidence=confidence,
-        #     reactive_eq=r_mks,
-        #     reactive_sim=react_mks,
-        #     plot_reactive=False,
-        #     save=True
-        # )
-
-        plot_monte_carlo_simulation_barplots(
-            models=plot_models,
-            confidence=confidence
+    plot_examples = False
+    if plot_examples:
+        indices = [40, 6, 95]
+        plot_ft_classification_for_model(
+            model_names=plot_models.keys(),
+            models=plot_models.values(),
+            episodes=[test_data[idx] for idx in indices],
+            confidence=0.9
         )
 
-        # plot_simulation_makespans(
-        #     models=plot_models,
-        #     confidence=confidence,
-        #     reactive_mks=react_mks[:500],
-        #     plot_reactive=True,
-        #     save_plots=True
-        # )
+    # Equation and simulation makespan bar plots:
+    plot_roc = False
+    plot_eq_sim_barplots = False
+    plot_monte_carlo_barplots = False
+    plot_sim_makespans = False
+    for confidence in confidence_list:
+        if plot_roc:
+            plot_roc_window_data(
+                models=sim_models,
+                X_data=X_window_test,
+                Y_data=Y_window_test,
+                confidence=confidence
+            )
+
+        if plot_eq_sim_barplots:
+            plot_equation_simulation_makespan_barplots(
+                models=plot_models,
+                confidence=confidence,
+                reactive_eq=r_mks,
+                reactive_sim=react_mks,
+                plot_reactive=False,
+                save=True
+            )
+
+        if plot_monte_carlo_barplots:
+            plot_monte_carlo_simulation_barplots(
+                models=plot_models,
+                confidence=confidence
+            )
+
+        if plot_sim_makespans:
+            plot_simulation_makespans(
+                models=plot_models,
+                confidence=confidence,
+                reactive_mks=react_mks[:500],
+                plot_reactive=True,
+                save_plots=True
+            )
 

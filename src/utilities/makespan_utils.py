@@ -10,8 +10,6 @@ import seaborn as sns
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
-from random import choice
-from data_management.data_preprocessing import DataPreprocessing
 from utilities.utils import CounterDict, set_size
 
 # Classes --------------------------------------------------------------------------

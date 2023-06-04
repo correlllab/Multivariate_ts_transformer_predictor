@@ -14,7 +14,6 @@ from utilities.utils import set_size
 from data_management.data_preprocessing import DataPreprocessing
 from model_builds.FCN import FCN
 from model_builds.RNN import RNN, GRU, LSTM
-from model_builds.VanillaTransformer import VanillaTransformer
 from model_builds.OOPTransformer import OOPTransformer
 
 
@@ -185,11 +184,6 @@ def build_lstm():
     return LSTM()
 
 
-def build_vanilla_transformer():
-    # VanillaTransformer
-    return VanillaTransformer()
-
-
 def build_oop_transformer(X_sample, model_type: str):
     name = 'OOP_Transformer'
     if model_type == 'small':
@@ -242,8 +236,6 @@ def get_model(name: str, roll_win_width: int = 0, X_sample = None):
         return build_gru()
     elif name == 'LSTM':
         return build_lstm()
-    elif name == 'VanillaTransformer':
-        return build_vanilla_transformer()
     elif name == 'OOP_Transformer':
         return build_oop_transformer(X_sample=X_sample, model_type='big')
     elif name == 'OOP_Transformer_small':
@@ -257,7 +249,6 @@ MODELS_TO_RUN = [
     'RNN',
     'GRU',
     'LSTM',
-    'VanillaTransformer',
     'OOP_Transformer',
     'OOP_Transformer_small'
     ]

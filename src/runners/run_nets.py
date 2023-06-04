@@ -13,7 +13,6 @@ from sklearn.model_selection import train_test_split
 from data_management.data_preprocessing import DataPreprocessing
 from model_builds.FCN import FCN
 from model_builds.RNN import RNN, GRU, LSTM
-from model_builds.VanillaTransformer import VanillaTransformer
 from model_builds.OOPTransformer import OOPTransformer
 from utilities.metrics_plots import plot_acc_loss, plot_evaluation_on_test_window_data
 
@@ -57,11 +56,6 @@ def build_gru():
 def build_lstm():
     # LSTM
     return LSTM()
-
-
-def build_vanilla_transformer():
-    # VanillaTransformer
-    return VanillaTransformer()
 
 
 def build_oop_transformer(X_sample, model_type: str):
@@ -116,8 +110,6 @@ def get_model(name: str, roll_win_width: int = 0, X_sample = None):
         return build_gru()
     elif name == 'LSTM':
         return build_lstm()
-    elif name == 'VanillaTransformer':
-        return build_vanilla_transformer()
     elif name == 'OOP_Transformer':
         return build_oop_transformer(X_sample=X_sample, model_type='big')
     elif name == 'OOP_Transformer_small':
@@ -137,7 +129,6 @@ MODELS_TO_RUN = [
     'GRU',
     'LSTM',
     'RNN',
-    'VanillaTransformer',
     'OOP_Transformer',
     'OOP_Transformer_small'
     ]
@@ -164,7 +155,7 @@ def run_model(model, X_train, Y_train, X_test, Y_test, X_window_test, Y_window_t
     else:
         model_training_time = 0
         model.history = hist_obj(np.load(model.histories_path, allow_pickle=True))
-        if model.model_name in ('FCN', 'RNN', 'GRU', 'LSTM', 'VanillaTransformer'):
+        if model.model_name in ('FCN', 'RNN', 'GRU', 'LSTM'):
             model.model = load_keras_model(model_name=model.model_name, verbose=True)
         elif model.model_name in ('OOP_Transformer', 'OOP_Transformer_small'):
             load_keras_weights(model_build=model, model_name=model.model_name, verbose=True)

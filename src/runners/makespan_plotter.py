@@ -2,25 +2,12 @@ import os, sys, json
 sys.path.append(os.path.realpath('../'))
 print( sys.version )
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # INFO and WARNING messages are not printed
-import glob
-import pandas as pd
+
 import numpy as np
 import tensorflow
 import matplotlib.pyplot as plt
-import tensorflow as tf
 
-from tabulate import tabulate
-
-from run_makespan_simulation import run_reactive_simulation, run_makespan_simulation
-from data_management.data_preprocessing import DataPreprocessing
-from model_builds.FCN import FCN
-from model_builds.RNN import RNN, GRU, LSTM
-from model_builds.VanillaTransformer import VanillaTransformer
-from model_builds.OOPTransformer import OOPTransformer
-from utilities.metrics_plots import compute_confusion_matrix
-from utilities.makespan_utils import get_makespan_for_model, get_mts_mtf, scan_output_for_decision, reactive_makespan, monitored_makespan, reactive_makespan, plot_simulation_makespans
-from utilities.utils import CounterDict
-from utilities.utils import set_size
+from utilities.makespan_utils import get_mts_mtf
 
 SRC_PATH = os.path.dirname(os.path.realpath(__file__))
 MAIN_PATH = os.path.dirname(os.path.dirname(__file__))
@@ -31,8 +18,7 @@ MODELS_TO_RUN = [
     'FCN',
     'RNN',
     'GRU',
-    'LSTM',
-    'VanillaTransformer',
+    'LSTM'
     'OOP_Transformer_small',
     'OOP_Transformer'
 ]
