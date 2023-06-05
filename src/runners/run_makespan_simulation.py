@@ -73,15 +73,15 @@ def run_makespan_simulation(models_to_run: dict, data: list, confidence: float, 
                 res[f'{model_name}_{int(confidence*100)}'] = {'metrics': {}, 'conf_mat': {}, 'times': {}, 'makespan_sim_hist': [], 'makespan_sim_avg': -1, 'makespan_sim_std': -1}
             print(f'====> Updating expected makespan from equation for {model_name}:')
             res[model_name]['metrics']['EMS'] = abs(monitored_makespan(
-                MTS=res[f'{model_name}_{int(confidence*100)}']['metrics']['MTS'],
-                MTF=res[f'{model_name}_{int(confidence*100)}']['metrics']['MTF'],
-                MTN=res[f'{model_name}_{int(confidence*100)}']['metrics']['MTN'],
-                P_TP=res[f'{model_name}_{int(confidence*100)}']['metrics']['P_TP'],
-                P_FN=res[f'{model_name}_{int(confidence*100)}']['metrics']['P_FN'],
-                P_TN=res[f'{model_name}_{int(confidence*100)}']['metrics']['P_TN'],
-                P_FP=res[f'{model_name}_{int(confidence*100)}']['metrics']['P_FP'],
-                P_NCF=res[f'{model_name}_{int(confidence*100)}']['metrics']['P_NCF'],
-                P_NCS=res[f'{model_name}_{int(confidence*100)}']['metrics']['P_NCS']
+                MTS=float(res[f'{model_name}_{int(confidence*100)}']['metrics']['MTS']) if res[f'{model_name}_{int(confidence*100)}']['metrics']['MTS'] != 'N/A' else 0,
+                MTF=float(res[f'{model_name}_{int(confidence*100)}']['metrics']['MTF']) if res[f'{model_name}_{int(confidence*100)}']['metrics']['MTF'] != 'N/A' else 0,
+                MTN=float(res[f'{model_name}_{int(confidence*100)}']['metrics']['MTN']) if res[f'{model_name}_{int(confidence*100)}']['metrics']['MTN'] != 'N/A' else 0,
+                P_TP=float(res[f'{model_name}_{int(confidence*100)}']['metrics']['P_TP']) if res[f'{model_name}_{int(confidence*100)}']['metrics']['P_TP'] != 'N/A' else 0,
+                P_FN=float(res[f'{model_name}_{int(confidence*100)}']['metrics']['P_FN']) if res[f'{model_name}_{int(confidence*100)}']['metrics']['P_FN'] != 'N/A' else 0,
+                P_TN=float(res[f'{model_name}_{int(confidence*100)}']['metrics']['P_TN']) if res[f'{model_name}_{int(confidence*100)}']['metrics']['P_TN'] != 'N/A' else 0,
+                P_FP=float(res[f'{model_name}_{int(confidence*100)}']['metrics']['P_FP']) if res[f'{model_name}_{int(confidence*100)}']['metrics']['P_FP'] != 'N/A' else 0,
+                P_NCF=float(res[f'{model_name}_{int(confidence*100)}']['metrics']['P_NCF']) if res[f'{model_name}_{int(confidence*100)}']['metrics']['P_NCS'] != 'N/A' else 0,
+                P_NCS=float(res[f'{model_name}_{int(confidence*100)}']['metrics']['P_NCS']) if res[f'{model_name}_{int(confidence*100)}']['metrics']['P_NCF'] != 'N/A' else 0
             ))
 
     print(f'res = {res}\n')
@@ -110,68 +110,68 @@ if __name__ == '__main__':
         print( f"\t{dev}" )
         print
 
-    print('LOADING MODELS...')
-    makespan_models = {}
-    if 'FCN' in MODELS_TO_RUN:
-        load_keras_model(model_name='FCN', makespan_models=makespan_models)
+    # print('LOADING MODELS...')
+    # makespan_models = {}
+    # if 'FCN' in MODELS_TO_RUN:
+    #     load_keras_model(model_name='FCN', makespan_models=makespan_models)
 
-    if 'RNN' in MODELS_TO_RUN:
-        load_keras_model(model_name='RNN', makespan_models=makespan_models)
+    # if 'RNN' in MODELS_TO_RUN:
+    #     load_keras_model(model_name='RNN', makespan_models=makespan_models)
 
-    if 'OOP_Transformer' in MODELS_TO_RUN:
-        oop_transformer = OOPTransformer()
-        num_layers = 4
-        d_model = 6
-        ff_dim = 256
-        num_heads = 8
-        head_size = 256
-        dropout_rate = 0.2
-        mlp_dropout = 0.4
-        mlp_units = [128, 256, 64]
+    # if 'OOP_Transformer' in MODELS_TO_RUN:
+    #     oop_transformer = OOPTransformer()
+    #     num_layers = 4
+    #     d_model = 6
+    #     ff_dim = 256
+    #     num_heads = 8
+    #     head_size = 256
+    #     dropout_rate = 0.2
+    #     mlp_dropout = 0.4
+    #     mlp_units = [128, 256, 64]
 
-        oop_transformer.build(
-            X_sample=X_train_sampled[:64],
-            num_layers=num_layers,
-            d_model=d_model,
-            ff_dim=ff_dim,
-            num_heads=num_heads,
-            head_size=head_size,
-            dropout_rate=dropout_rate,
-            mlp_dropout=mlp_dropout,
-            mlp_units=mlp_units,
-            verbose=False
-        )
-        oop_transformer.compile()
-        load_keras_weights(model_build=oop_transformer, model_name='OOP_Transformer', makespan_models=makespan_models)
+    #     oop_transformer.build(
+    #         X_sample=X_train_sampled[:64],
+    #         num_layers=num_layers,
+    #         d_model=d_model,
+    #         ff_dim=ff_dim,
+    #         num_heads=num_heads,
+    #         head_size=head_size,
+    #         dropout_rate=dropout_rate,
+    #         mlp_dropout=mlp_dropout,
+    #         mlp_units=mlp_units,
+    #         verbose=False
+    #     )
+    #     oop_transformer.compile()
+    #     load_keras_weights(model_build=oop_transformer, model_name='OOP_Transformer', makespan_models=makespan_models)
 
-    if 'OOP_Transformer_small' in MODELS_TO_RUN:
-        oop_transformer_small = OOPTransformer()
-        num_layers = 4
-        d_model = 6
-        ff_dim = 256
-        num_heads = 4
-        head_size = 128
-        dropout_rate = 0.2
-        mlp_dropout = 0.4
-        mlp_units = [128]
+    # if 'OOP_Transformer_small' in MODELS_TO_RUN:
+    #     oop_transformer_small = OOPTransformer()
+    #     num_layers = 4
+    #     d_model = 6
+    #     ff_dim = 256
+    #     num_heads = 4
+    #     head_size = 128
+    #     dropout_rate = 0.2
+    #     mlp_dropout = 0.4
+    #     mlp_units = [128]
 
-        oop_transformer_small.build(
-            X_sample=X_train_sampled[:64],
-            num_layers=num_layers,
-            d_model=d_model,
-            ff_dim=ff_dim,
-            num_heads=num_heads,
-            head_size=head_size,
-            dropout_rate=dropout_rate,
-            mlp_dropout=mlp_dropout,
-            mlp_units=mlp_units,
-            verbose=False
-        )
-        oop_transformer_small.compile()
-        load_keras_weights(model_build=oop_transformer_small, model_name='OOP_Transformer_small', makespan_models=makespan_models)
+    #     oop_transformer_small.build(
+    #         X_sample=X_train_sampled[:64],
+    #         num_layers=num_layers,
+    #         d_model=d_model,
+    #         ff_dim=ff_dim,
+    #         num_heads=num_heads,
+    #         head_size=head_size,
+    #         dropout_rate=dropout_rate,
+    #         mlp_dropout=mlp_dropout,
+    #         mlp_units=mlp_units,
+    #         verbose=False
+    #     )
+    #     oop_transformer_small.compile()
+    #     load_keras_weights(model_build=oop_transformer_small, model_name='OOP_Transformer_small', makespan_models=makespan_models)
 
-    _ = run_makespan_simulation(
-        models_to_run=makespan_models,
-        data_mode='load_data',
-        compute=False
-    )
+    # _ = run_makespan_simulation(
+    #     models_to_run=makespan_models,
+    #     data_mode='load_data',
+    #     compute=False
+    # )

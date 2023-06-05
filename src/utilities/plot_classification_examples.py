@@ -121,7 +121,7 @@ def plot_ft_classification_for_model(model_names, models, episodes, confidence=0
             axes[j, i].stackplot(X, *L, labels=('Pr(Pass)', 'Pr(Fail)'), baseline='zero')
             axes[j, i].axhline(y=0.9, color='black', linestyle='--')
             axes[j, i].axhline(y=0.1, color='black', linestyle='--')
-            axes[j, i].legend()
+            axes[j, i].legend(loc='center left')
             axes[j, i].set_title(f'{model_name}: {ans}')
             axes[j, i].set_xlabel('Time in milliseconds')
             axes[j, i].set_ylabel('Probability')

@@ -273,11 +273,11 @@ if __name__ == '__main__':
 
     sim_models = {
         'FCN': makespan_models['FCN'],
-        'RNN': makespan_models['RNN'],
+        # 'RNN': makespan_models['RNN'],
         'GRU': makespan_models['GRU'],
-        'LSTM': makespan_models['LSTM'],
+        # 'LSTM': makespan_models['LSTM'],
         'Transformer': makespan_models['OOP_Transformer_small'],
-        'Transformer_big': makespan_models['OOP_Transformer']
+        # 'Transformer_big': makespan_models['OOP_Transformer']
     }
     plot_models = {
         'FCN': makespan_models['FCN'],
@@ -288,7 +288,8 @@ if __name__ == '__main__':
         # 'Transformer_big': makespan_models['OOP_Transformer']
     }
 
-    confidence_list = [0.85, 0.9, 0.95, 0.99]
+    # confidence_list = [0.85, 0.9, 0.95, 0.99]
+    confidence_list = [1]
 
     # To get equation makespan:
     get_eq_makespan = False
@@ -306,8 +307,8 @@ if __name__ == '__main__':
                 )
 
     # To get simulated makespan:
-    run_simulation = False
-    sim_results = {k: {} for k in confidence_list.keys()}
+    run_simulation = True
+    sim_results = {k: {} for k in confidence_list}
     for confidence in confidence_list:
         if run_simulation:
             sim_results[confidence] = run_makespan_simulation(
@@ -315,11 +316,10 @@ if __name__ == '__main__':
                 data=test_data,
                 n_simulations = 500,
                 confidence=confidence,
-                compute=True
+                compute=False
             )
 
             plot_simulation_makespans(
-                res=sim_results[confidence],
                 models=plot_models,
                 confidence=confidence,
                 reactive_mks=react_mks[:150],
@@ -327,29 +327,30 @@ if __name__ == '__main__':
                 save_plots=True
             )
 
-    for confidence in confidence_list:
-        for i, model_name in enumerate(sim_models.keys()):
-            if sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['EMS'] == 'N/A':
-                data_table[0][i+2] = 'N/A'
-            else:
-                data_table[0][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['makespan_sim_avg']
-            data_table[1][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['EMS']
-            data_table[2][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['MTS']
-            data_table[3][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['MTF']
-            data_table[4][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['MTP']
-            data_table[5][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['MTN']
-            data_table[6][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['P_TP']
-            data_table[7][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['P_FN']
-            data_table[8][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['P_TN']
-            data_table[9][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['P_FP']
-            data_table[10][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['P_NCS']
-            data_table[11][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['P_NCF']
+    if run_simulation:
+        for confidence in confidence_list:
+            for i, model_name in enumerate(sim_models.keys()):
+                if sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['EMS'] == 'N/A':
+                    data_table[0][i+2] = 'N/A'
+                else:
+                    data_table[0][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['makespan_sim_avg']
+                data_table[1][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['EMS']
+                data_table[2][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['MTS']
+                data_table[3][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['MTF']
+                data_table[4][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['MTP']
+                data_table[5][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['MTN']
+                data_table[6][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['P_TP']
+                data_table[7][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['P_FN']
+                data_table[8][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['P_TN']
+                data_table[9][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['P_FP']
+                data_table[10][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['P_NCS']
+                data_table[11][i+2] = sim_results[confidence][f'{model_name}_{int(confidence*100)}']['metrics']['P_NCF']
 
-        print(f'\nConfidence = {confidence}')
-        print(tabulate(data_table, headers=headers))
+            print(f'\nConfidence = {confidence}')
+            print(tabulate(data_table, headers=headers))
 
-    with open('../saved_data/simulation_results.json', 'w') as f:
-        json.dump(sim_results, f)
+        with open('../saved_data/simulation_results.json', 'w') as f:
+            json.dump(sim_results, f)
 
     # PLotting:
     # Plot 3 episode examples and their classifications by the FCN, GRU and Small Transformer
