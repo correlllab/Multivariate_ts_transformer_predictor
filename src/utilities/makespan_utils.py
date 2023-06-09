@@ -106,7 +106,7 @@ def make_predictions(model_name: str, model: tf.keras.Model, trunc_data, verbose
 
 
 
-def classify(model: tf.keras.Model, episode: np.ndarray, true_label: float, window_width: int, confidence: float = 0.9, ts_s: float = 20.0/1000.0):
+def classify(model: tf.keras.Model, episode: np.ndarray, true_label: float, window_width: int, confidence: float = 0.9, ts_s: float = 20.0/1000.0, return_row=False):
     with tf.device('/GPU:0'):
         time_steps = episode.shape[0]
         n_windows = time_steps - window_width + 1
@@ -124,6 +124,9 @@ def classify(model: tf.keras.Model, episode: np.ndarray, true_label: float, wind
         )
 
     # Return the classification answer and the time (in seconds) at which the classification happened
+    if return_row:
+        return ans, (window_width * ts_s) + (t_c * ts_s), row
+
     return ans, (window_width * ts_s) + (t_c * ts_s)
 
 

@@ -34,7 +34,7 @@ def classify(model: tf.keras.Model, episode: np.ndarray, true_label: float, wind
     return ans, (window_width * ts_s) + (t_c * ts_s), prediction
 
 
-def plot_ft_classification_for_model(model_names, models, episodes, confidence=0.9):
+def plot_ft_classification_for_model(model_names, models, episodes, ep_indices, confidence=0.9, plot_preds=True):
     ts_s = 20.0 / 1000.0
     ts_ms = 20
     rolling_window_width = int(7.0 * 50.0)
@@ -56,11 +56,16 @@ def plot_ft_classification_for_model(model_names, models, episodes, confidence=0
         "ytick.labelsize": 12
     }
     plt.rcParams.update(tex_fonts)
-    fig, axes = plt.subplots(5, 3, figsize=set_size(fig_width, subplots=(5, 3)))
+    if plot_preds:
+        fig, axes = plt.subplots(5, 3, figsize=set_size(fig_width, subplots=(5, 3)))
+    else:
+        fig, axes = plt.subplots(2, 3, figsize=set_size(fig_width, subplots=(2, 3)))
 
     i = 0
     for episode in episodes:
         episode_steps = episode.shape[0]
+
+        ep_label = 'Success' if episode[:, :][0, 7] == 1.0 else 'Failure'
 
         fx = episode[:, 1]
         fy = episode[:, 2]
@@ -73,7 +78,7 @@ def plot_ft_classification_for_model(model_names, models, episodes, confidence=0
         axes[0, i].plot(np.arange(0, episode_steps * ts_ms, ts_ms), fy, label='F_y')
         axes[0, i].plot(np.arange(0, episode_steps * ts_ms, ts_ms), fz, label='F_z')
         axes[0, i].legend()
-        axes[0, i].set_title('Force -vs- Time')
+        axes[0, i].set_title(f'Ep. {ep_indices[i]}: {ep_label}\nForce -vs- Time')
         axes[0, i].set_xlabel('Time in milliseconds')
         axes[0, i].set_ylabel('Force')
 
@@ -85,53 +90,56 @@ def plot_ft_classification_for_model(model_names, models, episodes, confidence=0
         axes[1, i].set_xlabel('Time in milliseconds')
         axes[1, i].set_ylabel('Torque')
 
-        j = 2
-        for model_name, model in zip(model_names, models):
-            n_steps = episode.shape[0]
-            episode_time = n_steps * ts_s
-            chopDex = 0
-            for bgn in range(int(1.5*50), n_steps - win_width + 1):
-                end     = bgn+win_width
-                FzSlice = episode[ bgn:end, FzCol ].flatten()
-                if np.abs( np.amax( FzSlice ) - np.amin( FzSlice ) ) >= spikeThresh:
-                    chopDex = end
-                    break
-            if (chopDex * ts_s) < 15.0:
-                ep_matrix = episode[chopDex:, :]
-                if len(ep_matrix) - rolling_window_width + 1 > rolling_window_width:
-                    true_label = 0.0
-                    if ep_matrix[0, 7] == 0.0:
-                        true_label = 1.0
-                    ans, t_c, preds = classify(
-                        model=model,
-                        episode=ep_matrix,
-                        true_label=true_label,
-                        window_width=rolling_window_width,
-                        confidence=confidence,
-                        ts_s=ts_s
-                    )
+        if plot_preds:
+            j = 2
+            for model_name, model in zip(model_names, models):
+                n_steps = episode.shape[0]
+                episode_time = n_steps * ts_s
+                chopDex = 0
+                for bgn in range(int(1.5*50), n_steps - win_width + 1):
+                    end     = bgn+win_width
+                    FzSlice = episode[ bgn:end, FzCol ].flatten()
+                    if np.abs( np.amax( FzSlice ) - np.amin( FzSlice ) ) >= spikeThresh:
+                        chopDex = end
+                        break
+                if (chopDex * ts_s) < 15.0:
+                    ep_matrix = episode[chopDex:, :]
+                    if len(ep_matrix) - rolling_window_width + 1 > rolling_window_width:
+                        true_label = 0.0
+                        if ep_matrix[0, 7] == 0.0:
+                            true_label = 1.0
+                        ans, t_c, preds = classify(
+                            model=model,
+                            episode=ep_matrix,
+                            true_label=true_label,
+                            window_width=rolling_window_width,
+                            confidence=confidence,
+                            ts_s=ts_s
+                        )
 
-            N = preds.shape[0]
-            X = np.arange(0, episode_steps*ts_ms, ts_ms)
-            L = preds.transpose()
-            n_empty_values = X.shape[0] - L.shape[1]
-            for _ in range(n_empty_values):
-                L = np.insert(L, 0, 0, axis=1)
-            # print(L.shape, X.shape)
-            axes[j, i].stackplot(X, *L, labels=('Pr(Pass)', 'Pr(Fail)'), baseline='zero')
-            axes[j, i].axhline(y=0.9, color='black', linestyle='--')
-            axes[j, i].axhline(y=0.1, color='black', linestyle='--')
-            axes[j, i].legend(loc='center left')
-            axes[j, i].set_title(f'{model_name}: {ans}')
-            axes[j, i].set_xlabel('Time in milliseconds')
-            axes[j, i].set_ylabel('Probability')
+                N = preds.shape[0]
+                X = np.arange(0, episode_steps*ts_ms, ts_ms)
+                L = preds.transpose()
+                n_empty_values = X.shape[0] - L.shape[1]
+                for _ in range(n_empty_values):
+                    L = np.insert(L, 0, 0, axis=1)
+                # print(L.shape, X.shape)
+                axes[j, i].stackplot(X, *L, labels=('Pr(Pass)', 'Pr(Fail)'), baseline='zero')
+                axes[j, i].axhline(y=0.9, color='black', linestyle='--')
+                axes[j, i].axhline(y=0.1, color='black', linestyle='--')
+                axes[j, i].legend(loc='center left')
+                axes[j, i].set_title(f'{model_name}: {ans}')
+                axes[j, i].set_xlabel('Time in milliseconds')
+                axes[j, i].set_ylabel('Probability')
 
-
-            j += 1
+                j += 1
         i += 1
 
     plt.tight_layout()
-    plt.savefig('../saved_data/imgs/ft_classification.png')
+    if plot_preds:
+        plt.savefig('../saved_data/imgs/ft_classification.png')
+    else:
+        plt.savefig('../saved_data/imgs/ft_examples.png')
 
 
 if __name__ == '__main__':
@@ -144,7 +152,7 @@ if __name__ == '__main__':
 
     print(f'Number of episodes in test data = {len(test_data)}')
 
-    ep_indices = [0, 6, 8]
+    ep_indices = [40, 6, 95]
     episode_list = []
     for idx in ep_indices:
         episode_list.append(test_data[idx])

@@ -307,7 +307,7 @@ if __name__ == '__main__':
                 )
 
     # To get simulated makespan:
-    run_simulation = True
+    run_simulation = False
     sim_results = {k: {} for k in confidence_list}
     for confidence in confidence_list:
         if run_simulation:
@@ -354,14 +354,16 @@ if __name__ == '__main__':
 
     # PLotting:
     # Plot 3 episode examples and their classifications by the FCN, GRU and Small Transformer
-    plot_examples = False
+    plot_examples = True
     if plot_examples:
         indices = [40, 6, 95]
         plot_ft_classification_for_model(
             model_names=plot_models.keys(),
             models=plot_models.values(),
             episodes=[test_data[idx] for idx in indices],
-            confidence=0.9
+            ep_indices=indices,
+            confidence=0.9,
+            plot_preds=True
         )
 
     # Equation and simulation makespan bar plots:
