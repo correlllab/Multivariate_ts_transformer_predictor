@@ -13,6 +13,57 @@ from utilities.makespan_utils import scan_output_for_decision
 from utilities.utils import set_size
 
 
+def plot_one_example(episode):
+    ts_s = 20.0 / 1000.0
+    ts_ms = 20
+
+    episode_steps = episode.shape[0]
+
+    ep_label = 'Success' if episode[:, :][0, 7] == 1.0 else 'Failure'
+
+    print(ep_label)
+
+    fx = episode[:, 1]
+    fy = episode[:, 2]
+    fz = episode[:, 3]
+    tx = episode[:, 4]
+    ty = episode[:, 5]
+    tz = episode[:, 6]
+
+    fig_width = 1000
+    tex_fonts = {
+        # Use LaTeX to write all text
+        # "text.usetex": True,
+        "font.family": "serif",
+        # Use 10pt font in plots, to match 10pt font in document
+        "axes.labelsize": 14,
+        "font.size": 14,
+        # Make the legend/label fonts a little smaller
+        "legend.fontsize": 12,
+        "xtick.labelsize": 12,
+        "ytick.labelsize": 12
+    }
+    fig, axes = plt.subplots(2, 1, figsize=(10, 7))
+    axes[0].plot(np.arange(0, episode_steps * ts_ms, ts_ms), fx, label='F_x')
+    axes[0].plot(np.arange(0, episode_steps * ts_ms, ts_ms), fy, label='F_y')
+    axes[0].plot(np.arange(0, episode_steps * ts_ms, ts_ms), fz, label='F_z')
+    axes[0].legend()
+    axes[0].set_title(f'Force -vs- Time')
+    axes[0].set_xlabel('Time in milliseconds')
+    axes[0].set_ylabel('Force')
+
+    axes[1].plot(np.arange(0, episode_steps * ts_ms, ts_ms), tx, label='T_x')
+    axes[1].plot(np.arange(0, episode_steps * ts_ms, ts_ms), ty, label='T_y')
+    axes[1].plot(np.arange(0, episode_steps * ts_ms, ts_ms), tz, label='T_z')
+    axes[1].legend()
+    axes[1].set_title('Torque -vs- Time')
+    axes[1].set_xlabel('Time in milliseconds')
+    axes[1].set_ylabel('Torque')
+
+    plt.tight_layout()
+    plt.savefig('../saved_data/imgs/single_example.png')
+    plt.clf()
+
 def classify(model: tf.keras.Model, episode: np.ndarray, true_label: float, window_width: int, confidence: float = 0.9, ts_s: float = 20.0/1000.0):
     with tf.device('/GPU:0'):
         time_steps = episode.shape[0]
@@ -152,13 +203,4 @@ if __name__ == '__main__':
 
     print(f'Number of episodes in test data = {len(test_data)}')
 
-    ep_indices = [40, 6, 95]
-    episode_list = []
-    for idx in ep_indices:
-        episode_list.append(test_data[idx])
-
-    plot_ft_classification_for_model(
-        model_names=[],
-        models=None,
-        episodes=episode_list
-    )
+    plot_one_example(episode=test_data[1])
