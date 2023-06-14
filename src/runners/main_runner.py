@@ -25,14 +25,15 @@ SRC_PATH = os.path.dirname(os.path.realpath(__file__))
 MAIN_PATH = os.path.dirname(os.path.dirname(__file__))
 
 DATA = ['reactive', 'training']
-DATA_DIR = f'../../data/instance_data/{"_".join(DATA)}'
+# DATA_DIR = f'../../data/instance_data/{"_".join(DATA)}'
+DATA_DIR = f'../../data/data_manager/{"_".join(DATA)}'
 MODELS_TO_RUN = [
-    'FCN',
-    'RNN',
-    'GRU',
-    'LSTM',
+    # 'FCN',
+    # 'RNN',
+    # 'GRU',
+    # 'LSTM',
     'OOP_Transformer_small',
-    'OOP_Transformer'
+    # 'OOP_Transformer'
 ]
 
 
@@ -154,15 +155,15 @@ if __name__ == '__main__':
         print( f"\t{dev}" )
 
     # Load data
-    print('\nLoading data from files...', end='')
-    with open(f'{DATA_DIR}/{"_".join(DATA)}_X_train.npy', 'rb') as f:
-        X_train = np.load(f, allow_pickle=True)
+    # print('\nLoading data from files...', end='')
+    # with open(f'{DATA_DIR}/{"_".join(DATA)}_X_train.npy', 'rb') as f:
+    #     X_train = np.load(f, allow_pickle=True)
 
     # with open(f'{DATA_DIR}/{"_".join(DATA)}_Y_train.npy', 'rb') as f:
     #     Y_train = np.load(f, allow_pickle=True)
 
-    # with open(f'{DATA_DIR}/{"_".join(DATA)}_X_test.npy', 'rb') as f:
-    #     X_test = np.load(f, allow_pickle=True)
+    with open(f'{DATA_DIR}/{"_".join(DATA)}_X_test.npy', 'rb') as f:
+        X_test = np.load(f, allow_pickle=True)
 
     # with open(f'{DATA_DIR}/{"_".join(DATA)}_Y_test.npy', 'rb') as f:
     #     Y_test = np.load(f, allow_pickle=True)
@@ -217,18 +218,21 @@ if __name__ == '__main__':
         load_keras_model(model_name='LSTM', makespan_models=makespan_models)
 
     if 'OOP_Transformer_small' in MODELS_TO_RUN:
-        transformer = get_model(name='OOP_Transformer_small', roll_win_width=roll_win_width, X_sample=X_train[:64])
+        # transformer = get_model(name='OOP_Transformer_small', roll_win_width=roll_win_width, X_sample=X_train[:64])
+        transformer = get_model(name='OOP_Transformer_small', roll_win_width=roll_win_width, X_sample=X_test[:64])
         load_keras_weights(model_build=transformer, model_name='OOP_Transformer_small', makespan_models=makespan_models, verbose=True)
 
     if 'OOP_Transformer' in MODELS_TO_RUN:
-        transformer = get_model(name='OOP_Transformer', roll_win_width=roll_win_width, X_sample=X_train[:64])
+        # transformer = get_model(name='OOP_Transformer', roll_win_width=roll_win_width, X_sample=X_train[:64])
+        transformer = get_model(name='OOP_Transformer', roll_win_width=roll_win_width, X_sample=X_test[:64])
         load_keras_weights(model_build=transformer, model_name='OOP_Transformer', makespan_models=makespan_models, verbose=True)
 
     # Call function to compute confusion matrices
-    compute_conf_mats = False
+    compute_conf_mats = True
     make_prob_plots = False
     for model_name in MODELS_TO_RUN:
-        model = get_model(name=model_name, roll_win_width=roll_win_width, X_sample=X_train[:64])
+        # model = get_model(name=model_name, roll_win_width=roll_win_width, X_sample=X_train[:64])
+        model = get_model(name=model_name, roll_win_width=roll_win_width, X_sample=X_test[:64])
         model.model = makespan_models[model_name]
         print(f'--> For model {model.model_name}')
         if compute_conf_mats:

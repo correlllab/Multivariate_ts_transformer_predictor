@@ -364,9 +364,9 @@ class DataPreprocessing:
 
 
 if __name__ == '__main__':
-    dp = DataPreprocessing(sampling='under', data=['reactive', 'training'])
+    # dp = DataPreprocessing(sampling='under', data=['reactive', 'training'])
     # dp = DataPreprocessing(sampling='under', data=['training'])
-    # dp = DataPreprocessing(sampling='under', data=['reactive'])
+    dp = DataPreprocessing(sampling='under', data=['reactive'])
     dp.run(save_data=True, verbose=True)
     # print(f'X_winTest shape = {dp.X_winTest[0].shape})')
     # print(f'X_test shape = {dp.X_test.shape}')

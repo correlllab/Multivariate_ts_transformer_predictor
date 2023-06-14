@@ -8,7 +8,9 @@ __pycache__/
 .idea/
 
 # Data for eval
+data/
 data/eval_data/
+src/saved_data/
 
 # Data for makespan
 data/makespan_data/
